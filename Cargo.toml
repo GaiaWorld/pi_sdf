@@ -1,0 +1,20 @@
+[package]
+name = "pi_sdf"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+nalgebra = "0.32"
+parry2d = "0.13"
+bytemuck = { version = "1.4", features = [ "derive" ] }
+freetype-sys = { registry = "yn", version = "0.13" }
+pi_wgpu = { registry = "yn", version = "0.1", features = ["use_wgpu"] }
+winit = { registry = "yn", version = "0.27" }
+env_logger = "0.10"
+naga = { version = "0.12", features = ["clone", "glsl-in", "glsl-out"] }
+pollster = "0.3"
+lazy_static = '1.4'
+log = "0.4"
+linked-hash-map = "0.5"
