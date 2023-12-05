@@ -1,159 +1,97 @@
 use std::collections::HashMap;
 
+// use freetype_sys::FT_New_Face;
+// use parry2d::na::ComplexField;
 // use hashlink::LinkedHashMap;
-use parry2d::{
-    bounding_volume::Aabb,
-    math::Vector,
-};
+use parry2d::{bounding_volume::Aabb, math::Vector};
 
+use wasm_bindgen::prelude::wasm_bindgen;
 
 use super::{
     geometry::{
+        aabb::Direction,
         arc::{Arc, ArcEndpoint},
-        arcs::glyphy_arc_list_extents,
         line::Line,
         vector::VectorEXT,
     },
     sdf::glyphy_sdf_from_arc_list,
     util::{is_inf, GLYPHY_INFINITY},
 };
-use crate::{glyphy::geometry::aabb::AabbEXT, Point};
-use crate::glyphy::geometry::point::PointExt;
+use crate::glyphy::geometry::aabb::AabbEXT;
+use crate::Point;
 
-const MAX_GRID_SIZE: f32 = 63.0;
+pub const MAX_GRID_SIZE: f32 = 63.0;
 
 const GLYPHY_MAX_D: f32 = 0.5;
 
 const MAX_X: f32 = 4095.;
 const MAX_Y: f32 = 4095.;
 
+#[wasm_bindgen(getter_with_clone)]
 #[derive(Clone, Debug)]
 pub struct UnitArc {
-    pub(crate) offset: usize, // 此单元（去重后）在数据纹理中的 像素偏移（不是字节偏移）；
+    pub offset: usize, // 此单元（去重后）在数据纹理中的 像素偏移（不是字节偏移）；
 
-    pub(crate) sdf: f32, // 方格中心对应的sdf
+    pub sdf: f32, // 方格中心对应的sdf
 
-    pub(crate) show: String, // 用于Canvas显示的字符串
+    pub show: String, // 用于Canvas显示的字符串
 
-    pub(crate) data: Vec<ArcEndpoint>,
+    pub data: Vec<ArcEndpoint>,
 
-    pub(crate) origin_data: Vec<ArcEndpoint>, // 原始数据, 用于显示 点 (因为data 对 1, 0 做了优化)
+    pub origin_data: Vec<ArcEndpoint>, // 原始数据, 用于显示 点 (因为data 对 1, 0 做了优化)
 }
-
-// #[wasm_bindgen]
-#[derive(Debug)]
+#[wasm_bindgen]
+#[derive(Debug, Clone)]
 pub struct BlobArc {
-    cell_size: f32,
+    pub cell_size: f32,
 
     pub width_cells: f32,
     pub height_cells: f32,
-
+    #[wasm_bindgen(skip)]
     pub tex_data: Option<TexData>,
 
     // 显示
-    show: String,
+    pub(crate) show: String,
 
-    pub extents: Aabb,
-    data: Vec<Vec<UnitArc>>,
+    pub(crate) extents: Aabb,
+    #[wasm_bindgen(skip)]
+    pub data: Vec<Vec<UnitArc>>,
     pub avg_fetch_achieved: f32,
+    pub(crate) endpoints: Vec<ArcEndpoint>,
 }
 
-// impl 
+#[wasm_bindgen]
+pub struct Extents {
+    pub min_x: f32,
+    pub min_y: f32,
+    pub max_x: f32,
+    pub max_y: f32,
+}
 
-/**
- * 找 距离 cell 最近的 圆弧，放到 near_endpoints 返回
- * Uses idea that all close arcs to cell must be ~close to center of cell.
- * @returns {f32} 1 外；-1 内
- */
-pub fn closest_arcs_to_cell(
-    // cell 坐标
-    _cx: f32,
-    _cy: f32,
+#[wasm_bindgen]
+impl BlobArc {
+    pub fn get_unit_arc(&self, i: u32, j: u32) -> UnitArc {
+        self.data[i as usize][j as usize].clone()
+    }
 
-    // cell 的 左上 和 右下 顶点 坐标
-    c0: Point,
-    c1: Point, /* corners */
-    // 近距离的判断
-    faraway: f32,
-
-    _enlighten_max: f32,
-    _embolden_max: f32,
-
-    // 改字体 所有的 圆弧
-    endpoints: &Vec<ArcEndpoint>,
-    // 每条曲线起始索引
-    loop_start_indies: &Vec<usize>,
-
-    // 输出参数
-    near_endpoints: &mut Vec<ArcEndpoint>,
-) -> (f32, Vec<ArcEndpoint>) {
-    let num_endpoints = endpoints.len();
-
-    // This can be improved:
-    // let synth_max = enlighten_max.max(embolden_max);
-    // faraway = faraway.max(synth_max);
-
-    // cell 的 中心
-    let c = c0.midpoint(&c1);
-    // 所有的 圆弧到 中心 的 距离
-    let (mut min_dist, start_index) = glyphy_sdf_from_arc_list(endpoints, c);
-
-    let side = if min_dist >= 0.0 { 1 } else { -1 };
-    min_dist = min_dist.abs();
-    let mut near_arcs = vec![];
-
-    // 最近的意思：某个半径的 圆内
-    let half_diagonal = (c - c0).norm();
-
-    // let added = half_diagonal;
-    // let added = min_dist + half_diagonal + synth_max;
-
-    let radius_squared = half_diagonal * half_diagonal;
-
-    if min_dist - half_diagonal <= faraway {
-        let mut p0 = Point::new(0., 0.);
-        for i in 0..num_endpoints {
-            let endpoint = &endpoints[i];
-            if endpoint.d == GLYPHY_INFINITY {
-                p0 = endpoint.p;
-                continue;
-            }
-            let arc = Arc::new(p0, endpoint.p, endpoint.d);
-            p0 = endpoint.p;
-
-            if arc.squared_distance_to_point(c) <= radius_squared {
-                near_arcs.push(arc);
-            }
+    pub fn get_extents(&self) -> Extents {
+        Extents {
+            max_x: self.extents.maxs.x,
+            max_y: self.extents.maxs.y,
+            min_x: self.extents.mins.x,
+            min_y: self.extents.mins.y,
         }
     }
 
-    let mut _p1 = Point::new(0.0, 0.);
-    for i in 0..near_arcs.len() {
-        let arc = &near_arcs[i];
-
-        if i == 0 || !_p1.equals(&arc.p0) {
-            let endpoint = ArcEndpoint::new(arc.p0.x, arc.p0.y, GLYPHY_INFINITY);
-            near_endpoints.push(endpoint);
-            _p1 = arc.p0;
-        }
-
-        let endpoint = ArcEndpoint::new(arc.p1.x, arc.p1.y, arc.d);
-        near_endpoints.push(endpoint);
-        _p1 = arc.p1;
+    pub fn get_endpoints_len(&self) -> usize {
+        self.endpoints.len()
     }
 
-
-    // 全外 或者 全内 时
-    let mut effect_endpoints: Vec<ArcEndpoint> = vec![];
-    if near_arcs.len() == 0 {
-        let [loop_start, loop_end] = get_loop_idnex(start_index, loop_start_indies);
-        effect_endpoints =
-            choose_best_arcs(start_index, loop_start, loop_end, endpoints, side, c0, c1);
-    //   println!("loop_start: {}, loop_end: {}, effect_endpoints: {}, loop_start_indies: {:?}, start_index: {}", loop_start, loop_end, effect_endpoints.len(), loop_start_indies, start_index);
+    pub fn get_endpoint(&self, index: usize) -> ArcEndpoint {
+        self.endpoints[index].clone()
     }
-
-    return (side as f32 * min_dist, effect_endpoints);
 }
+
 
 // 取 index 所在的 循环的 起始和结束索引
 // loop_start_indies 的 第一个 元素 肯定是 0
@@ -312,8 +250,8 @@ pub fn get_prev_index(mut index: usize, loop_start: usize, loop_end: usize) -> u
     return index as usize;
 }
 
-// 正方形的四个角落是否 全部 在 给定圆弧的 外面/里面
-// 返回有几个点的 符号 和 sdf_sign 相同
+/// 正方形的四个角落是否 全部 在 给定圆弧的 外面/里面
+/// 返回有几个点的 符号 和 sdf_sign 相同
 pub fn is_quad_same_sign(
     cp0: Point,
     cp1: Point,
@@ -343,253 +281,10 @@ pub fn is_point_same_sign(point: Point, endpoints: &Vec<ArcEndpoint>, sdf_sign: 
 
     return v == sdf_sign;
 }
-// // 一
-pub fn glyphy_arc_list_encode_blob2(
-    endpoints: &Vec<ArcEndpoint>, // 字形的所有圆弧
-    mut faraway: f32, // font.units_per_EM  / (10.0 * 2.0f32.sqrt()); font.units_per_EM 为 2048
-    grid_unit: f32, // (endpoints.len() as f32 / 4 as f32).ceil(); 当值小于20时为20; 再用 font.units_per_EM 除以值
-    enlighten_max: f32, //  font.units_per_EM / 0.0001
-    embolden_max: f32, //  font.units_per_EM / 0.0001
-    pextents: &mut Aabb,
-) -> BlobArc {
-    let mut extents = Aabb::new_invalid();
-
-    // 取字形里每条线段的起始索引
-    let mut loop_start_indies = [].to_vec();
-    for i in 0..endpoints.len() {
-        let ep = &endpoints[i];
-        if ep.d == GLYPHY_INFINITY {
-            loop_start_indies.push(i);
-        }
-    }
-    // 最后一个是用于 回环的 哨兵
-    loop_start_indies.push(endpoints.len());
-
-    // 取圆弧的包围盒
-    glyphy_arc_list_extents(&endpoints, &mut extents);
-
-    if extents.is_empty() {
-        // 不可显示 字符，比如 空格，制表符 等
-        pextents.set(&extents);
-
-        return BlobArc {
-            width_cells: 1.0,
-            height_cells: 1.0,
-            cell_size: 1.0,
-
-            show: "".to_owned(),
-
-            tex_data: None,
-
-            extents: extents.clone(),
-            data: vec![],
-            avg_fetch_achieved: 0.0,
-        };
-    }
-
-    // 添加 抗锯齿的 空隙
-    extents.mins.x -= faraway + embolden_max;
-    extents.mins.y -= faraway + embolden_max;
-    extents.maxs.x += faraway + embolden_max;
-    extents.maxs.y += faraway + embolden_max;
-
-    let mut glyph_width = extents.maxs.x - extents.mins.x;
-    let mut glyph_height = extents.maxs.y - extents.mins.y;
-    let unit = glyph_width.max(glyph_height);
-
-    // 字符 的 glyph 被分成 grid_w * grid_h 个 格子
-    let grid_w = MAX_GRID_SIZE.min((glyph_width / grid_unit).ceil());
-    let grid_h = MAX_GRID_SIZE.min((glyph_height / grid_unit).ceil());
-
-    if glyph_width > glyph_height {
-        glyph_height = grid_h * unit / grid_w;
-        extents.maxs.y = extents.mins.y + glyph_height;
-    } else {
-        glyph_width = grid_w * unit / grid_h;
-        extents.maxs.x = extents.mins.x + glyph_width;
-    }
-
-    let cell_unit = unit / grid_w.max(grid_h);
-
-    // 每个 格子的 最近的 圆弧
-    let mut near_endpoints: Vec<ArcEndpoint> = vec![];
-
-    let origin = Point::new(extents.mins.x, extents.mins.y);
-    // println!("======== extents: {:?}, glyph_width: {}, glyph_height: {}", extents, glyph_width, glyph_height);
-    let total_arcs = 0;
-    let synth_max = enlighten_max.max(embolden_max);
-    faraway = faraway.max(synth_max);
-
-    // c 第一个网格的中心
-    let c = Point::new(
-        extents.mins.x + glyph_width * 0.5,
-        extents.mins.y + glyph_height * 0.5,
-    );
-
-    let begin = std::time::Instant::now();
-    let mut result_arcs = vec![];
-    for row in 0..grid_h as i32 {
-        let mut row_arcs = vec![
-            UnitArc {
-                offset: 0,
-                sdf: 0.0,
-                show: "".to_owned(),
-                data: vec![],
-                origin_data: vec![],
-            };
-            grid_w as usize
-        ];
-        for col in 0..grid_w as i32 {
-            let unit_arc = &mut row_arcs[col as usize];
-
-            let cp0 = origin.add_vector(&Vector::new(
-                (col as f32 + 0.0) * cell_unit,
-                (row as f32 + 0.0) * cell_unit,
-            ));
-            let cp1 = origin.add_vector(&Vector::new(
-                (col as f32 + 1.0) * cell_unit,
-                (row as f32 + 1.0) * cell_unit,
-            ));
-            // println!("2row: {}, col: {}", row, col);
-            // println!("======= cp0: {:?}, cp1: {:?}, cell_unit: {}", cp0, cp1, cell_unit);
-
-            near_endpoints.clear();
-
-            if col == 20 && row == 0 {
-                log::warn!(
-                    "col: {}, row: {}, cp0: {}, {}, cp1: {}, {}",
-                    col,
-                    row,
-                    cp0.x,
-                    cp0.y,
-                    cp1.x,
-                    cp1.y
-                )
-            }
-
-            // 判断 每个 格子 最近的 圆弧
-            let (sdf, effect_endpoints) = closest_arcs_to_cell(
-                col as f32,
-                row as f32,
-                cp0,
-                cp1,
-                faraway,
-                enlighten_max,
-                embolden_max,
-                endpoints,
-                &loop_start_indies,
-                &mut near_endpoints,
-            );
-            // println!("near_endpoints: {}", near_endpoints.len());
-            unit_arc.sdf = sdf;
-
-            if near_endpoints.len() == 0 {
-                near_endpoints = effect_endpoints;
-            }
-
-            // 线段，终点的 d = 0
-            if near_endpoints.len() == 2 && near_endpoints[1].d == 0.0 {
-                // unit_arc.data.push(near_endpoints[0]);
-                // unit_arc.data.push(near_endpoints[1]);
-
-                let start = &near_endpoints[0];
-                let end = &near_endpoints[1];
-
-                let mut line = Line::from_points(
-                    snap(&start.p, &extents, glyph_width, glyph_height),
-                    snap(&end.p, &extents, glyph_width, glyph_height),
-                );
-
-                // Shader的最后 要加回去
-                line.c -= line.n.dot(&c.into_vector());
-                // shader 的 decode 要 乘回去
-                line.c /= unit;
-
-                let line_key = get_line_key(&near_endpoints[0], &near_endpoints[1]);
-                let le = line_encode(line);
-
-                let mut line_data = ArcEndpoint::new(0.0, 0.0, 0.0);
-                line_data.line_key = Some(line_key);
-                line_data.line_encode = Some(le);
-
-                unit_arc.data.push(line_data);
-                // println!("1row: {}, col: {} line_data: {:?}n \n", row, col, unit_arc.data.len());
-                unit_arc.origin_data.push(start.clone());
-                unit_arc.origin_data.push(end.clone());
-
-                continue;
-            }
-
-            // If the arclist is two arcs that can be combined in encoding if reordered, do that.
-            if near_endpoints.len() == 4
-                && is_inf(near_endpoints[2].d)
-                && near_endpoints[0].p.x == near_endpoints[3].p.x
-                && near_endpoints[0].p.y == near_endpoints[3].p.y
-            {
-                let e0 = near_endpoints[2].clone();
-                let e1 = near_endpoints[3].clone();
-                let e2 = near_endpoints[1].clone();
-
-                near_endpoints.clear();
-                near_endpoints.push(e0);
-                near_endpoints.push(e1);
-                near_endpoints.push(e2);
-            }
-
-            // 编码到纹理：该格子 对应 的 圆弧数据
-            for i in 0..near_endpoints.len() {
-                let endpoint = near_endpoints[i].clone();
-                unit_arc.data.push(endpoint);
-            }
-            // println!("cp0: {}, cp1: {} data: {:?}\n", cp0, cp1, unit_arc.data);
-            // row_arcs.push(unit_arc);
-        }
-        result_arcs.push(row_arcs);
-    }
-    println!("closest_arcs_to_cell: {:?}", begin.elapsed());
-    pextents.set(&extents);
-
-    let mut data = BlobArc {
-        cell_size: cell_unit,
-        width_cells: grid_w,
-        height_cells: grid_h,
-
-        show: "".to_owned(),
-
-        tex_data: None,
-
-        data: result_arcs,
-        extents: extents.clone(),
-        avg_fetch_achieved: 1. + total_arcs as f32 / (grid_w * grid_h),
-    };
-
-    // println!("result_arcs: {:?}", result_arcs);
-
-    let [min_sdf, max_sdf] = travel_data(&data);
 
 
-
-    data.show.push_str(&format!(
-        "<br> 格子数：宽 = {}, 高 = {} <br>",
-        grid_w, grid_h
-    ));
-    let begin = std::time::Instant::now();
-    data.tex_data = Some(encode_to_tex(
-        &mut data,
-        extents,
-        glyph_width,
-        glyph_height,
-        grid_w,
-        grid_h,
-        min_sdf,
-        max_sdf,
-    ));
-    println!("数据编码 {:?}", begin.elapsed());
-    return data;
-}
-
-// #[wasm_bindgen]
-#[derive(Debug)]
+#[wasm_bindgen(getter_with_clone)]
+#[derive(Debug, Clone)]
 pub struct TexData {
     pub index_tex: Vec<u8>, // 字节数 = 2 * 像素个数
     pub data_tex: Vec<u8>,  // 字节数 = 4 * 像素个数
@@ -634,7 +329,7 @@ pub fn encode_to_tex(
     let sdf_step = sdf_range / level as f32;
 
     // 2 * grid_w * grid_h 个 Uint8
-    let mut indiecs = vec![];
+    let mut indiecs: Vec<f32> = vec![];
     for i in 0..data.data.len() {
         let row = &mut data.data[i];
         for j in 0..row.len() {
@@ -654,7 +349,6 @@ pub fn encode_to_tex(
 
                 let offset = map_arc_data.offset;
                 let sdf = unit_arc.sdf;
-                // println!("unit_arc.sdf: {}", unit_arc.sdf);
 
                 let cell_size = data.cell_size;
                 let is_interval = sdf.abs() <= cell_size * 0.5f32.sqrt();
@@ -816,7 +510,7 @@ pub fn decode_from_uint16(value: f32, max_offset: f32, min_sdf: f32, sdf_step: f
     return Res {
         is_interval,
         num_points,
-        _sdf,
+         _sdf,
         offset,
     };
 }
@@ -856,38 +550,20 @@ pub fn encode_data_tex(
 
     let mut before_size = 0;
 
-    let mut keys: Vec<String> = vec![];
     for row in &data.data {
         for unit_arc in row {
             let key = get_key(&unit_arc);
             before_size += unit_arc.data.len();
             if key.len() > 0 {
-                // let r = unit_arc.clone();
-                map.insert(key.clone(), unit_arc.clone());
-                if keys.iter().find(|v| **v == key).is_none() {
-                    keys.push(key);
-                }
+                map.insert(key, unit_arc.clone());
             }
         }
     }
 
-    // let mut after_size = 0;
-    // for value in map.values() {
-    //     after_size += value.data.len();
-    // }
-
     let mut r = vec![];
 
-    // console.warn(`map size = ${map.size}, before_size = ${before_size}, after_size = ${after_size}, ratio = ${after_size / before_size}`)
-
-    for key in &keys {
-    // for v in map.values_mut() {
-        let unit_arc = map.get_mut(key).unwrap();
-        // let unit_arc = v;
-        // if (unit_arc.is_none()) {
-        //     panic!("unit_arc is null");
-        // }
-        // let unit_arc = unit_arc.unwrap();
+    for v in map.values_mut() {
+        let unit_arc = v;
 
         unit_arc.offset = r.len() / 4;
 
@@ -1056,4 +732,196 @@ pub fn line_decode(encoded: [f32; 4], nominal_size: [f32; 2]) -> Line {
     let n = Vector::new(angle.cos(), angle.sin());
 
     return Line::from_normal_d(n, d * scale);
+}
+
+// 判断 每个 格子 最近的 圆弧
+pub fn recursion_near_arcs_of_cell<'a>(
+    extents: &Aabb,
+    cell: &Aabb,
+    arcs: &Vec<&'static Arc>,
+    min_width: &mut f32,
+    min_height: &mut f32,
+    top_near: Option<Vec<&'static Arc>>,
+    bottom_near: Option<Vec<&'static Arc>>,
+    left_near: Option<Vec<&'static Arc>>,
+    right_near: Option<Vec<&'static Arc>>,
+    result_arcs: &mut Vec<(Vec<&'a Arc>, Aabb)>,
+) {
+    let cell_width = cell.width();
+    let cell_height = cell.height();
+    if *min_width > cell_width {
+        *min_width = cell_width;
+    }
+
+    if *min_height > cell_height {
+        *min_height = cell_height;
+    }
+
+    let (near_arcs, top_near, bottom_near, left_near, right_near) =
+        compute_near_arc(cell, arcs, top_near, bottom_near, left_near, right_near);
+
+    let glyph_width = extents.width();
+    let glyph_height = extents.height();
+    // println!("cell_width: {}, glyph_width: {}", cell_width, glyph_width);
+    if near_arcs.len() <= 2
+        || (cell_width * 32.0 - glyph_width).abs() < 0.1
+            && (cell_height * 32.0 - glyph_height).abs() < 0.1
+    {
+        // println!("======= cell");
+        result_arcs.push((near_arcs, cell.clone()));
+    } else {
+        let (
+            (cell1, cell2),
+            (top_near1, bottom_near1, left_near1, right_near1),
+            (top_near2, bottom_near2, left_near2, right_near2),
+        ) = if cell_width > cell_height && cell_width * 32.0 > glyph_width {
+            (
+                cell.half(Direction::Col),
+                (None, None, Some(left_near), None),
+                (None, None, None, Some(right_near)),
+            )
+        } else {
+            (
+                cell.half(Direction::Row),
+                (Some(top_near), None, None, None),
+                (None, Some(bottom_near), None, None),
+            )
+        };
+        // println!("cell1: {:?}, cell2: {:?}, cell: {:?}", cell1, cell2, cell);
+        recursion_near_arcs_of_cell(
+            extents,
+            &cell1,
+            &near_arcs,
+            min_width,
+            min_height,
+            top_near1,
+            bottom_near1,
+            left_near1,
+            right_near1,
+            result_arcs,
+        );
+        recursion_near_arcs_of_cell(
+            extents,
+            &cell2,
+            &near_arcs,
+            min_width,
+            min_height,
+            top_near2,
+            bottom_near2,
+            left_near2,
+            right_near2,
+            result_arcs,
+        );
+    }
+}
+
+fn compute_near_arc(
+    cell: &Aabb,
+    arcs: &Vec<&'static Arc>,
+    mut top_near: Option<Vec<&'static Arc>>,
+    mut bottom_near: Option<Vec<&'static Arc>>,
+    mut left_near: Option<Vec<&'static Arc>>,
+    mut right_near: Option<Vec<&'static Arc>>,
+) -> (
+    Vec<&'static Arc>,
+    Vec<&'static Arc>,
+    Vec<&'static Arc>,
+    Vec<&'static Arc>,
+    Vec<&'static Arc>,
+) {
+    let c = cell.center();
+    // 最近的意思：某个半径的 圆内
+    let radius_squared = cell.half_extents().norm_squared();
+
+    let mut near_arcs: Vec<&'static Arc> = vec![];
+    for arc in arcs {
+        if arc.squared_distance_to_point(c) <= radius_squared {
+            near_arcs.push(*arc);
+        }
+    }
+    // println!("near_arcs: {:?}", near_arcs);
+    let row_area = cell.near_area(Direction::Row);
+
+    let top_near = if let Some(near) = top_near.take() {
+        near
+    } else {
+        let mut top_near = vec![];
+        let top_segment = cell.bound(Direction::Top);
+        row_area.near_arcs(arcs, &top_segment, &mut top_near);
+        top_near
+    };
+
+    let bottom_near = if let Some(near_arcs) = bottom_near.take() {
+        near_arcs
+    } else {
+        let mut near_arcs = vec![];
+        let bottom_segment = cell.bound(Direction::Bottom);
+        row_area.near_arcs(arcs, &bottom_segment, &mut near_arcs);
+        near_arcs
+    };
+
+    let col_area = cell.near_area(Direction::Col);
+
+    let left_near = if let Some(near_arcs) = left_near.take() {
+        near_arcs
+    } else {
+        let mut near_arcs = vec![];
+        let left_segment = cell.bound(Direction::Left);
+        col_area.near_arcs(arcs, &left_segment, &mut near_arcs);
+        near_arcs
+    };
+
+    let right_near = if let Some(near_arcs) = right_near.take() {
+        near_arcs
+    } else {
+        let mut near_arcs = vec![];
+        let right_segment = cell.bound(Direction::Right);
+        col_area.near_arcs(arcs, &right_segment, &mut near_arcs);
+        near_arcs
+    };
+
+    near_arcs.extend(&top_near);
+    near_arcs.extend(&bottom_near);
+    near_arcs.extend(&left_near);
+    near_arcs.extend(&right_near);
+    // println!("near_arcs22222222: {}", near_arcs.len());
+    near_arcs.sort_by(|a, b| a.id.cmp(&b.id));
+
+    near_arcs.dedup_by(|a, b| a.id == b.id);
+    (near_arcs, top_near, bottom_near, left_near, right_near)
+}
+
+#[test]
+fn test1() {
+    // let arcs = vec![
+    //     Arc::new(Point::new(32.0, 865.0), Point::new(2020.0, 865.0), 0.0),
+    //     Arc::new(Point::new(2020.0, 865.0), Point::new(2020.0, 689.0), 0.0),
+    //     Arc::new(Point::new(2020.0, 689.0), Point::new(32.0, 689.0), 0.0),
+    //     Arc::new(Point::new(32.0, 689.0), Point::new(32.0, 865.0), 0.0),
+    // ];
+    // let a = vec![
+    //     unsafe { std::mem::transmute(&arcs[0]) },
+    //     unsafe { std::mem::transmute(&arcs[1]) },
+    //     unsafe { std::mem::transmute(&arcs[2]) },
+    //     unsafe { std::mem::transmute(&arcs[3]) },
+    // ];
+
+    // let cell = Aabb::new(Point::new(1957.875, 689.0), Point::new(2020.0, 694.5));
+    // let mut r = vec![];
+    // let mut min_w = f32::INFINITY;
+    // let mut min_h = f32::INFINITY;
+
+    // recursion_near_arcs_of_cell(&cell, &cell, &a, &mut min_w, &mut min_h, &mut r);
+
+    // let row_area = cell.near_area(Direction::Row);
+
+    // let mut top_near_arcs = vec![];
+    // let top_segment = cell.bound(Direction::Top);
+    // println!("top_segment: {:?}", top_segment);
+    // row_area.near_arcs(&a, &top_segment, &mut top_near_arcs);
+    // println!("top_near_arcs: {:?}", top_near_arcs.len());
+    let mut v1 = vec![1, 2, 3];
+    let v2 = vec![4, 5, 6];
+    v1.extend(&v2);
+    println!("v1:{:?}, v2:{:?}", v1, v2);
 }

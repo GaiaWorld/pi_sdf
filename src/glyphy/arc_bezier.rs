@@ -88,7 +88,7 @@ pub fn approximate_bezier_arc_error(
 
     let tan_v = v.x / v.y;
 
-    let mut eb = 0.0;
+    let mut _eb = 0.0;
     if tan_v.abs() <= tan_half_alpha {
         return ea.value + v.norm();
     }
@@ -96,10 +96,10 @@ pub fn approximate_bezier_arc_error(
     let c2 = (a.p1 - a.p0).norm() * 0.5;
     let r = a.radius();
 
-    eb = Vector::new(c2 + v.x, c2 / tan_half_alpha + v.y).norm() - r;
-    assert!(eb >= 0.0);
+    _eb = Vector::new(c2 + v.x, c2 / tan_half_alpha + v.y).norm() - r;
+    assert!(_eb >= 0.0);
 
-    return ea.value + eb;
+    return ea.value + _eb;
 }
 
 // export class ArcBezierApproximatorMidpointSimple
@@ -180,7 +180,7 @@ impl ArcBezierApproximatorQuantized {
             // println!("a.d.abs(): {}, self.max_d: {}", a.d.abs(), self.max_d);
             assert!(a.d.abs() <= self.max_d);
 
-            let v = 1;
+            let _v = 1;
             let mult = (1 << (self.d_bits - 1) as u32) - 1;
             let id = (a.d / self.max_d * mult as f32).round();
             assert!(-mult as f32 <= id && id <= mult as f32);
@@ -204,7 +204,7 @@ impl ArcBezierApproximatorQuantized {
             /* Try a simple one-arc approx which works with the quantized arc.
             	* May produce smaller error bound. */
             let e = approximate_bezier_arc_error(&b, &a);
-            if (e < error.value) {
+            if e < error.value {
                 error.value = e;
             }
         }

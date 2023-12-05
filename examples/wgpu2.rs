@@ -1,13 +1,12 @@
-use parry2d::na::{self, Vector3};
+use parry2d::na::{Orthographic3, Matrix4, Vector3};
+use pi_sdf::{utils::FontFace, glyphy_draw2::get_char_arc, glyphy::vertex::{GlyphInfo, add_glyph_vertices}};
 use tracing::Level;
 use tracing_subscriber::fmt::Subscriber;
 
-// use nalgebra::Vector3;
-use pi_sdf::{
-    glyphy::vertex::{add_glyph_vertices, GlyphInfo},
-    glyphy_draw::get_char_arc,
-    utils::FontFace,
-};
+use env_logger::Env;
+
+
+
 use pi_wgpu as wgpu;
 use wgpu::{util::DeviceExt, BlendState, ColorTargetState};
 use winit::{
@@ -74,8 +73,6 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     let buffer = std::fs::read("./source/msyh.ttf").unwrap();
     let mut ft_face = FontFace::new(buffer);
 
-    // let time = std::time::Instant::now();
-
     let mut gi = GlyphInfo::new();
     let arcs = get_char_arc(&mut gi, &mut ft_face, '魔', None);
 
@@ -88,7 +85,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     // println!("time:{:?}", time.elapsed());
 
     let char_size = 64.0;
-    let mut world_matrix = na::Matrix4::<f32>::identity();
+    let mut world_matrix = Matrix4::<f32>::identity();
     world_matrix =
         world_matrix.append_nonuniform_scaling(&Vector3::<f32>::new(char_size, char_size, 1.0));
     world_matrix = world_matrix.append_translation(&Vector3::<f32>::new(25.0, 120.0, 0.0));
@@ -100,7 +97,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         usage: wgpu::BufferUsages::UNIFORM,
     });
 
-    let view_matrix = na::Matrix4::<f32>::identity();
+    let view_matrix = Matrix4::<f32>::identity();
     let view_matrix_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Index Buffer"),
         contents: bytemuck::cast_slice(view_matrix.as_slice()),
@@ -108,7 +105,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     });
     println!("view_matrix.as_slice(): {:?}", view_matrix.as_slice());
 
-    let proj_matrix = na::Orthographic3::<f32>::new(
+    let proj_matrix = Orthographic3::<f32>::new(
         0.0,
         window_size.width as f32,
         0.0,
@@ -267,10 +264,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
     println!(
         "tex.index_tex: {:?}, tex.grid_w: {}, tex.grid_h:{}, tex.index_tex len: {}",
-        &tex.index_tex,
-        tex.grid_w,
-        tex.grid_h,
-        tex.index_tex.len()
+        &tex.index_tex, tex.grid_w, tex.grid_h, tex.index_tex.len()
     );
 
     let index_texture_view = index_texture.create_view(&wgpu::TextureViewDescriptor::default());
@@ -536,7 +530,7 @@ fn main() {
     // let window = winit::window::Window::new(&event_loop).unwrap();
     #[cfg(not(target_arch = "wasm32"))]
     {
-        // env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
+        env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
         pollster::block_on(run(event_loop, window));
     }
     #[cfg(target_arch = "wasm32")]

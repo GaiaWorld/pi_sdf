@@ -3,7 +3,6 @@
  */
 
 use parry2d::bounding_volume::Aabb;
-use parry2d::math::Point;
 
 use super::aabb::AabbEXT;
 use super::arc::{Arc, ArcEndpoint, ErrorValue};
@@ -14,13 +13,14 @@ use crate::glyphy::arc_bezier::{
 };
 use crate::glyphy::geometry::point::PointExt;
 use crate::glyphy::util::{is_zero, GLYPHY_INFINITY, GLYPHY_MAX_D};
+use crate::Point;
 
 pub struct GlyphyArcAccumulator {
     pub(crate) tolerance: f32,
     pub(crate) max_d: f32,
     pub(crate) d_bits: i32,
-    pub(crate) start_point: Point<f32>,
-    pub(crate) current_point: Point<f32>,
+    pub(crate) start_point: Point,
+    pub(crate) current_point: Point,
     pub(crate) need_moveto: bool,
     pub(crate) num_endpoints: f32,
     pub(crate) max_error: f32,
@@ -57,14 +57,14 @@ impl GlyphyArcAccumulator {
     }
 
     // d = inf，就是 移动点
-    pub fn move_to(&mut self, p: Point<f32>) {
+    pub fn move_to(&mut self, p: Point) {
         if self.num_endpoints != 0.0 || !p.equals(&self.current_point) {
             self.accumulate(p, GLYPHY_INFINITY);
         }
     }
 
     // d = 0 就是 线段
-    pub fn line_to(&mut self, p1: Point<f32>) {
+    pub fn line_to(&mut self, p1: Point) {
         self.arc_to(p1, 0.0)
     }
 
@@ -84,7 +84,7 @@ impl GlyphyArcAccumulator {
     //	 + Q2 = 1 / 3 * P2 + 2 / 3 * P1
     //	 + Q3 = P2
     //
-    pub fn conic_to(&mut self, p1: Point<f32>, p2: Point<f32>) {
+    pub fn conic_to(&mut self, p1: Point, p2: Point) {
         let b = Bezier::new(
             self.current_point,
             self.current_point.lerp(&p1, 2. / 3.),
@@ -95,7 +95,7 @@ impl GlyphyArcAccumulator {
     }
 
     // 3次 贝塞尔曲线，用 圆弧 拟合
-    pub fn cubic_to(&mut self, p1: Point<f32>, p2: Point<f32>, p3: Point<f32>) {
+    pub fn cubic_to(&mut self, p1: Point, p2: Point, p3: Point) {
         let b = Bezier::new(self.current_point, p1, p2, p3);
         self.bezier(b);
     }
@@ -106,7 +106,7 @@ impl GlyphyArcAccumulator {
         }
     }
 
-    pub fn emit(&mut self, p: Point<f32>, d: f32) {
+    pub fn emit(&mut self, p: Point, d: f32) {
         let endpoint = ArcEndpoint::new(p.x, p.y, d);
         self.result.push(endpoint);
 
@@ -114,7 +114,7 @@ impl GlyphyArcAccumulator {
         self.current_point = p;
     }
 
-    pub fn accumulate(&mut self, p: Point<f32>, d: f32) {
+    pub fn accumulate(&mut self, p: Point, d: f32) {
         if p.equals(&self.current_point) {
             return;
         }
@@ -133,7 +133,7 @@ impl GlyphyArcAccumulator {
         self.emit(p, d);
     }
 
-    pub fn arc_to(&mut self, p1: Point<f32>, d: f32) {
+    pub fn arc_to(&mut self, p1: Point, d: f32) {
         self.accumulate(p1, d);
     }
 
@@ -142,8 +142,6 @@ impl GlyphyArcAccumulator {
         let appx = ArcBezierApproximatorQuantized::new(Some(self.max_d), Some(self.d_bits));
 
         // 圆弧 拟合 贝塞尔 的 主要实现
-        // let inner =  ArcsBezierApproximatorSpringSystem;
-
         let mut arcs = vec![];
         let e = ArcsBezierApproximatorSpringSystem::approximate_bezier_with_arcs(
             &b,
@@ -195,8 +193,8 @@ impl ArcsBezierApproximatorSpringSystem {
         appx: &ArcBezierApproximatorQuantizedDefault,
         e: &mut Vec<f32>,
         arcs: &mut Vec<Arc>,
-        mut max_e: f32,
-        mut min_e: f32,
+        mut _max_e: f32,
+        mut _min_e: f32,
     ) -> [f32; 2] {
         let n = t.len() - 1;
 
@@ -204,8 +202,8 @@ impl ArcsBezierApproximatorSpringSystem {
         // println!("e.len: {}", e.len());
         arcs.clear();
 
-        max_e = 0.0;
-        min_e = GLYPHY_INFINITY;
+        _max_e = 0.0;
+        _min_e = GLYPHY_INFINITY;
 
         for i in 0..n {
             let segment = b.segment(t[i], t[i + 1]);
@@ -219,11 +217,11 @@ impl ArcsBezierApproximatorSpringSystem {
             // println!("n: {}", n);
             e[i] = temp.value;
 
-            max_e = max_e.max(e[i]);
-            min_e = min_e.min(e[i]);
+            _max_e = _max_e.max(e[i]);
+            _min_e = _min_e.min(e[i]);
         }
 
-        return [min_e, max_e];
+        return [_min_e, _max_e];
     }
 
     pub fn jiggle(
@@ -291,7 +289,7 @@ impl ArcsBezierApproximatorSpringSystem {
             return 0.0;
         }
 
-        let mut t = vec![];
+        let mut _t = vec![];
         let mut e = vec![];
 
         let mut max_e = 0.0;
@@ -300,19 +298,19 @@ impl ArcsBezierApproximatorSpringSystem {
 
         /* Technically speaking we can bsearch for n. */
         for n in 1..max_segments as usize {
-            t = vec![0.0; n + 1];
+            _t = vec![0.0; n + 1];
             for i in 0..n {
-                t[i] = i as f32 / n as f32;
+                _t[i] = i as f32 / n as f32;
             }
-            t[n] = 1.0; // Do self out of the loop to get real 1.0, not .9999999999999998!
+            _t[n] = 1.0; // Do self out of the loop to get real 1.0, not .9999999999999998!
 
-            [min_e, max_e] = Self::calc_arcs(b, &t, appx, &mut e, arcs, max_e, min_e);
+            [min_e, max_e] = Self::calc_arcs(b, &_t, appx, &mut e, arcs, max_e, min_e);
 
-            let mut jiggle = 0.0;
+            let mut _jiggle = 0.0;
             for i in 0..n {
                 if e[i] <= tolerance {
                     [_, min_e, max_e] =
-                        Self::jiggle(b, appx, &mut t, &mut e, arcs, max_e, min_e, tolerance);
+                        Self::jiggle(b, appx, &mut _t, &mut e, arcs, max_e, min_e, tolerance);
                     // n_jiggle += jiggle;
                     break;
                 }

@@ -4,6 +4,7 @@ use parry2d::math::Vector;
 
 pub trait VectorEXT {
     fn sdf_angle(&self) -> f32;
+    /// 逆时针旋转90度
     fn ortho(&self) -> Vector<f32>;
     /**
      * 重建向量

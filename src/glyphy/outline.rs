@@ -1,5 +1,3 @@
-use std::collections::vec_deque;
-
 use parry2d::math::Point;
 
 use crate::glyphy::geometry::{arc::Arc, vector::VectorEXT};
@@ -139,7 +137,7 @@ pub fn even_odd(
     let mut p0 = Point::new(0.0, 0.0);
     for i in 0..num_endpoints {
         let endpoint = &endpoints[i];
-        if (endpoint.d == GLYPHY_INFINITY) {
+        if endpoint.d == GLYPHY_INFINITY {
             p0 = Point::new(endpoint.p.x, endpoint.p.y);
             continue;
         }
@@ -150,7 +148,7 @@ pub fn even_odd(
          * Skip our own contour
          * c_endpoints 是 endpoints 的 切片，而 start_index 是 c_endpoints 起始元素 在 endpoints 中的索引
          */
-        if (i >= start_index && i < start_index + num_c_endpoints) {
+        if i >= start_index && i < start_index + num_c_endpoints {
             continue;
         }
 
@@ -167,23 +165,23 @@ pub fn even_odd(
                  * crossing direction.
                  */
                 let t = arc.tangents();
-                if (s0 == 0 && arc.p0.x < p.x + GLYPHY_EPSILON) {
+                if s0 == 0 && arc.p0.x < p.x + GLYPHY_EPSILON {
                     count += 0.5 * categorize(t.0.y, 0.0) as f32;
                 }
-                if (s1 == 0 && arc.p1.x < p.x + GLYPHY_EPSILON) {
+                if s1 == 0 && arc.p1.x < p.x + GLYPHY_EPSILON {
                     count += 0.5 * categorize(t.1.y, 0.0) as f32;
                 }
                 continue;
             }
 
-            if (s0 == s1) {
+            if s0 == s1 {
                 continue; // Segment fully above or below the halfline
             }
 
             // Find x pos that the line segment would intersect the half-line.
             let x = arc.p0.x + (arc.p1.x - arc.p0.x) * ((p.y - arc.p0.y) / (arc.p1.y - arc.p0.y));
 
-            if (x >= p.x - GLYPHY_EPSILON) {
+            if x >= p.x - GLYPHY_EPSILON {
                 continue; // Does not intersect halfline
             }
 
@@ -203,30 +201,30 @@ pub fn even_odd(
                  * If the tangent has y==0, use the other endpoint's
                  * y value to decide which way the arc will be heading.
                  */
-                if (is_zero(t.0.y, None)) {
+                if is_zero(t.0.y, None) {
                     t.0.y = categorize(arc.p1.y, p.y) as f32;
                 }
-                if (is_zero(t.1.y, None)) {
+                if is_zero(t.1.y, None) {
                     t.1.y = -categorize(arc.p0.y, p.y) as f32;
                 }
 
-                if (s0 == 0 && arc.p0.x < p.x + GLYPHY_EPSILON) {
+                if s0 == 0 && arc.p0.x < p.x + GLYPHY_EPSILON {
                     count += 0.5 * categorize(t.0.y, 0.0) as f32;
                 }
-                if (s1 == 0 && arc.p1.x < p.x + GLYPHY_EPSILON) {
+                if s1 == 0 && arc.p1.x < p.x + GLYPHY_EPSILON {
                     count += 0.5 * categorize(t.1.y, 0.0) as f32;
                 }
             }
 
             let c = arc.center();
             let r = arc.radius();
-            if (c.x - r >= p.x) {
+            if c.x - r >= p.x {
                 continue; // No chance
             }
             /* Solve for arc crossing line with y = p.y */
             let y = p.y - c.y;
             let x2 = r * r - y * y;
-            if (x2 <= GLYPHY_EPSILON) {
+            if x2 <= GLYPHY_EPSILON {
                 continue; // Negative delta, no crossing
             }
             let dx = x2.sqrt();
@@ -237,10 +235,10 @@ pub fn even_odd(
             for i in 0..pp.len() {
                 /* Make sure we don't double-count endpoints that fall on the
                  * halfline as we already accounted for those above */
-                if (!pp[i].equals(&arc.p0)
+                if !pp[i].equals(&arc.p0)
                     && !pp[i].equals(&arc.p1)
                     && pp[i].x < p.x - GLYPHY_EPSILON
-                    && arc.wedge_contains_point(&pp[i]))
+                    && arc.wedge_contains_point(&pp[i])
                 {
                     count += 1.0; // Add one for full crossing
                 }
@@ -275,12 +273,12 @@ pub fn process_contour(
         return false;
     }
 
-    if (num_endpoints < 3) {
+    if num_endpoints < 3 {
         log::warn!("Don't expect this");
         return false; // Need at least two arcs
     }
 
-    if (!endpoints[0].p.equals(&endpoints[num_endpoints - 1].p)) {
+    if !endpoints[0].p.equals(&endpoints[num_endpoints - 1].p) {
         log::warn!("Don't expect this");
         return false; // Need a closed contour
     }

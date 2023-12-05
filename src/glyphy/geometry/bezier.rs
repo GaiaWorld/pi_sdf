@@ -1,12 +1,14 @@
+use crate::Point;
+
 use super::{point::PointExt, vector::VectorEXT};
-use parry2d::math::{Point, Vector};
+use parry2d::math::Vector;
 
 #[derive(Debug)]
 pub struct Bezier {
-    pub p0: Point<f32>,
-    pub p1: Point<f32>,
-    pub p2: Point<f32>,
-    pub p3: Point<f32>,
+    pub p0: Point,
+    pub p1: Point,
+    pub p2: Point,
+    pub p3: Point,
 }
 
 // 3次 贝塞尔曲线
@@ -17,7 +19,7 @@ impl Bezier {
      * @param p2 控制点2
      * @param p3 终点
      */
-    pub fn new(p0: Point<f32>, p1: Point<f32>, p2: Point<f32>, p3: Point<f32>) -> Self {
+    pub fn new(p0: Point, p1: Point, p2: Point, p3: Point) -> Self {
         Self { p0, p1, p2, p3 }
     }
 
@@ -25,7 +27,7 @@ impl Bezier {
      * 求 参数t 对应的点
      * @param t 参数
      */
-    pub fn point(&self, t: f32) -> Point<f32> {
+    pub fn point(&self, t: f32) -> Point {
         let p01 = self.p0.lerp(&self.p1, t);
         let p12 = self.p1.lerp(&self.p2, t);
         let p23 = self.p2.lerp(&self.p3, t);
@@ -41,7 +43,7 @@ impl Bezier {
     /**
      * 求 中点
      */
-    pub fn midpoint(&self) -> Point<f32> {
+    pub fn midpoint(&self) -> Point {
         let p01 = self.p0.midpoint(&self.p1);
         let p12 = self.p1.midpoint(&self.p2);
         let p23 = self.p2.midpoint(&self.p3);

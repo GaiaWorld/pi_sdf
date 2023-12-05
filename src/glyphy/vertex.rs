@@ -1,9 +1,11 @@
 use parry2d::{bounding_volume::Aabb, math::Point};
+use wasm_bindgen::prelude::wasm_bindgen;
 
 use super::geometry::aabb::AabbEXT;
 
+#[wasm_bindgen]
 pub struct GlyphInfo {
-    pub (crate) extents: Aabb,
+    pub(crate) extents: Aabb,
 
     // 晶格 的 宽-高
     pub(crate) nominal_w: f32,
@@ -15,6 +17,7 @@ pub struct GlyphInfo {
     atlas_y: f32,
 }
 
+#[wasm_bindgen]
 impl GlyphInfo {
     pub fn new() -> Self {
         Self {
@@ -57,15 +60,15 @@ pub struct GlyphyVertex {
 pub fn add_glyph_vertices(
     gi: &GlyphInfo,
     font_size: Option<f32>, // = 1.0
-    extents:  Option<&mut Aabb>,
-) -> Vec<GlyphyVertex> {
+    extents: Option<&mut Aabb>,
+) -> [GlyphyVertex; 4] {
     let font_size = if let Some(v) = font_size { v } else { 1.0 };
-    let mut r = vec![];
-
-    r.push(encode_corner(0.0, 0.0, gi, font_size));
-    r.push(encode_corner(0.0, 1.0, gi, font_size));
-    r.push(encode_corner(1.0, 0.0, gi, font_size));
-    r.push(encode_corner(1.0, 1.0, gi, font_size));
+    let r = [
+        encode_corner(0.0, 0.0, gi, font_size),
+        encode_corner(0.0, 1.0, gi, font_size),
+        encode_corner(1.0, 0.0, gi, font_size),
+        encode_corner(1.0, 1.0, gi, font_size),
+    ];
 
     if let Some(extents) = extents {
         extents.clear();

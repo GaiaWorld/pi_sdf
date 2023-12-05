@@ -1,14 +1,19 @@
-use parry2d::{
-    bounding_volume::Aabb,
-    math::{Point, Vector},
-};
+use parry2d::{bounding_volume::Aabb, math::Vector, shape::Segment};
+use std::sync::atomic::AtomicU64;
+use std::{ops::Range, sync::atomic::Ordering};
+use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::glyphy::util::{float_equals, xor};
+use crate::Point;
 
 use super::{
-    aabb::AabbEXT, bezier::Bezier, line::Line, point::PointExt, segment::Segment,
+    aabb::AabbEXT, bezier::Bezier, line::Line, point::PointExt, segment::SegmentEXT,
     signed_vector::SignedVector, vector::VectorEXT,
 };
+
+lazy_static! {
+    static ref ID: AtomicU64 = AtomicU64::new(0);
+}
 
 // sin( 2 * atan(d) )
 pub fn sin2atan(d: f32) -> f32 {
@@ -29,25 +34,31 @@ pub struct ErrorValue {
     pub(crate) value: f32,
 }
 
+#[wasm_bindgen(getter_with_clone)]
 #[derive(Debug, Clone)]
 pub struct ArcEndpoint {
-    pub p: Point<f32>,
+    pub(crate) p: Point,
     pub d: f32,
 
     // 线段特殊处理，只有一个值
     pub line_key: Option<String>,
 
-    pub line_encode: Option<[f32; 4]>, // rgba
+    pub(crate) line_encode: Option<[f32; 4]>, // rgba
 }
 
+#[wasm_bindgen]
 impl ArcEndpoint {
     pub fn new(x: f32, y: f32, d: f32) -> Self {
         Self {
             p: Point::new(x, y),
-            d,   
+            d,
             line_key: None,
             line_encode: None,
         }
+    }
+
+    pub fn get_xy(&self) -> Vec<f32> {
+        vec![self.p.x, self.p.y]
     }
 }
 
@@ -63,17 +74,39 @@ impl ArcEndpoint {
 //    d < 0，和 上面 相反
 #[derive(Debug, Clone)]
 pub struct Arc {
-    pub p0: Point<f32>,
-    pub p1: Point<f32>,
+    pub id: u64,
+
+    pub p0: Point,
+    pub p1: Point,
     pub d: f32,
+
+    pub radius: f32,
+    pub center: Point,
+    pub aabb: Aabb,
 }
 
 impl Arc {
     /**
      * 构造函数
      */
-    pub fn new(p0: Point<f32>, p1: Point<f32>, d: f32) -> Self {
-        Self { p0, p1, d }
+    pub fn new(p0: Point, p1: Point, d: f32) -> Self {
+        let mut aabb = Aabb::new_invalid();
+        let id = ID.fetch_add(1, Ordering::Relaxed);
+        let mut arc = Self {
+            id,
+            p0,
+            p1,
+            d,
+            radius: 0.0,
+            center: Point::default(),
+            aabb,
+        };
+        arc.extents(&mut aabb);
+        arc.aabb = aabb;
+        arc.center = arc.center();
+        arc.radius = arc.radius();
+
+        arc
     }
 
     /**
@@ -83,7 +116,7 @@ impl Arc {
      * @param pm 中间点
      * @param complement 是否补弧
      */
-    pub fn from_points(p0: Point<f32>, p1: Point<f32>, pm: Point<f32>, complement: bool) -> Self {
+    pub fn from_points(p0: Point, p1: Point, pm: Point, complement: bool) -> Self {
         let mut arc = Arc::new(p0, p1, 0.0);
         if p0 != pm && p1 != pm {
             let v = p1 - pm;
@@ -108,7 +141,7 @@ impl Arc {
      * @param complement 是否补弧
      */
     pub fn from_center_radius_angle(
-        center: Point<f32>,
+        center: Point,
         radius: f32,
         a0: f32,
         a1: f32,
@@ -159,7 +192,7 @@ impl Arc {
     /**
      * 减去 点
      */
-    pub fn sub(&self, p: Point<f32>) -> SignedVector {
+    pub fn sub(&self, p: Point) -> SignedVector {
         // todo!()
         if self.d.abs() < 1e-5 {
             let arc_segment = Segment::new(self.p0, self.p1);
@@ -202,7 +235,7 @@ impl Arc {
      * 计算圆弧的圆心
      * @returns {Point} 圆弧的圆心
      */
-    pub fn center(&self) -> Point<f32> {
+    pub fn center(&self) -> Point {
         return (self.p0.midpoint(&self.p1)).add_vector(
             &(self.p1 - (self.p0))
                 .ortho()
@@ -234,7 +267,7 @@ impl Arc {
         let result_dp = dp.scale(cos2atan(self.d));
 
         return (
-            result_dp + pp,   // 起点 切线向量，注：没有单位化
+            result_dp + pp, // 起点 切线向量，注：没有单位化
             result_dp - pp, // 终点 切线向量，注：没有单位化
         );
     }
@@ -263,7 +296,7 @@ impl Arc {
      * 包括 圆弧边缘 的 线
      *
      */
-    pub fn wedge_contains_point(&self, p: &Point<f32>) -> bool {
+    pub fn wedge_contains_point(&self, p: &Point) -> bool {
         let t = self.tangents();
 
         if self.d.abs() <= 1. {
@@ -285,7 +318,7 @@ impl Arc {
     /**
      * 计算点到圆弧的距离
      */
-    pub fn distance_to_point(&self, p: Point<f32>) -> f32 {
+    pub fn distance_to_point(&self, p: Point) -> f32 {
         if self.d.abs() < 1e-5 {
             // d = 0, 当 线段 处理
             let arc_segment = Segment::new(self.p0, self.p1);
@@ -315,7 +348,7 @@ impl Arc {
     /**
      * 计算点到圆弧的平方距离
      */
-    pub fn squared_distance_to_point(&self, p: Point<f32>) -> f32 {
+    pub fn squared_distance_to_point(&self, p: Point) -> f32 {
         if self.d.abs() < 1e-5 {
             let arc_segment = Segment::new(self.p0, self.p1);
             // 点 到 线段 的 距离 的 平方
@@ -336,9 +369,18 @@ impl Arc {
     }
 
     /**
+     * 计算点到圆弧的平方距离
+     */
+    pub fn squared_distance_to_point2(&self, p: &Point) -> Segment {
+        let arc_segment = Segment::new(self.p0, self.p1);
+        // 点 到 线段 的 距离 的 平方
+        return arc_segment.squared_distance_to_point2(p);
+    }
+
+    /**
      * 计算点到圆弧的扩展距离
      */
-    pub fn extended_dist(&self, p: &Point<f32>) -> f32 {
+    pub fn extended_dist(&self, p: &Point) -> f32 {
         // m 是 P0 P1 的 中点
         let m = self.p0.lerp(&self.p1, 0.5);
 
@@ -389,6 +431,48 @@ impl Arc {
             }
         }
     }
+
+    pub fn projection_to_bound(&self, aabb: &Aabb, segment: &Segment) -> (Range<f32>, Point, f32) {
+        if segment.a.y == segment.b.y {
+            self.projection_to_row_bound(aabb, segment)
+        } else {
+            self.projection_to_col_bound(aabb, segment)
+        }
+    }
+
+    pub fn projection_to_row_bound(
+        &self,
+        aabb: &Aabb,
+        segment: &Segment,
+    ) -> (Range<f32>, Point, f32) {
+        let s = segment.nearest_points_on_line_segments(&Segment::new(self.p0, self.p1));
+        if let Some(ab) = aabb.intersection(&self.aabb) {
+            ((ab.mins.x..ab.maxs.x), s.a, (s.a - s.b).norm_squared())
+        } else {
+            if self.p0.x < aabb.mins.x {
+                ((aabb.mins.x..aabb.mins.x), s.a, (s.a - s.b).norm_squared())
+            } else {
+                ((aabb.maxs.x..aabb.maxs.x), s.a, (s.a - s.b).norm_squared())
+            }
+        }
+    }
+
+    pub fn projection_to_col_bound(
+        &self,
+        aabb: &Aabb,
+        segment: &Segment,
+    ) -> (Range<f32>, Point, f32) {
+        let s = segment.nearest_points_on_line_segments(&Segment::new(self.p0, self.p1));
+        if let Some(ab) = aabb.intersection(&self.aabb) {
+            ((ab.mins.y..ab.maxs.y), s.a, (s.a - s.b).norm_squared())
+        } else {
+            if self.p0.y < aabb.mins.y {
+                ((aabb.mins.y..aabb.mins.y), s.a, (s.a - s.b).norm_squared())
+            } else {
+                ((aabb.maxs.y..aabb.maxs.y), s.a, (s.a - s.b).norm_squared())
+            }
+        }
+    }
 }
 
 impl PartialEq for Arc {
@@ -402,6 +486,160 @@ impl PartialEq for Arc {
 /**
  * 圆弧 减去 点
  */
-pub fn sub_point_from_arc(p: Point<f32>, a: Arc) -> SignedVector {
+pub fn sub_point_from_arc(p: Point, a: Arc) -> SignedVector {
     return a.sub(p).neg();
 }
+
+// 185.0, 5.0
+pub fn squared_distance_segment(p: &Point, segment: &Segment) -> f32 {
+    // 先计算r的值 看r的范围 （p相当于A点，q相当于B点，pt相当于P点）
+    // AB 向量
+    // 189 - 1077
+    let pqx = segment.b.x - segment.a.x;
+    //0
+    let pqy = segment.b.y - segment.a.y;
+
+    // AP 向量
+    // 185 - 1077
+    let mut dx = p.x - segment.a.x;
+    // 5.0
+    let mut dy = p.y - segment.a.y;
+
+    // qp线段长度的平方=上面公式中的分母：AB向量的平方。
+    // 189 - 1077 平方
+    let d = pqx * pqx + pqy * pqy;
+    // （p pt向量）点积 （pq 向量）= 公式中的分子：AP点积AB
+    let mut t = pqx * dx + pqy * dy;
+
+    // t 就是 公式中的r了
+    if d > 0.0
+    // 除数不能为0; 如果为零 t应该也为零。下面计算结果仍然成立。
+    {
+        t /= d;
+    } // 此时t 相当于 上述推导中的 r。
+
+    // 分类讨论
+    if t < 0.0 {
+        t = 0.0;
+    }
+    // 当t（r）< 0时，最短距离即为 pt点 和 p点（A点和P点）之间的距离。
+    else if t > 1.0 {
+        t = 1.0;
+    } // 当t（r）> 1时，最短距离即为 pt点 和 q点（B点和P点）之间的距离。
+
+    // t = 0，计算 pt点 和 p点的距离; （A点和P点）
+    // t = 1, 计算 pt点 和 q点 的距离; （B点和P点）
+    // 否则计算 pt点 和 投影点 的距离。（C点和P点 ，t*（pqx，pqy，pqz）就是向量AC）
+    dx = segment.a.x + t * pqx - p.x;
+    dy = segment.a.y + t * pqy - p.y;
+
+    // 算出来是距离的平方，后续自行计算距离
+    return dx * dx + dy * dy;
+}
+
+#[test]
+fn test_projection_to_top_bound() {
+    // let cell = Aabb::new(
+    //     Point::new(88.53931, -26.240723),
+    //     Point::new(1115.0508, 1575.4801),
+    // );
+
+    // let row_area = cell.near_area(Direction::Col);
+    // println!("row_area: {:?}", row_area);
+    // let segment = Segment::new(cell.mins, Point::new(cell.mins.x, cell.maxs.y));
+    // println!("segment: {:?}", segment);
+
+    // // println!("ab: {:?}", ab);
+
+    // let arc = Arc::new(
+    //     Point::new(91.0, 744.0),
+    //     Point::new(227.0, 1364.0),
+    //     -0.14173229,
+    // );
+    // println!(
+    //     "r1 : {:?}",
+    //     arc.projection_to_col_bound(&row_area, &segment),
+    // );
+
+    // let arc = Arc::new(
+    //     Point::new(227.0, 1364.0),
+    //     Point::new(621.0, 1575.0),
+    //     -0.27165353,
+    // );
+    // println!(
+    //     "r2 : {:?}",
+    //     arc.projection_to_col_bound(&row_area, &segment),
+    // );
+
+    // let arc = Arc::new(Point::new(4.0, -1.0), Point::new(2.0, -1.0), 1.0);
+    // assert_eq!(arc.projection_to_top_bound(&ab), None);
+}
+
+#[test]
+fn test_projection_to_bottom_bound() {
+    let s = Segment::new(Point::new(1077.0, 0.0), Point::new(189.0, 0.0));
+    let r = squared_distance_segment(&Point::new(185.0, 5.0), &s);
+    println!("R: {}", r);
+}
+
+#[test]
+fn test_projection_to_left_bound() {
+    // let ab = Aabb::new(Point::new(0.0, 0.0), Point::new(5.0, 5.0)).near_area(Direction::Left);
+    // let arc = Arc::new(Point::new(-3.0, 2.0), Point::new(-3.0, 4.0), 1.0);
+
+    // assert_eq!(arc.projection_to_left_bound(&ab), Some((2.0..4.0, 2.0)));
+
+    // let arc = Arc::new(Point::new(-1.0, 1.0), Point::new(-1.0, 4.0), 1.0);
+    // assert_eq!(arc.projection_to_left_bound(&ab), None);
+
+    // let ab = Aabb::new(Point::new(0.0, 0.0), Point::new(5.0, 5.0)).near_area(Direction::Col);
+    // let segment = Segment::new(Point::new(0.0, 0.0), Point::new(0.0, 5.0));
+    // println!("ab: {:?}", ab);
+
+    // let arc = Arc::new(Point::new(1.0, -2.0), Point::new(2.0, -1.0), 0.4);
+    // // assert_eq!(
+    //     arc.projection_to_col_bound(&ab, &segment),
+    //     ((Point::new(0.0, 0.0), Point::new(0.0, 0.0)), (5.0, 5.0))
+    // );
+
+    // let arc = Arc::new(Point::new(-1.0, 1.0), Point::new(-3.0, -1.0), 0.4);
+    // println!(
+    //     "arc: c: {}, r: {:?}, ab: {:?}",
+    //     arc.center, arc.radius, arc.aabb
+    // );
+    // assert_eq!(
+    //     arc.projection_to_col_bound(&ab, &segment),
+    //     ((Point::new(0.0, 0.0), Point::new(0.0, 1.0)), (9.0, 1.0))
+    // );
+
+    // let arc = Arc::new(Point::new(4.0, -3.0), Point::new(6.0, -1.0), 0.4);
+    // assert_eq!(
+    //     arc.projection_to_row_bound(&ab, &segment),
+    //     ((Point::new(4.0, 0.0), Point::new(5.0, 0.0)), (9.0, 1.0))
+    // );
+}
+
+// #[test]
+// fn test_projection_to_right_bound() {
+//     let ab = Aabb::new(Point::new(0.0, 0.0), Point::new(5.0, 5.0)).near_area(Direction::Right);
+
+//     let arc = Arc::new(Point::new(6.0, 2.0), Point::new(6.0, 4.0), 1.0);
+
+//     assert_eq!(arc.projection_to_right_bound(&ab), Some((2.0..4.0, 1.0)));
+
+//     let arc = Arc::new(Point::new(6.0, 1.0), Point::new(8.0, -1.0), 0.4);
+//     println!(
+//         "arc: c: {}, r: {:?}, ab: {:?}",
+//         arc.center, arc.radius, arc.aabb
+//     );
+//     assert_eq!(arc.projection_to_right_bound(&ab), Some((0.0..1.0, 1.0)));
+
+//     let arc = Arc::new(Point::new(4.0, 3.0), Point::new(5.0, 3.0), 1.0);
+//     assert_eq!(arc.projection_to_right_bound(&ab), None);
+// }
+
+// #[test]
+// fn test() {
+//     let ab = Aabb::new(Point::new(1.0, 1.0), Point::new(5.0, 5.0));
+//     println!("ab: {}", ab.half_extents().norm())
+// }

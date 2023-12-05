@@ -1,6 +1,6 @@
-use parry2d::math::{Point, Vector};
+use parry2d::math::Vector;
 
-use crate::glyphy::util::{float_equals, GLYPHY_INFINITY};
+use crate::{glyphy::util::{float_equals, GLYPHY_INFINITY}, Point};
 
 use super::{point::PointExt, signed_vector::SignedVector, vector::VectorEXT};
 
@@ -28,7 +28,7 @@ impl Line {
     /**
      * 从 两点 构造 直线
      */
-    pub fn from_points(p0: Point<f32>, p1: Point<f32>) -> Self {
+    pub fn from_points(p0: Point, p1: Point) -> Self {
         // let r  =Vector::new(0.0f32, 0.0f32);
         let n = (p1 - p0).ortho();
         let c = p0.into_vector().dot(&n);
@@ -59,7 +59,7 @@ impl Line {
     /**
      * 交点
      */
-    pub fn intersect(&self, l: Line) -> Point<f32> {
+    pub fn intersect(&self, l: Line) -> Point {
         let dot = self.n.x * l.n.y - self.n.y * l.n.x;
         if dot == 0.0 {
             return Point::new(GLYPHY_INFINITY, GLYPHY_INFINITY);
@@ -74,7 +74,7 @@ impl Line {
     /**
      * 点到直线的最短向量
      */
-    pub fn sub(&self, p: &Point<f32>) -> SignedVector {
+    pub fn sub(&self, p: &Point) -> SignedVector {
         let mag = -(self.n.dot(&p.into_vector()) - self.c) / self.n.norm();
         return SignedVector::from_vector(self.n.normalize().scale(mag), mag < 0.0);
     }
