@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Range};
 
 // use freetype_sys::FT_New_Face;
 // use parry2d::na::ComplexField;
@@ -12,7 +12,7 @@ use super::{
         aabb::Direction,
         arc::{Arc, ArcEndpoint},
         line::Line,
-        vector::VectorEXT,
+        vector::VectorEXT, segment::SegmentEXT,
     },
     sdf::glyphy_sdf_from_arc_list,
     util::{is_inf, GLYPHY_INFINITY},
@@ -30,6 +30,7 @@ const MAX_Y: f32 = 4095.;
 #[wasm_bindgen(getter_with_clone)]
 #[derive(Clone, Debug)]
 pub struct UnitArc {
+    pub parent_cell: Extents,
     pub offset: usize, // 此单元（去重后）在数据纹理中的 像素偏移（不是字节偏移）；
 
     pub sdf: f32, // 方格中心对应的sdf
@@ -40,6 +41,13 @@ pub struct UnitArc {
 
     pub origin_data: Vec<ArcEndpoint>, // 原始数据, 用于显示 点 (因为data 对 1, 0 做了优化)
 }
+#[wasm_bindgen]
+impl UnitArc {
+    pub fn get_data_len(&self) -> usize {
+        self.data.len()
+    }
+}
+
 #[wasm_bindgen]
 #[derive(Debug, Clone)]
 pub struct BlobArc {
@@ -61,6 +69,7 @@ pub struct BlobArc {
 }
 
 #[wasm_bindgen]
+#[derive(Debug, Clone, Copy)]
 pub struct Extents {
     pub min_x: f32,
     pub min_y: f32,
@@ -70,8 +79,8 @@ pub struct Extents {
 
 #[wasm_bindgen]
 impl BlobArc {
-    pub fn get_unit_arc(&self, i: u32, j: u32) -> UnitArc {
-        self.data[i as usize][j as usize].clone()
+    pub fn get_unit_arc(&self, i: usize, j: usize) -> UnitArc {
+        self.data[j][i].clone()
     }
 
     pub fn get_extents(&self) -> Extents {
@@ -91,7 +100,6 @@ impl BlobArc {
         self.endpoints[index].clone()
     }
 }
-
 
 // 取 index 所在的 循环的 起始和结束索引
 // loop_start_indies 的 第一个 元素 肯定是 0
@@ -282,7 +290,6 @@ pub fn is_point_same_sign(point: Point, endpoints: &Vec<ArcEndpoint>, sdf_sign: 
     return v == sdf_sign;
 }
 
-
 #[wasm_bindgen(getter_with_clone)]
 #[derive(Debug, Clone)]
 pub struct TexData {
@@ -343,6 +350,8 @@ pub fn encode_to_tex(
                 let map_arc_data = map_arc_data.as_ref().unwrap();
 
                 let mut num_points = map_arc_data.data.len();
+
+                let num_points2 = num_points;
                 if num_points > 3 {
                     num_points = 0;
                 }
@@ -386,7 +395,7 @@ pub fn encode_to_tex(
                 // 解码后的 sdf
                 let _dsdf = min_sdf + sdf_index * sdf_step;
                 // unit_arc.show = `${num_points}:${dsdf.toFixed(1)}`;
-                unit_arc.show = format!("{}", num_points);
+                unit_arc.show = format!("{}", num_points2);
                 // unit_arc.show = `${offset}`;
             }
         }
@@ -510,7 +519,7 @@ pub fn decode_from_uint16(value: f32, max_offset: f32, min_sdf: f32, sdf_step: f
     return Res {
         is_interval,
         num_points,
-         _sdf,
+        _sdf,
         offset,
     };
 }
@@ -550,18 +559,28 @@ pub fn encode_data_tex(
 
     let mut before_size = 0;
 
+    let mut num_endpoints = 0;
+
+    log::info!("i: 7, j: 8, data: {:?}", data.data[8][7].data);
+    log::info!("i: 8, j: 8, data: {:?}", data.data[8][8].data);
+    // let mut j = 0;
     for row in &data.data {
+        // let mut i = 0;
         for unit_arc in row {
+            num_endpoints += unit_arc.data.len();
             let key = get_key(&unit_arc);
             before_size += unit_arc.data.len();
             if key.len() > 0 {
                 map.insert(key, unit_arc.clone());
             }
+            // i += 1;
         }
+        // j += 1;
     }
+    println!("总共有{}个点", num_endpoints);
+    println!("平均每个格子有{}个点", num_endpoints as f32 / (data.data.len() * data.data[0].len()) as f32);
 
     let mut r = vec![];
-
     for v in map.values_mut() {
         let unit_arc = v;
 
@@ -746,6 +765,7 @@ pub fn recursion_near_arcs_of_cell<'a>(
     left_near: Option<Vec<&'static Arc>>,
     right_near: Option<Vec<&'static Arc>>,
     result_arcs: &mut Vec<(Vec<&'a Arc>, Aabb)>,
+    temps : &mut Vec<(Point, f32, Vec<Range<f32>>)>,
 ) {
     let cell_width = cell.width();
     let cell_height = cell.height();
@@ -758,7 +778,7 @@ pub fn recursion_near_arcs_of_cell<'a>(
     }
 
     let (near_arcs, top_near, bottom_near, left_near, right_near) =
-        compute_near_arc(cell, arcs, top_near, bottom_near, left_near, right_near);
+        compute_near_arc(cell, arcs, top_near, bottom_near, left_near, right_near, temps);
 
     let glyph_width = extents.width();
     let glyph_height = extents.height();
@@ -767,7 +787,6 @@ pub fn recursion_near_arcs_of_cell<'a>(
         || (cell_width * 32.0 - glyph_width).abs() < 0.1
             && (cell_height * 32.0 - glyph_height).abs() < 0.1
     {
-        // println!("======= cell");
         result_arcs.push((near_arcs, cell.clone()));
     } else {
         let (
@@ -799,6 +818,7 @@ pub fn recursion_near_arcs_of_cell<'a>(
             left_near1,
             right_near1,
             result_arcs,
+            temps
         );
         recursion_near_arcs_of_cell(
             extents,
@@ -811,6 +831,7 @@ pub fn recursion_near_arcs_of_cell<'a>(
             left_near2,
             right_near2,
             result_arcs,
+            temps
         );
     }
 }
@@ -822,6 +843,7 @@ fn compute_near_arc(
     mut bottom_near: Option<Vec<&'static Arc>>,
     mut left_near: Option<Vec<&'static Arc>>,
     mut right_near: Option<Vec<&'static Arc>>,
+    temps : &mut Vec<(Point, f32, Vec<Range<f32>>)>,
 ) -> (
     Vec<&'static Arc>,
     Vec<&'static Arc>,
@@ -833,9 +855,9 @@ fn compute_near_arc(
     // 最近的意思：某个半径的 圆内
     let radius_squared = cell.half_extents().norm_squared();
 
-    let mut near_arcs: Vec<&'static Arc> = vec![];
+    let mut near_arcs: Vec<&'static Arc> = Vec::with_capacity(arcs.len());
     for arc in arcs {
-        if arc.squared_distance_to_point(c) <= radius_squared {
+        if arc.squared_distance_to_point2(&c).norm_squared() <= radius_squared {
             near_arcs.push(*arc);
         }
     }
@@ -845,18 +867,18 @@ fn compute_near_arc(
     let top_near = if let Some(near) = top_near.take() {
         near
     } else {
-        let mut top_near = vec![];
+        let mut top_near = Vec::with_capacity(arcs.len());
         let top_segment = cell.bound(Direction::Top);
-        row_area.near_arcs(arcs, &top_segment, &mut top_near);
+        row_area.near_arcs(arcs, &top_segment, &mut top_near, temps);
         top_near
     };
 
     let bottom_near = if let Some(near_arcs) = bottom_near.take() {
         near_arcs
     } else {
-        let mut near_arcs = vec![];
+        let mut near_arcs = Vec::with_capacity(arcs.len());
         let bottom_segment = cell.bound(Direction::Bottom);
-        row_area.near_arcs(arcs, &bottom_segment, &mut near_arcs);
+        row_area.near_arcs(arcs, &bottom_segment, &mut near_arcs, temps);
         near_arcs
     };
 
@@ -865,18 +887,18 @@ fn compute_near_arc(
     let left_near = if let Some(near_arcs) = left_near.take() {
         near_arcs
     } else {
-        let mut near_arcs = vec![];
+        let mut near_arcs = Vec::with_capacity(arcs.len());
         let left_segment = cell.bound(Direction::Left);
-        col_area.near_arcs(arcs, &left_segment, &mut near_arcs);
+        col_area.near_arcs(arcs, &left_segment, &mut near_arcs, temps);
         near_arcs
     };
 
     let right_near = if let Some(near_arcs) = right_near.take() {
         near_arcs
     } else {
-        let mut near_arcs = vec![];
+        let mut near_arcs = Vec::with_capacity(arcs.len());
         let right_segment = cell.bound(Direction::Right);
-        col_area.near_arcs(arcs, &right_segment, &mut near_arcs);
+        col_area.near_arcs(arcs, &right_segment, &mut near_arcs, temps);
         near_arcs
     };
 
@@ -893,6 +915,9 @@ fn compute_near_arc(
 
 #[test]
 fn test1() {
+    let mut vec1 = vec![1, 2, 3, 5,4, 5, 6];
+    vec1.dedup_by(|a, b| a == b);
+    println!("vec: {:?}", vec1);
     // let arcs = vec![
     //     Arc::new(Point::new(32.0, 865.0), Point::new(2020.0, 865.0), 0.0),
     //     Arc::new(Point::new(2020.0, 865.0), Point::new(2020.0, 689.0), 0.0),
@@ -920,8 +945,8 @@ fn test1() {
     // println!("top_segment: {:?}", top_segment);
     // row_area.near_arcs(&a, &top_segment, &mut top_near_arcs);
     // println!("top_near_arcs: {:?}", top_near_arcs.len());
-    let mut v1 = vec![1, 2, 3];
-    let v2 = vec![4, 5, 6];
-    v1.extend(&v2);
-    println!("v1:{:?}, v2:{:?}", v1, v2);
+    // let mut v1 = vec![1, 2, 3];
+    // let v2 = vec![4, 5, 6];
+    // v1.extend(&v2);
+    // println!("v1:{:?}, v2:{:?}", v1, v2);
 }

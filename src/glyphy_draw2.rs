@@ -5,7 +5,7 @@ use crate::{
     glyphy::{
         blob_new::{
             encode_to_tex, get_line_key, line_encode, recursion_near_arcs_of_cell, snap,
-            travel_data, BlobArc, UnitArc,
+            travel_data, BlobArc, Extents, UnitArc,
         },
         geometry::{
             aabb::AabbEXT,
@@ -78,7 +78,7 @@ pub fn get_char_arc(
     let mut min_height = f32::INFINITY;
 
     let mut p0 = Point::new(0., 0.);
-    let mut near_arcs = vec![];
+
     let begin = std::time::Instant::now();
 
     // 添加 抗锯齿的 空隙
@@ -95,6 +95,8 @@ pub fn get_char_arc(
         extents.maxs.y = extents.mins.x + glyph_height;
     };
 
+    let mut near_arcs = Vec::with_capacity(endpoints.len());
+    let mut arcs = Vec::with_capacity(endpoints.len());
     for i in 0..endpoints.len() {
         let endpoint = &endpoints[i];
         if endpoint.d == GLYPHY_INFINITY {
@@ -105,14 +107,15 @@ pub fn get_char_arc(
         p0 = endpoint.p;
 
         near_arcs.push(arc);
+        arcs.push(unsafe { std::mem::transmute(near_arcs.last().unwrap()) });
     }
-    let mut arcs = vec![];
-    for arc in &near_arcs {
-        arcs.push(unsafe { std::mem::transmute(arc) })
-    }
+
+    // for arc in &near_arcs {
+    //     arcs.push(unsafe { std::mem::transmute(arc) });
+    // }
 
     let mut result_arc = vec![];
-
+    let mut temp = Vec::with_capacity(arcs.len());
     recursion_near_arcs_of_cell(
         &extents,
         &extents,
@@ -124,6 +127,7 @@ pub fn get_char_arc(
         None,
         None,
         &mut result_arc,
+        &mut temp
     );
 
     let width_cells = (extents.width() / min_width).floor() as usize;
@@ -131,10 +135,16 @@ pub fn get_char_arc(
     let mut data = vec![
         vec![
             UnitArc {
+                parent_cell: Extents {
+                    min_x: 0.,
+                    min_y: 0.,
+                    max_x: 0.,
+                    max_y: 0.
+                },
                 offset: 0,
                 sdf: 0.0,
                 show: "".to_owned(),
-                data: vec![],
+                data: Vec::with_capacity(8),
                 origin_data: vec![],
             };
             width_cells
@@ -173,12 +183,14 @@ pub fn get_char_arc(
 
         let end_x = (end.x / min_width).floor() as usize;
         let end_y = (end.y / min_height).floor() as usize;
-
+        let parent_cell = Extents {
+            min_x: cell.mins.x,
+            min_y: cell.mins.y,
+            max_x: cell.maxs.x,
+            max_y: cell.maxs.y,
+        };
         for i in begin_x..end_x {
             for j in begin_y..end_y {
-                if i == 31 && j == 31 {
-                    // println!("=========== cell: {:?}, near_arcs: {:?}", cell, near_arcs);
-                }
                 let unit_arc = &mut data[j][i];
 
                 if near_endpoints.len() == 2 && near_endpoints[1].d == 0.0 {
@@ -206,7 +218,7 @@ pub fn get_char_arc(
                     // println!("1row: {}, col: {} line_data: {:?}n \n", row, col, unit_arc.data.len());
                     unit_arc.origin_data.push(start.clone());
                     unit_arc.origin_data.push(end.clone());
-
+                    unit_arc.parent_cell = parent_cell;
                     continue;
                 }
 
@@ -231,11 +243,15 @@ pub fn get_char_arc(
                     let endpoint = near_endpoints[i].clone();
                     unit_arc.data.push(endpoint);
                 }
+                unit_arc.parent_cell = parent_cell;
+                // if (i == 7 && j == 8) || (i == 8 && j == 8) {
+                //     log::info!("i: {}, j: {}, cell: {:?}, near_arcs: {:?}", i, j, cell, near_arcs);
+                //     log::info!("near_endpoints: {:?}, data: {:?}", near_endpoints, unit_arc.data);
+                // }
             }
         }
     }
-
-    println!("recursion_near_arcs_of_cell time: {:?}", begin.elapsed());
+    println!("格子计算: {:?}", begin.elapsed());
 
     let mut arcs = BlobArc {
         cell_size: min_width,
@@ -260,7 +276,6 @@ pub fn get_char_arc(
         min_sdf,
         max_sdf,
     ));
-    // println!("=========== cell: {:?}", arcs.data[31][31]);
 
     extents.scale(1.0 / upem, 1.0 / upem);
 
@@ -274,16 +289,18 @@ pub fn get_char_arc(
 
 #[wasm_bindgen]
 pub fn get_char_arc_debug(char: String) -> BlobArc {
-    // console_log::init_with_level(log::Level::Debug);
+    console_error_panic_hook::set_once();
+
+    let _ = console_log::init_with_level(log::Level::Debug);
     let buffer = include_bytes!("../source/msyh.ttf").to_vec();
-    log::error!("1111111111");
+    log::info!("1111111111");
     let mut ft_face = FontFace::new(buffer);
     let mut gi = GlyphInfo::new();
-    log::error!("22222222char: {}", char);
+    log::info!("22222222char: {}", char);
     let char = char.chars().next().unwrap();
-    log::error!("13333333");
+    log::info!("13333333");
     let arcs = get_char_arc(&mut gi, &mut ft_face, char, None);
-    log::error!("44444444444");
+    log::info!("44444444444");
     arcs
 }
 

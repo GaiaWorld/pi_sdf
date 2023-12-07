@@ -72,17 +72,19 @@ impl ArcEndpoint {
 // d符号，表示圆心的方向（在 圆弧垂线的左边，还是右边）
 //    d > 0，和 (终 - 起).otho() 同向
 //    d < 0，和 上面 相反
+
+#[wasm_bindgen]
 #[derive(Debug, Clone)]
 pub struct Arc {
     pub id: u64,
 
-    pub p0: Point,
-    pub p1: Point,
+    pub(crate) p0: Point,
+    pub(crate) p1: Point,
     pub d: f32,
 
     pub radius: f32,
-    pub center: Point,
-    pub aabb: Aabb,
+    pub(crate) center: Point,
+    pub(crate) aabb: Aabb,
 }
 
 impl Arc {
@@ -432,7 +434,7 @@ impl Arc {
         }
     }
 
-    pub fn projection_to_bound(&self, aabb: &Aabb, segment: &Segment) -> (Range<f32>, Point, f32) {
+    pub fn projection_to_bound(&self, aabb: &Aabb, segment: &Segment) -> (Range<f32>, Segment, f32) {
         if segment.a.y == segment.b.y {
             self.projection_to_row_bound(aabb, segment)
         } else {
@@ -444,15 +446,15 @@ impl Arc {
         &self,
         aabb: &Aabb,
         segment: &Segment,
-    ) -> (Range<f32>, Point, f32) {
+    ) -> (Range<f32>, Segment, f32) {
         let s = segment.nearest_points_on_line_segments(&Segment::new(self.p0, self.p1));
         if let Some(ab) = aabb.intersection(&self.aabb) {
-            ((ab.mins.x..ab.maxs.x), s.a, (s.a - s.b).norm_squared())
+            ((ab.mins.x..ab.maxs.x), s, (s.a - s.b).norm_squared())
         } else {
             if self.p0.x < aabb.mins.x {
-                ((aabb.mins.x..aabb.mins.x), s.a, (s.a - s.b).norm_squared())
+                ((aabb.mins.x..aabb.mins.x), s, (s.a - s.b).norm_squared())
             } else {
-                ((aabb.maxs.x..aabb.maxs.x), s.a, (s.a - s.b).norm_squared())
+                ((aabb.maxs.x..aabb.maxs.x), s, (s.a - s.b).norm_squared())
             }
         }
     }
@@ -461,15 +463,15 @@ impl Arc {
         &self,
         aabb: &Aabb,
         segment: &Segment,
-    ) -> (Range<f32>, Point, f32) {
+    ) -> (Range<f32>, Segment, f32) {
         let s = segment.nearest_points_on_line_segments(&Segment::new(self.p0, self.p1));
         if let Some(ab) = aabb.intersection(&self.aabb) {
-            ((ab.mins.y..ab.maxs.y), s.a, (s.a - s.b).norm_squared())
+            ((ab.mins.y..ab.maxs.y), s, (s.a - s.b).norm_squared())
         } else {
             if self.p0.y < aabb.mins.y {
-                ((aabb.mins.y..aabb.mins.y), s.a, (s.a - s.b).norm_squared())
+                ((aabb.mins.y..aabb.mins.y), s, (s.a - s.b).norm_squared())
             } else {
-                ((aabb.maxs.y..aabb.maxs.y), s.a, (s.a - s.b).norm_squared())
+                ((aabb.maxs.y..aabb.maxs.y), s, (s.a - s.b).norm_squared())
             }
         }
     }

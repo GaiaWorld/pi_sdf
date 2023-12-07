@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 use parry2d::{bounding_volume::Aabb, shape::Segment};
 
 use crate::{
@@ -30,6 +32,7 @@ pub trait AabbEXT {
         arcs: &Vec<&'static Arc>,
         segment: &Segment,
         result: &mut Vec<&'static Arc>,
+        temps : &mut Vec<(Point, f32, Vec<Range<f32>>)>,
     );
     fn bound(&self, direction: Direction) -> Segment;
     fn width(&self) -> f32;
@@ -162,16 +165,18 @@ impl AabbEXT for Aabb {
         arcs: &Vec<&'static Arc>,
         segment: &Segment,
         result_arcs: &mut Vec<&'static Arc>,
+        temps : &mut Vec<(Point, f32, Vec<Range<f32>>)>,
     ) {
-        let mut temps = vec![];
+        // let mut temps = Vec::with_capacity(arcs.len());
+        temps.clear();
         // println!("segment: {:?}", segment);
         for i in 0..arcs.len() {
-            let (rang, p, min_dist) = arcs[i].projection_to_bound(self, &segment);
+            let (rang, s, min_dist) = arcs[i].projection_to_bound(self, &segment);
             // println!(
             //     "arcs: {:?}, rang: {:?}, dist: {},p: {}",
             //     arcs[i], rang, min_dist, p
             // );
-
+            let p = s.a;
             if i == 0 {
                 result_arcs.push(&arcs[i]);
                 temps.push((p, min_dist, vec![rang]));
@@ -201,8 +206,9 @@ impl AabbEXT for Aabb {
                         let d21 = arcs[i].squared_distance_to_point2(&p1).norm_squared();
                         let d22 = arcs[i].squared_distance_to_point2(&p2).norm_squared();
 
-                        if d11 < d21 && d12 < d22 {
-                            is_push = false
+                        if (d11 < d21 && d12 < d22) || (d11 < d22  && d12 < d21){
+                            is_push = false;
+                            break;
                         }
                     }
                 }

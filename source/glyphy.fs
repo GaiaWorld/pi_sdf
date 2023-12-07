@@ -9,15 +9,18 @@ precision highp float;
 #define GLYPHY_MAX_D 0.5
 #define GLYPHY_MAX_NUM_ENDPOINTS 20
 
-layout(set = 1, binding = 0) uniform  sampler samp;
-layout(set = 1, binding = 1) uniform  texture2D u_index_tex;
-layout(set = 1, binding = 2) uniform  texture2D u_data_tex;
 
 // (max_offset, min_sdf, sdf_step, check)
 // 如果 晶格的 sdf 在 [-check, check]，该晶格 和 字体轮廓 可能 相交 
-layout(set = 1, binding = 3) uniform vec4 u_info;
+layout(set = 0, binding = 3) uniform vec4 u_info;
 
-layout(set = 1, binding = 4) uniform vec4 uColor; 
+layout(set = 0, binding = 4) uniform vec4 uColor; 
+
+layout(set = 1, binding = 0) uniform  sampler index_tex_samp;
+layout(set = 1, binding = 1) uniform  texture2D u_index_tex;
+
+layout(set = 2, binding = 0) uniform  sampler data_tex_samp;
+layout(set = 2, binding = 1) uniform  texture2D u_data_tex;
 
 
 // (网格的边界-宽, 网格的边界-高, z, w)
@@ -314,7 +317,7 @@ glyphy_index_t get_glyphy_index(const vec2 p, const vec2 nominal_size) {
 	vec2 index_uv = get_index_uv(p, nominal_size);
 	
 	// vec4 c = texture2D(u_index_tex, index_uv).rgba;
-	vec4 c = texture(sampler2D(u_index_tex, samp), index_uv).rgba;
+	vec4 c = texture(sampler2D(u_index_tex, index_tex_samp), index_uv).rgba;
 
 	return decode_glyphy_index(c, nominal_size);
 }
@@ -341,7 +344,7 @@ float glyphy_sdf(const vec2 p, vec2 nominal_size, vec2 atlas_pos) {
 	// 注：N卡，和 高通 的 显卡，纹理 需要 加 0.5像素
 	float offset = 0.5 + float(index_info.offset);
 
-	vec4 rgba = texture(sampler2D(u_data_tex, samp), vec2(offset / u_info.x, 0.0));
+	vec4 rgba = texture(sampler2D(u_data_tex, data_tex_samp), vec2(offset / u_info.x, 0.0));
 	
 
 	glyphy_arc_t closest_arc;
@@ -353,17 +356,13 @@ float glyphy_sdf(const vec2 p, vec2 nominal_size, vec2 atlas_pos) {
 	for(int i = 1; i < GLYPHY_MAX_NUM_ENDPOINTS; i++) {
 		// vec4 rgba = vec4(0.0);
 		float offset = 0.5 + float(index_info.offset + i);
-		vec4 rgba = texture(sampler2D(u_data_tex, samp), vec2(offset / u_info.x, 0.0));
+		vec4 rgba = texture(sampler2D(u_data_tex, data_tex_samp), vec2(offset / u_info.x, 0.0));
 
 		if(index_info.num_endpoints == 0) {
-			// float offset = 0.5 + float(index_info.offset + i);
-			// rgba = texture(sampler2D(u_data_tex, samp), vec2(offset / u_info.x, 0.0));
 			if (rgba == vec4(0.0)) {
 				break;
 			}
 		} else if (i < index_info.num_endpoints) {
-			// float offset = 0.5 + float(index_info.offset + i);
-			// rgba = texture(sampler2D(u_data_tex, samp), vec2(offset / u_info.x, 0.0));
 		} else {
 			break;
 		}

@@ -145,6 +145,22 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     ];
     println!("a_glyph_vertex: {:?}", a_glyph_vertex);
 
+    let tex = tex_data.as_ref().unwrap();
+    let check = tex.cell_size * 0.5 * 2.0f32.sqrt();
+    let u_info = [tex.max_offset as f32, tex.min_sdf, tex.sdf_step, check];
+    let u_info_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("Index Buffer"),
+        contents: bytemuck::cast_slice(&u_info),
+        usage: wgpu::BufferUsages::UNIFORM,
+    });
+
+    let font_color: [f32; 4] = [1.0, 0.0, 0.0, 1.0];
+    let font_color_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("font_color Buffer"),
+        contents: bytemuck::cast_slice(&font_color),
+        usage: wgpu::BufferUsages::UNIFORM,
+    });
+
     let bind_group_layout0 = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: None,
         entries: &[
@@ -178,6 +194,26 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 },
                 count: None,
             },
+            wgpu::BindGroupLayoutEntry {
+                binding: 3,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: wgpu::BufferSize::new(16),
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 4,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: wgpu::BufferSize::new(16),
+                },
+                count: None,
+            },
         ],
     });
 
@@ -208,159 +244,6 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     size: wgpu::BufferSize::new(64),
                 }),
             },
-        ],
-        label: None,
-    });
-
-    let sampler = device.create_sampler(&wgpu::SamplerDescriptor::default());
-
-    let tex = tex_data.as_ref().unwrap();
-    let texture_extent = wgpu::Extent3d {
-        width: tex.data_tex.len() as u32 / 4,
-        height: 1,
-        depth_or_array_layers: 1,
-    };
-
-    let data_texture = device.create_texture(&wgpu::TextureDescriptor {
-        label: None,
-        size: texture_extent,
-        mip_level_count: 1,
-        sample_count: 1,
-        dimension: wgpu::TextureDimension::D2,
-        format: wgpu::TextureFormat::Rgba8Unorm,
-        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-        view_formats: &[],
-    });
-
-    println!("data_tex: {:?}, len: {}", tex.data_tex, tex.data_tex.len());
-    let data_texture_view = data_texture.create_view(&wgpu::TextureViewDescriptor::default());
-    queue.write_texture(
-        data_texture.as_image_copy(),
-        &tex.data_tex,
-        wgpu::ImageDataLayout {
-            offset: 0,
-            bytes_per_row: Some(tex.data_tex.len() as u32),
-            rows_per_image: None,
-        },
-        texture_extent,
-    );
-
-    let texture_extent = wgpu::Extent3d {
-        width: tex.grid_w as u32,
-        height: tex.grid_h as u32,
-        depth_or_array_layers: 1,
-    };
-
-    let index_texture = device.create_texture(&wgpu::TextureDescriptor {
-        label: None,
-        size: texture_extent,
-        mip_level_count: 1,
-        sample_count: 1,
-        dimension: wgpu::TextureDimension::D2,
-        format: wgpu::TextureFormat::Rg8Unorm,
-        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-        view_formats: &[],
-    });
-
-    println!(
-        "tex.index_tex: {:?}, tex.grid_w: {}, tex.grid_h:{}, tex.index_tex len: {}",
-        &tex.index_tex, tex.grid_w, tex.grid_h, tex.index_tex.len()
-    );
-
-    let index_texture_view = index_texture.create_view(&wgpu::TextureViewDescriptor::default());
-    queue.write_texture(
-        index_texture.as_image_copy(),
-        &tex.index_tex,
-        wgpu::ImageDataLayout {
-            offset: 0,
-            bytes_per_row: Some(tex.grid_w as u32 * 2),
-            rows_per_image: None,
-        },
-        texture_extent,
-    );
-
-    let check = tex.cell_size * 0.5 * 2.0f32.sqrt();
-    let u_info = [tex.max_offset as f32, tex.min_sdf, tex.sdf_step, check];
-    let u_info_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("Index Buffer"),
-        contents: bytemuck::cast_slice(&u_info),
-        usage: wgpu::BufferUsages::UNIFORM,
-    });
-
-    let font_color: [f32; 4] = [1.0, 0.0, 0.0, 1.0];
-    let font_color_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("font_color Buffer"),
-        contents: bytemuck::cast_slice(&font_color),
-        usage: wgpu::BufferUsages::UNIFORM,
-    });
-
-    let bind_group_layout1 = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-        label: None,
-        entries: &[
-            wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 1,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Texture {
-                    multisampled: false,
-                    sample_type: wgpu::TextureSampleType::Float { filterable: false },
-                    view_dimension: wgpu::TextureViewDimension::D2,
-                },
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 2,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Texture {
-                    multisampled: false,
-                    sample_type: wgpu::TextureSampleType::Float { filterable: false },
-                    view_dimension: wgpu::TextureViewDimension::D2,
-                },
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 3,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: wgpu::BufferSize::new(16),
-                },
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 4,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: wgpu::BufferSize::new(16),
-                },
-                count: None,
-            },
-        ],
-    });
-
-    let bind_group1 = device.create_bind_group(&wgpu::BindGroupDescriptor {
-        layout: &bind_group_layout1,
-        entries: &[
-            wgpu::BindGroupEntry {
-                binding: 0,
-                resource: wgpu::BindingResource::Sampler(&sampler),
-            },
-            wgpu::BindGroupEntry {
-                binding: 1,
-                resource: wgpu::BindingResource::TextureView(&index_texture_view),
-            },
-            wgpu::BindGroupEntry {
-                binding: 2,
-                resource: wgpu::BindingResource::TextureView(&data_texture_view),
-            },
             wgpu::BindGroupEntry {
                 binding: 3,
                 resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
@@ -381,9 +264,157 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         label: None,
     });
 
+    let index_tex_sampler = device.create_sampler(&wgpu::SamplerDescriptor::default());
+
+    let texture_extent = wgpu::Extent3d {
+        width: tex.grid_w as u32,
+        height: tex.grid_h as u32,
+        depth_or_array_layers: 1,
+    };
+
+    let index_texture = device.create_texture(&wgpu::TextureDescriptor {
+        label: None,
+        size: texture_extent,
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: wgpu::TextureFormat::Rg8Unorm,
+        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+        view_formats: &[],
+    });
+
+    // println!(
+    //     "tex.index_tex: {:?}, tex.grid_w: {}, tex.grid_h:{}, tex.index_tex len: {}",
+    //     &tex.index_tex,
+    //     tex.grid_w,
+    //     tex.grid_h,
+    //     tex.index_tex.len()
+    // );
+
+    let index_texture_view = index_texture.create_view(&wgpu::TextureViewDescriptor::default());
+    queue.write_texture(
+        index_texture.as_image_copy(),
+        &tex.index_tex,
+        wgpu::ImageDataLayout {
+            offset: 0,
+            bytes_per_row: Some(tex.grid_w as u32 * 2),
+            rows_per_image: None,
+        },
+        texture_extent,
+    );
+
+    let bind_group_layout1 = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: None,
+        entries: &[
+            wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 1,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Texture {
+                    multisampled: false,
+                    sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                    view_dimension: wgpu::TextureViewDimension::D2,
+                },
+                count: None,
+            },
+        ],
+    });
+
+    let bind_group1 = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        layout: &bind_group_layout1,
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::Sampler(&index_tex_sampler),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: wgpu::BindingResource::TextureView(&index_texture_view),
+            },
+        ],
+        label: None,
+    });
+
+    let tex_data_sampler = device.create_sampler(&wgpu::SamplerDescriptor::default());
+    let texture_extent = wgpu::Extent3d {
+        width: tex.data_tex.len() as u32 / 4,
+        height: 1,
+        depth_or_array_layers: 1,
+    };
+
+    let data_texture = device.create_texture(&wgpu::TextureDescriptor {
+        label: None,
+        size: texture_extent,
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: wgpu::TextureFormat::Rgba8Unorm,
+        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+        view_formats: &[],
+    });
+
+    // println!("data_tex: {:?}, len: {}", tex.data_tex, tex.data_tex.len());
+    let data_texture_view = data_texture.create_view(&wgpu::TextureViewDescriptor::default());
+    queue.write_texture(
+        data_texture.as_image_copy(),
+        &tex.data_tex,
+        wgpu::ImageDataLayout {
+            offset: 0,
+            bytes_per_row: Some(tex.data_tex.len() as u32),
+            rows_per_image: None,
+        },
+        texture_extent,
+    );
+
+    let bind_group_layout2 = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: None,
+        entries: &[
+            wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 1,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Texture {
+                    multisampled: false,
+                    sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                    view_dimension: wgpu::TextureViewDimension::D2,
+                },
+                count: None,
+            },
+        ],
+    });
+
+    let bind_group2 = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        layout: &bind_group_layout2,
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::Sampler(&tex_data_sampler),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: wgpu::BindingResource::TextureView(&data_texture_view),
+            },
+        ],
+        label: None,
+    });
+
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: None,
-        bind_group_layouts: &[&bind_group_layout0, &bind_group_layout1],
+        bind_group_layouts: &[
+            &bind_group_layout0,
+            &bind_group_layout1,
+            &bind_group_layout2,
+        ],
         push_constant_ranges: &[],
     });
 
@@ -406,7 +437,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     let primitive = wgpu::PrimitiveState::default();
     // primitive.
     let mut tt: ColorTargetState = swapchain_format.into();
-    tt.blend = Some(BlendState::ALPHA_BLENDING);
+    tt.blend = Some(BlendState::PREMULTIPLIED_ALPHA_BLENDING);
     let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
         label: None,
         layout: Some(&pipeline_layout),
@@ -499,6 +530,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     rpass.set_pipeline(&render_pipeline);
                     rpass.set_bind_group(0, &bind_group0, &[]);
                     rpass.set_bind_group(1, &bind_group1, &[]);
+                    rpass.set_bind_group(2, &bind_group2, &[]);
                     rpass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint16);
                     rpass.set_vertex_buffer(0, vertex_buffer.slice(..));
                     // rpass.insert_debug_marker("Draw!");
@@ -530,7 +562,7 @@ fn main() {
     // let window = winit::window::Window::new(&event_loop).unwrap();
     #[cfg(not(target_arch = "wasm32"))]
     {
-        env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
+        // env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
         pollster::block_on(run(event_loop, window));
     }
     #[cfg(target_arch = "wasm32")]
