@@ -1,11 +1,13 @@
-use parry2d::na::{Orthographic3, Matrix4, Vector3};
-use pi_sdf::{utils::FontFace, glyphy_draw2::get_char_arc, glyphy::vertex::{GlyphInfo, add_glyph_vertices}};
+use parry2d::na::{Matrix4, Orthographic3, Vector3};
+use pi_sdf::{
+    glyphy::vertex::{add_glyph_vertices, GlyphInfo},
+    glyphy_draw2::get_char_arc,
+    utils::FontFace,
+};
 use tracing::Level;
 use tracing_subscriber::fmt::Subscriber;
 
 use env_logger::Env;
-
-
 
 use pi_wgpu as wgpu;
 use wgpu::{util::DeviceExt, BlendState, ColorTargetState};
@@ -125,6 +127,13 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         proj_matrix.as_matrix().as_slice()
     );
 
+    let slope = [0.35, verties[0].y];
+    let slope_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("Index Buffer"),
+        contents: bytemuck::cast_slice(&slope),
+        usage: wgpu::BufferUsages::UNIFORM,
+    });
+
     let a_glyph_vertex = [
         verties[0].x,
         verties[0].y,
@@ -158,6 +167,28 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     let font_color_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("font_color Buffer"),
         contents: bytemuck::cast_slice(&font_color),
+        usage: wgpu::BufferUsages::UNIFORM,
+    });
+
+    let u_gradient_start_end: [f32; 4] = [1.2, 0.5, -0.2, 0.5];
+    let u_gradient_start_end_buffer =
+        device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("u_gradient_start_end_buffer"),
+            contents: bytemuck::cast_slice(&u_gradient_start_end),
+            usage: wgpu::BufferUsages::UNIFORM,
+        });
+
+    let u_outline: [f32; 4] = [0.2, 0.9, 0.2, 2.0];
+    let u_outline_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("u_outline_buffer"),
+        contents: bytemuck::cast_slice(&u_outline),
+        usage: wgpu::BufferUsages::UNIFORM,
+    });
+
+    let u_weight_and_offset: [f32; 4] = [0.0, 0.0, 1.0, 0.0];
+    let u_weight_and_offset_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("u_weight_and_offset_buffer"),
+        contents: bytemuck::cast_slice(&u_weight_and_offset),
         usage: wgpu::BufferUsages::UNIFORM,
     });
 
@@ -196,6 +227,16 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
             },
             wgpu::BindGroupLayoutEntry {
                 binding: 3,
+                visibility: wgpu::ShaderStages::VERTEX,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: wgpu::BufferSize::new(8),
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 4,
                 visibility: wgpu::ShaderStages::FRAGMENT,
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Uniform,
@@ -205,7 +246,37 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 count: None,
             },
             wgpu::BindGroupLayoutEntry {
-                binding: 4,
+                binding: 5,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: wgpu::BufferSize::new(16),
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 6,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: wgpu::BufferSize::new(16),
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 7,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: wgpu::BufferSize::new(16),
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 8,
                 visibility: wgpu::ShaderStages::FRAGMENT,
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Uniform,
@@ -247,15 +318,47 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
             wgpu::BindGroupEntry {
                 binding: 3,
                 resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                    buffer: &slope_buffer,
+                    offset: 0,
+                    size: wgpu::BufferSize::new(8),
+                }),
+            },
+            wgpu::BindGroupEntry {
+                binding: 4,
+                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
                     buffer: &u_info_buffer,
                     offset: 0,
                     size: wgpu::BufferSize::new(16),
                 }),
             },
             wgpu::BindGroupEntry {
-                binding: 4,
+                binding: 5,
                 resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
                     buffer: &font_color_buffer,
+                    offset: 0,
+                    size: wgpu::BufferSize::new(16),
+                }),
+            },
+            wgpu::BindGroupEntry {
+                binding: 6,
+                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                    buffer: &u_gradient_start_end_buffer,
+                    offset: 0,
+                    size: wgpu::BufferSize::new(16),
+                }),
+            },
+            wgpu::BindGroupEntry {
+                binding: 7,
+                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                    buffer: &u_outline_buffer,
+                    offset: 0,
+                    size: wgpu::BufferSize::new(16),
+                }),
+            },
+            wgpu::BindGroupEntry {
+                binding: 8,
+                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                    buffer: &u_weight_and_offset_buffer,
                     offset: 0,
                     size: wgpu::BufferSize::new(16),
                 }),
@@ -518,7 +621,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                             view: &view,
                             resolve_target: None,
                             ops: wgpu::Operations {
-                                load: wgpu::LoadOp::Clear(wgpu::Color::GREEN),
+                                load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
                                 store: true,
                             },
                         })],

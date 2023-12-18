@@ -12,7 +12,8 @@ use super::{
         aabb::Direction,
         arc::{Arc, ArcEndpoint},
         line::Line,
-        vector::VectorEXT, segment::SegmentEXT,
+        segment::SegmentEXT,
+        vector::VectorEXT,
     },
     sdf::glyphy_sdf_from_arc_list,
     util::{is_inf, GLYPHY_INFINITY},
@@ -578,7 +579,10 @@ pub fn encode_data_tex(
         // j += 1;
     }
     println!("总共有{}个点", num_endpoints);
-    println!("平均每个格子有{}个点", num_endpoints as f32 / (data.data.len() * data.data[0].len()) as f32);
+    println!(
+        "平均每个格子有{}个点",
+        num_endpoints as f32 / (data.data.len() * data.data[0].len()) as f32
+    );
 
     let mut r = vec![];
     for v in map.values_mut() {
@@ -760,13 +764,14 @@ pub fn recursion_near_arcs_of_cell<'a>(
     arcs: &Vec<&'static Arc>,
     min_width: &mut f32,
     min_height: &mut f32,
-    top_near: Option<Vec<&'static Arc>>,
-    bottom_near: Option<Vec<&'static Arc>>,
-    left_near: Option<Vec<&'static Arc>>,
-    right_near: Option<Vec<&'static Arc>>,
+    top_near: Option<(Vec<&'static Arc>, bool)>,
+    bottom_near: Option<(Vec<&'static Arc>, bool)>,
+    left_near: Option<(Vec<&'static Arc>, bool)>,
+    right_near: Option<(Vec<&'static Arc>, bool)>,
     result_arcs: &mut Vec<(Vec<&'a Arc>, Aabb)>,
-    temps : &mut Vec<(Point, f32, Vec<Range<f32>>)>,
+    temps: &mut Vec<(Point, f32, Vec<Range<f32>>)>,
 ) {
+    // let time = std::time::Instant::now();
     let cell_width = cell.width();
     let cell_height = cell.height();
     if *min_width > cell_width {
@@ -777,33 +782,88 @@ pub fn recursion_near_arcs_of_cell<'a>(
         *min_height = cell_height;
     }
 
-    let (near_arcs, top_near, bottom_near, left_near, right_near) =
-        compute_near_arc(cell, arcs, top_near, bottom_near, left_near, right_near, temps);
+    let (near_arcs, top_near, bottom_near, left_near, right_near) = compute_near_arc(
+        cell,
+        arcs,
+        top_near,
+        bottom_near,
+        left_near,
+        right_near,
+        temps,
+    );
+    let mut arcs: Vec<&Arc> =
+        Vec::with_capacity(near_arcs.len() + top_near.len() + bottom_near.len() + right_near.len());
+    arcs.extend(&near_arcs);
+    arcs.extend(&top_near);
+    arcs.extend(&bottom_near);
+    arcs.extend(&left_near);
+    arcs.extend(&right_near);
+    // println!("near_arcs22222222: {}", near_arcs.len());
+    arcs.sort_by(|a, b| a.id.cmp(&b.id));
+
+    arcs.dedup_by(|a, b| a.id == b.id);
 
     let glyph_width = extents.width();
     let glyph_height = extents.height();
     // println!("cell_width: {}, glyph_width: {}", cell_width, glyph_width);
-    if near_arcs.len() <= 2
+    // println!("time: {:?}",time.elapsed());
+    if arcs.len() <= 2
         || (cell_width * 32.0 - glyph_width).abs() < 0.1
             && (cell_height * 32.0 - glyph_height).abs() < 0.1
     {
-        result_arcs.push((near_arcs, cell.clone()));
+        result_arcs.push((arcs, cell.clone()));
     } else {
         let (
             (cell1, cell2),
             (top_near1, bottom_near1, left_near1, right_near1),
             (top_near2, bottom_near2, left_near2, right_near2),
         ) = if cell_width > cell_height && cell_width * 32.0 > glyph_width {
+            let (ab1, ab2) = cell.half(Direction::Col);
+
+            let col_area = cell.near_area(Direction::Col);
+
+            let mut near_arcs = Vec::with_capacity(arcs.len());
+            let right_segment = ab1.bound(Direction::Right);
+            col_area.near_arcs(&arcs, &right_segment, &mut near_arcs, temps);
+
             (
-                cell.half(Direction::Col),
-                (None, None, Some(left_near), None),
-                (None, None, None, Some(right_near)),
+                (ab1, ab2),
+                (
+                    Some((top_near.clone(), false)),
+                    Some((bottom_near.clone(), false)),
+                    Some((left_near, true)),
+                    Some((near_arcs.clone(), true)),
+                ),
+                (
+                    Some((top_near, false)),
+                    Some((bottom_near, false)),
+                    Some((near_arcs, true)),
+                    Some((right_near, true)),
+                ),
             )
         } else {
+            let (ab1, ab2) = cell.half(Direction::Row);
+
+            let col_area = ab1.near_area(Direction::Row);
+
+            let mut near_arcs = Vec::with_capacity(arcs.len());
+            let bottom_segment = ab1.bound(Direction::Bottom);
+            col_area.near_arcs(&arcs, &bottom_segment, &mut near_arcs, temps);
+
             (
-                cell.half(Direction::Row),
-                (Some(top_near), None, None, None),
-                (None, Some(bottom_near), None, None),
+                (ab1, ab2),
+                (
+                    Some((top_near, true)),
+                    Some((near_arcs.clone(), true)),
+                    Some((left_near.clone(), false)),
+                    Some((right_near.clone(), false)),
+                ),
+                (
+                    Some((near_arcs, true)),
+                    Some((bottom_near, true)),
+                    Some((left_near, false)),
+                    Some((right_near, false)),
+                ),
             )
         };
         // println!("cell1: {:?}, cell2: {:?}, cell: {:?}", cell1, cell2, cell);
@@ -818,7 +878,7 @@ pub fn recursion_near_arcs_of_cell<'a>(
             left_near1,
             right_near1,
             result_arcs,
-            temps
+            temps,
         );
         recursion_near_arcs_of_cell(
             extents,
@@ -831,7 +891,7 @@ pub fn recursion_near_arcs_of_cell<'a>(
             left_near2,
             right_near2,
             result_arcs,
-            temps
+            temps,
         );
     }
 }
@@ -839,11 +899,11 @@ pub fn recursion_near_arcs_of_cell<'a>(
 fn compute_near_arc(
     cell: &Aabb,
     arcs: &Vec<&'static Arc>,
-    mut top_near: Option<Vec<&'static Arc>>,
-    mut bottom_near: Option<Vec<&'static Arc>>,
-    mut left_near: Option<Vec<&'static Arc>>,
-    mut right_near: Option<Vec<&'static Arc>>,
-    temps : &mut Vec<(Point, f32, Vec<Range<f32>>)>,
+    mut top_near: Option<(Vec<&'static Arc>, bool)>,
+    mut bottom_near: Option<(Vec<&'static Arc>, bool)>,
+    mut left_near: Option<(Vec<&'static Arc>, bool)>,
+    mut right_near: Option<(Vec<&'static Arc>, bool)>,
+    temps: &mut Vec<(Point, f32, Vec<Range<f32>>)>,
 ) -> (
     Vec<&'static Arc>,
     Vec<&'static Arc>,
@@ -864,8 +924,15 @@ fn compute_near_arc(
     // println!("near_arcs: {:?}", near_arcs);
     let row_area = cell.near_area(Direction::Row);
 
-    let top_near = if let Some(near) = top_near.take() {
-        near
+    let top_near = if let Some((near, is_use)) = top_near.take() {
+        if is_use {
+            near
+        } else {
+            let mut near_arcs = Vec::with_capacity(near.len());
+            let top_segment = cell.bound(Direction::Top);
+            row_area.near_arcs(&near, &top_segment, &mut near_arcs, temps);
+            near_arcs
+        }
     } else {
         let mut top_near = Vec::with_capacity(arcs.len());
         let top_segment = cell.bound(Direction::Top);
@@ -873,8 +940,15 @@ fn compute_near_arc(
         top_near
     };
 
-    let bottom_near = if let Some(near_arcs) = bottom_near.take() {
-        near_arcs
+    let bottom_near = if let Some((near, is_use)) = bottom_near.take() {
+        if is_use {
+            near
+        } else {
+            let mut near_arcs = Vec::with_capacity(near.len());
+            let bottom_segment = cell.bound(Direction::Bottom);
+            row_area.near_arcs(&near, &bottom_segment, &mut near_arcs, temps);
+            near_arcs
+        }
     } else {
         let mut near_arcs = Vec::with_capacity(arcs.len());
         let bottom_segment = cell.bound(Direction::Bottom);
@@ -884,8 +958,15 @@ fn compute_near_arc(
 
     let col_area = cell.near_area(Direction::Col);
 
-    let left_near = if let Some(near_arcs) = left_near.take() {
-        near_arcs
+    let left_near = if let Some((near, is_use)) = left_near.take() {
+        if is_use {
+            near
+        } else {
+            let mut near_arcs = Vec::with_capacity(near.len());
+            let left_segment = cell.bound(Direction::Left);
+            col_area.near_arcs(&near, &left_segment, &mut near_arcs, temps);
+            near_arcs
+        }
     } else {
         let mut near_arcs = Vec::with_capacity(arcs.len());
         let left_segment = cell.bound(Direction::Left);
@@ -893,8 +974,15 @@ fn compute_near_arc(
         near_arcs
     };
 
-    let right_near = if let Some(near_arcs) = right_near.take() {
-        near_arcs
+    let right_near = if let Some((near, is_use)) = right_near.take() {
+        if is_use {
+            near
+        } else {
+            let mut near_arcs = Vec::with_capacity(near.len());
+            let right_segment = cell.bound(Direction::Right);
+            col_area.near_arcs(&near, &right_segment, &mut near_arcs, temps);
+            near_arcs
+        }
     } else {
         let mut near_arcs = Vec::with_capacity(arcs.len());
         let right_segment = cell.bound(Direction::Right);
@@ -902,20 +990,12 @@ fn compute_near_arc(
         near_arcs
     };
 
-    near_arcs.extend(&top_near);
-    near_arcs.extend(&bottom_near);
-    near_arcs.extend(&left_near);
-    near_arcs.extend(&right_near);
-    // println!("near_arcs22222222: {}", near_arcs.len());
-    near_arcs.sort_by(|a, b| a.id.cmp(&b.id));
-
-    near_arcs.dedup_by(|a, b| a.id == b.id);
     (near_arcs, top_near, bottom_near, left_near, right_near)
 }
 
 #[test]
 fn test1() {
-    let mut vec1 = vec![1, 2, 3, 5,4, 5, 6];
+    let mut vec1 = vec![1, 2, 3, 5, 4, 5, 6];
     vec1.dedup_by(|a, b| a == b);
     println!("vec: {:?}", vec1);
     // let arcs = vec![

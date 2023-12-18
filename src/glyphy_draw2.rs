@@ -8,7 +8,7 @@ use crate::{
             travel_data, BlobArc, Extents, UnitArc,
         },
         geometry::{
-            aabb::AabbEXT,
+            aabb::{AabbEXT, Direction},
             arc::{Arc, ArcEndpoint},
             arcs::glyphy_arc_list_extents,
             line::Line,
@@ -116,9 +116,10 @@ pub fn get_char_arc(
 
     let mut result_arc = vec![];
     let mut temp = Vec::with_capacity(arcs.len());
+    let (ab1, ab2) = extents.half(Direction::Col);
     recursion_near_arcs_of_cell(
         &extents,
-        &extents,
+        &ab1,
         &arcs,
         &mut min_width,
         &mut min_height,
@@ -127,11 +128,74 @@ pub fn get_char_arc(
         None,
         None,
         &mut result_arc,
-        &mut temp
+        &mut temp,
+    );
+    recursion_near_arcs_of_cell(
+        &extents,
+        &ab2,
+        &arcs,
+        &mut min_width,
+        &mut min_height,
+        None,
+        None,
+        None,
+        None,
+        &mut result_arc,
+        &mut temp,
     );
 
     let width_cells = (extents.width() / min_width).floor() as usize;
     let height_cells = (extents.height() / min_height).floor() as usize;
+    let mut arcs = BlobArc {
+        cell_size: min_width,
+        width_cells: width_cells as f32,
+        height_cells: height_cells as f32,
+        tex_data: None,
+        show: format!("<br> 格子数：宽 = {}, 高 = {} <br>", min_width, min_height),
+        extents,
+        data: encode_to_uint_arc_data(
+            result_arc,
+            &extents,
+            min_width,
+            min_height,
+            width_cells,
+            height_cells,
+        ),
+        avg_fetch_achieved: 0.0,
+        endpoints: endpoints.clone(),
+    };
+    println!("计算格子: {:?}", begin.elapsed());
+    let [min_sdf, max_sdf] = travel_data(&arcs);
+
+    arcs.tex_data = Some(encode_to_tex(
+        &mut arcs,
+        extents,
+        extents.width(),
+        extents.height(),
+        width_cells as f32,
+        height_cells as f32,
+        min_sdf,
+        max_sdf,
+    ));
+
+    extents.scale(1.0 / upem, 1.0 / upem);
+
+    gi.nominal_w = width_cells as f32;
+    gi.nominal_h = height_cells as f32;
+
+    gi.extents.set(&extents);
+
+    arcs
+}
+
+pub fn encode_to_uint_arc_data(
+    result_arcs: Vec<(Vec<&Arc>, Aabb)>,
+    extents: &Aabb,
+    min_width: f32,
+    min_height: f32,
+    width_cells: usize,
+    height_cells: usize,
+) -> Vec<Vec<UnitArc>> {
     let mut data = vec![
         vec![
             UnitArc {
@@ -159,7 +223,7 @@ pub fn get_char_arc(
     let c = extents.center();
     let unit = glyph_width.max(glyph_height);
 
-    for (near_arcs, cell) in result_arc {
+    for (near_arcs, cell) in result_arcs {
         let mut near_endpoints = vec![];
         let mut _p1 = Point::new(0.0, 0.0);
         for i in 0..near_arcs.len() {
@@ -251,40 +315,8 @@ pub fn get_char_arc(
             }
         }
     }
-    println!("格子计算: {:?}", begin.elapsed());
 
-    let mut arcs = BlobArc {
-        cell_size: min_width,
-        width_cells: width_cells as f32,
-        height_cells: height_cells as f32,
-        tex_data: None,
-        show: format!("<br> 格子数：宽 = {}, 高 = {} <br>", min_width, min_height),
-        extents,
-        data,
-        avg_fetch_achieved: 0.0,
-        endpoints: endpoints.clone(),
-    };
-    let [min_sdf, max_sdf] = travel_data(&arcs);
-
-    arcs.tex_data = Some(encode_to_tex(
-        &mut arcs,
-        extents,
-        glyph_width,
-        glyph_height,
-        width_cells as f32,
-        height_cells as f32,
-        min_sdf,
-        max_sdf,
-    ));
-
-    extents.scale(1.0 / upem, 1.0 / upem);
-
-    gi.nominal_w = width_cells as f32;
-    gi.nominal_h = height_cells as f32;
-
-    gi.extents.set(&extents);
-
-    arcs
+    data
 }
 
 #[wasm_bindgen]

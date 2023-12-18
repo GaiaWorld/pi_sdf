@@ -12,9 +12,13 @@ precision highp float;
 
 // (max_offset, min_sdf, sdf_step, check)
 // 如果 晶格的 sdf 在 [-check, check]，该晶格 和 字体轮廓 可能 相交 
-layout(set = 0, binding = 3) uniform vec4 u_info;
+layout(set = 0, binding = 4) uniform vec4 u_info;
 
-layout(set = 0, binding = 4) uniform vec4 uColor; 
+layout(set = 0, binding = 5) uniform vec4 uColor; 
+
+layout(set = 0, binding = 6) uniform vec4 u_gradientStarteEnd;
+layout(set = 0, binding = 7) uniform vec4 u_outline;
+layout(set = 0, binding = 8) uniform vec4 u_weightAndOffset;
 
 layout(set = 1, binding = 0) uniform  sampler index_tex_samp;
 layout(set = 1, binding = 1) uniform  texture2D u_index_tex;
@@ -26,7 +30,8 @@ layout(set = 2, binding = 1) uniform  texture2D u_data_tex;
 // (网格的边界-宽, 网格的边界-高, z, w)
 // z(有效位 低15位) --> (高7位:纹理偏移.x, 中6位:网格宽高.x, 低2位: 00) 
 // w(有效位 低15位) --> (高7位:纹理偏移.y, 中6位:网格宽高.y, 低2位: 00) 
-layout(location = 0) in vec4 v_glyph;
+layout (location = 0) in vec4 v_glyph;
+layout (location = 1) in vec2 lp;
 
 out vec4 fragColor;
 
@@ -76,11 +81,9 @@ struct line_t {
 
 // 修复glsl bug 的 取余
 // 某些显卡, 当b为uniform, 且 a % b 为 0 时候，会返回 b
-//                 56,       256
+
 vec2 div_mod(float a, float b) {
-	// 0
 	float d = floor(a / b);
-	// 56
 	float m = mod(a, b);
 	if (m == b) {
 		return vec2(d + 1.0, 0.0);
@@ -297,19 +300,11 @@ glyphy_index_t decode_glyphy_index(vec4 v, const vec2 nominal_size)
 }
 
 // 取 索引 uv
-// (0.0, 0.0) (13.0, 19.0)
-// (13.0, 19.0) (13.0, 19.0)
 vec2 get_index_uv(vec2 p, vec2 nominal_size)
 {
-	// (0.0,0.0)
-	// (13, 19)
 	p = floor(p);
-	// (0.5, 0.5)
-	// (12.0, 18.0)
 	vec2 cell = vec2(0.5) + clamp(p, vec2(0.0), nominal_size - vec2(1.0) );
 
-	// (0.5 / 13.0, 0.5 / 19.0)
-	// (12.0 / 13.0, 18.0 / 19.0)
 	return cell / vec2(nominal_size);
 }
 
@@ -447,29 +442,22 @@ struct glyph_info_t {
 // 解码 
 // v.x (有效位 低15位) --> (高7位:纹理偏移.x, 中6位:网格宽高.x, 低2位: 00) 
 // v.y (有效位 低15位) --> (高7位:纹理偏移.y, 中6位:网格宽高.y, 低2位: 00) 
-// (52.0, 76.0)
-
 glyph_info_t glyph_info_decode(vec2 v) {
 	glyph_info_t gi;
 
 	// mod 256 取低8位
 	// 除4 取低8位中的 高6位
-	// (0.0, 52.0)
+	
 	vec2 rx = div_mod(v.x, 256.0);
-	// (0.0, 76.0)
 	vec2 ry = div_mod(v.y, 256.0);
 
-	// (52.0, 76.0)
 	vec2 r = vec2(rx.y, ry.y);
 	
 	// TODO +2 不了解什么意思 
-	// (13, 19)
 	ivec2 size = (ivec2(r) + 2) / 4;
-	// (13, 19)
 	gi.nominal_size = vec2(size);
 
 	// 去掉 低8位的 信息 
-	// (0, 0)
 	ivec2 pos = ivec2(v) / 256;
 	gi.atlas_pos = vec2(pos);
 	
@@ -502,11 +490,77 @@ void main() {
 
 	float sdist = gsdist * scale;
 
-	float alpha = antialias(sdist);
+	// 每渲染像素对应Distance
+	// 1024. 是数据生成时用的计算范围
+	float distancePerPixel = 1.;
 
-	fragColor = vec4(uColor.rgb, alpha * uColor.a);
+	float weight = u_weightAndOffset.x;
+	sdist = sdist - weight * distancePerPixel;
+
+	float alpha = antialias(sdist);
+	vec4 faceColor = vec4(uColor.rgb, alpha);
+
+	
+    // gradient
+    vec3 gradientColor1     = vec3(0.1, 0.8, 0.2);
+    float gradientAmount1   = 0.1;
+    
+    vec3 gradientColor2     = vec3(0.7, 0.5, 0.2);
+    float gradientAmount2   = 0.3;
+    
+    vec3 gradientColor3     = vec3(0.7, 0.0, 0.2);
+    float gradientAmount3   = 0.6;
+    
+    vec3 gradientColor4     = vec3(0.0, 0.0, 0.7);
+    float gradientAmount4   = 0.9;
+
+    vec2 gradientStart      = u_gradientStarteEnd.xy;
+    vec2 gradientEnd        = u_gradientStarteEnd.zw;
+    vec2 gradientDir        = gradientEnd - gradientStart; // 逻辑控制 两者不相等
+    vec2 gradientDirNor     = normalize(gradientDir);
+    float gradientLength    = length(gradientDir);
+
+	vec2 local				= lp;
+    vec2 gradientV          = local - gradientStart;
+    float gradient          = dot(gradientV, gradientDirNor) / gradientLength;
+
+    vec3 gradientColor      = gradientColor1 * step(gradient, gradientAmount1)
+                            + mix(gradientColor1, gradientColor2, (gradient - gradientAmount1) / (gradientAmount2 - gradientAmount1)) * (step(gradientAmount1, gradient) * step(gradient, gradientAmount2) )
+                            + mix(gradientColor2, gradientColor3, (gradient - gradientAmount2) / (gradientAmount3 - gradientAmount2)) * (step(gradientAmount2, gradient) * step(gradient, gradientAmount3) )
+                            + mix(gradientColor3, gradientColor4, (gradient - gradientAmount3) / (gradientAmount4 - gradientAmount3)) * (step(gradientAmount3, gradient) * step(gradient, gradientAmount4) )
+                            + gradientColor4 * step(gradientAmount4, gradient);
+							
+    faceColor.rgb   = mix(faceColor.rgb, gradientColor, step(0.05, gradientLength));
+	// faceColor.rgb *= 0.0;
+	
+	float outlineSofeness 	= 0.8;
+	float outlineWidth 		= u_outline.w * distancePerPixel;
+	vec4 outlineColor 		= vec4(u_outline.xyz, 1.);
+	float outline 			= (1.0 - smoothstep(0., outlineWidth, abs(sdist))) * step(-0.1, sdist);
+	float alphaOutline 		= min(outline, 1.0 - alpha) * step(0.001, outline);
+	float outlineFactor 	= smoothstep(0.0, outlineSofeness, alphaOutline);
+	outlineColor.a 			= outlineFactor;
+	vec4 finalColor 		= mix(faceColor, outlineColor, outlineFactor);
+	// finalColor.a = antialias(finalColor.a);
+
+	// gl_FragColor = finalColor;
+
+	// gl_FragColor = vec4(sdist * 0.05 + 0.4);
+
+	float edgeCotrol = u_weightAndOffset.z;
+	float right = step(edgeCotrol * 1.2 - 0.1, lp.x);
+	
+	float d = abs(fwidth(lp.x));
+	fragColor = mix(
+		finalColor,
+		vec4(
+			floor(
+				((sdist + u_info.y * d) / u_info.z * 0.5 + 0.5) * 16.
+			) / 16.
+		),
+		right
+	);
 	fragColor.rgb *= fragColor.a;
-	// fragColor = vec4(alpha, 0., 0., 1.);
 
 	// 画 网格
 

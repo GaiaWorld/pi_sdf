@@ -5,11 +5,14 @@ precision highp float;
 layout(set = 0, binding = 0) uniform mat4 uWorld;
 layout(set = 0, binding = 1) uniform mat4 uView;
 layout(set = 0, binding = 2) uniform mat4 uProj;
+// 斜率, 斜体需要
+layout(set = 0, binding = 3) uniform vec2 slope;
 
 // glyph_vertex_t: x, y; g16hi, g16lo; 
 layout (location = 0) in vec4 a_glyph_vertex;
 
-out vec4 v_glyph;
+layout (location = 0) out vec4 v_glyph;
+layout (location = 1) out vec2 lp;
 
 // "A" 中 的 v = (26.0, 38.0)
 // (26.0, 39.0)
@@ -42,5 +45,9 @@ vec4 glyph_vertex_transcode(vec2 v)
 void main() {
     v_glyph = glyph_vertex_transcode(a_glyph_vertex.zw);
 
-    gl_Position = uProj * uView * uWorld * vec4(a_glyph_vertex.xy, 0.0, 1.0);
+    float x = (slope.y - a_glyph_vertex.y) * slope.x;
+    vec2 pos = vec2(a_glyph_vertex.x - x, a_glyph_vertex.y);
+
+    gl_Position = uProj * uView * uWorld * vec4(pos, 0.0, 1.0);
+    lp = a_glyph_vertex.xy;
 }
