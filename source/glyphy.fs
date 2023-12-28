@@ -12,26 +12,30 @@ precision highp float;
 
 // (max_offset, min_sdf, sdf_step, check)
 // 如果 晶格的 sdf 在 [-check, check]，该晶格 和 字体轮廓 可能 相交 
-layout(set = 0, binding = 4) uniform vec4 u_info;
+layout(set = 1, binding = 0) uniform vec4 uColor; 
+layout(set = 1, binding = 1) uniform vec4 u_outline;
+layout(set = 1, binding = 2) uniform vec4 u_weightAndOffset;
+layout(set = 1, binding = 3) uniform vec4 u_gradientStarteEnd;
+layout(set = 1, binding = 4) uniform mat4 u_gradient;
 
-layout(set = 0, binding = 5) uniform vec4 uColor; 
+layout(set = 2, binding = 0) uniform sampler index_tex_samp;
+layout(set = 2, binding = 1) uniform texture2D u_index_tex;
+layout(set = 2, binding = 2) uniform vec2 index_tex_size;
 
-layout(set = 0, binding = 6) uniform vec4 u_gradientStarteEnd;
-layout(set = 0, binding = 7) uniform vec4 u_outline;
-layout(set = 0, binding = 8) uniform vec4 u_weightAndOffset;
-
-layout(set = 1, binding = 0) uniform  sampler index_tex_samp;
-layout(set = 1, binding = 1) uniform  texture2D u_index_tex;
-
-layout(set = 2, binding = 0) uniform  sampler data_tex_samp;
-layout(set = 2, binding = 1) uniform  texture2D u_data_tex;
+layout(set = 3, binding = 0) uniform sampler data_tex_samp;
+layout(set = 3, binding = 1) uniform texture2D u_data_tex;
+layout(set = 3, binding = 2) uniform vec2 data_tex_size;
 
 
 // (网格的边界-宽, 网格的边界-高, z, w)
 // z(有效位 低15位) --> (高7位:纹理偏移.x, 中6位:网格宽高.x, 低2位: 00) 
 // w(有效位 低15位) --> (高7位:纹理偏移.y, 中6位:网格宽高.y, 低2位: 00) 
-layout (location = 0) in vec4 v_glyph;
-layout (location = 1) in vec2 lp;
+layout (location = 5) in vec2 uv;
+layout (location = 6) in vec2 lp;
+layout (location = 7) in vec4 index_offset_and_size;
+layout (location = 8) in vec2 u_data_offset;
+layout (location = 9) in vec4 u_info;
+
 
 out vec4 fragColor;
 
@@ -81,7 +85,7 @@ struct line_t {
 
 // 修复glsl bug 的 取余
 // 某些显卡, 当b为uniform, 且 a % b 为 0 时候，会返回 b
-
+// 128 , 256
 vec2 div_mod(float a, float b) {
 	float d = floor(a / b);
 	float m = mod(a, b);
@@ -300,28 +304,27 @@ glyphy_index_t decode_glyphy_index(vec4 v, const vec2 nominal_size)
 }
 
 // 取 索引 uv
-vec2 get_index_uv(vec2 p, vec2 nominal_size)
+vec2 get_index_uv(vec2 nominal_size)
 {
-	p = floor(p);
-	vec2 cell = vec2(0.5) + clamp(p, vec2(0.0), nominal_size - vec2(1.0) );
-
-	return cell / vec2(nominal_size);
+	vec2 offset = vec2(index_offset_and_size.xy);
+	return (nominal_size * uv + offset) / index_tex_size;
 }
 
-glyphy_index_t get_glyphy_index(const vec2 p, const vec2 nominal_size) {
-	vec2 index_uv = get_index_uv(p, nominal_size);
-	
-	// vec4 c = texture2D(u_index_tex, index_uv).rgba;
-	vec4 c = texture(sampler2D(u_index_tex, index_tex_samp), index_uv).rgba;
 
+
+glyphy_index_t get_glyphy_index(vec2 nominal_size) {
+	
+	vec2 index_uv = get_index_uv(nominal_size);
+	
+	vec4 c = texture(sampler2D(u_index_tex, index_tex_samp), index_uv).rgba;
 	return decode_glyphy_index(c, nominal_size);
 }
 
 
 // 重点 计算 sdf 
-float glyphy_sdf(const vec2 p, vec2 nominal_size, vec2 atlas_pos) {
+float glyphy_sdf(vec2 p, vec2 nominal_size) {
 
-	glyphy_index_t index_info = get_glyphy_index(p, nominal_size);
+	glyphy_index_t index_info = get_glyphy_index(nominal_size);
 		
 	// if (index_info.sdf >= GLYPHY_INFINITY - GLYPHY_EPSILON) {
 	// 	// 全外面
@@ -338,8 +341,12 @@ float glyphy_sdf(const vec2 p, vec2 nominal_size, vec2 atlas_pos) {
 	
 	// 注：N卡，和 高通 的 显卡，纹理 需要 加 0.5像素
 	float offset = 0.5 + float(index_info.offset);
+	// float a = offset / u_info.x;
+	float x = floor(offset / 8.0) + u_data_offset.x;
+	float y = mod(offset, 8.0) + u_data_offset.y;
 
-	vec4 rgba = texture(sampler2D(u_data_tex, data_tex_samp), vec2(offset / u_info.x, 0.0));
+
+	vec4 rgba = texture(sampler2D(u_data_tex, data_tex_samp), vec2(x, y) / data_tex_size);
 	
 
 	glyphy_arc_t closest_arc;
@@ -351,7 +358,10 @@ float glyphy_sdf(const vec2 p, vec2 nominal_size, vec2 atlas_pos) {
 	for(int i = 1; i < GLYPHY_MAX_NUM_ENDPOINTS; i++) {
 		// vec4 rgba = vec4(0.0);
 		float offset = 0.5 + float(index_info.offset + i);
-		vec4 rgba = texture(sampler2D(u_data_tex, data_tex_samp), vec2(offset / u_info.x, 0.0));
+		float x = floor(offset / 8.0) + u_data_offset.x;
+		float y = mod(offset, 8.0) + u_data_offset.y;
+		
+		vec4 rgba = texture(sampler2D(u_data_tex, data_tex_samp), vec2(x, y) / data_tex_size);
 
 		if(index_info.num_endpoints == 0) {
 			if (rgba == vec4(0.0)) {
@@ -477,13 +487,10 @@ float antialias(float d) {
 }
 
 void main() {
-	vec2 p = v_glyph.xy;
-
-	// 解码 p
-	glyph_info_t gi = glyph_info_decode(v_glyph.zw);
-
+	vec2 nominal_size = vec2(index_offset_and_size.zw);
+	vec2 p = uv * nominal_size;
 	// 重点：计算 SDF 
-	float gsdist = glyphy_sdf(p, gi.nominal_size, gi.atlas_pos);
+	float gsdist = glyphy_sdf(p, nominal_size);
 	
 	// 均匀缩放 
 	float scale = SQRT2 / length(fwidth(p));
@@ -499,20 +506,19 @@ void main() {
 
 	float alpha = antialias(sdist);
 	vec4 faceColor = vec4(uColor.rgb, alpha);
-
 	
     // gradient
-    vec3 gradientColor1     = vec3(0.1, 0.8, 0.2);
-    float gradientAmount1   = 0.1;
+    vec3 gradientColor1     = vec3(u_gradient[0][0], u_gradient[0][1], u_gradient[0][2]);
+    float gradientAmount1   = u_gradient[0][3];
     
-    vec3 gradientColor2     = vec3(0.7, 0.5, 0.2);
-    float gradientAmount2   = 0.3;
+    vec3 gradientColor2     = vec3(u_gradient[1][0], u_gradient[1][1], u_gradient[1][2]);
+    float gradientAmount2   = u_gradient[1][3];
     
-    vec3 gradientColor3     = vec3(0.7, 0.0, 0.2);
-    float gradientAmount3   = 0.6;
+    vec3 gradientColor3     = vec3(u_gradient[2][0], u_gradient[2][1], u_gradient[2][2]);
+    float gradientAmount3   = u_gradient[2][3];
     
-    vec3 gradientColor4     = vec3(0.0, 0.0, 0.7);
-    float gradientAmount4   = 0.9;
+    vec3 gradientColor4     = vec3(u_gradient[3][0], u_gradient[3][1], u_gradient[3][2]);
+    float gradientAmount4   = u_gradient[3][3];
 
     vec2 gradientStart      = u_gradientStarteEnd.xy;
     vec2 gradientEnd        = u_gradientStarteEnd.zw;
@@ -530,12 +536,13 @@ void main() {
                             + mix(gradientColor3, gradientColor4, (gradient - gradientAmount3) / (gradientAmount4 - gradientAmount3)) * (step(gradientAmount3, gradient) * step(gradient, gradientAmount4) )
                             + gradientColor4 * step(gradientAmount4, gradient);
 							
-    faceColor.rgb   = mix(faceColor.rgb, gradientColor, step(0.05, gradientLength));
+    faceColor.rgb   		= mix(faceColor.rgb, gradientColor, step(0.05, gradientLength));
 	// faceColor.rgb *= 0.0;
 	
 	float outlineSofeness 	= 0.8;
 	float outlineWidth 		= u_outline.w * distancePerPixel;
-	vec4 outlineColor 		= vec4(u_outline.xyz, 1.);
+	vec4 outlineColor 		= vec4(u_outline.xyz, 1.0);
+	// outlineColor.rgb *=0.0;
 	float outline 			= (1.0 - smoothstep(0., outlineWidth, abs(sdist))) * step(-0.1, sdist);
 	float alphaOutline 		= min(outline, 1.0 - alpha) * step(0.001, outline);
 	float outlineFactor 	= smoothstep(0.0, outlineSofeness, alphaOutline);
@@ -561,7 +568,11 @@ void main() {
 		right
 	);
 	fragColor.rgb *= fragColor.a;
+	// fragColor.rgb = gradientColor;
 
+
+	// fragColor = faceColor;
+	// fragColor.rgb *= fragColor.a;
 	// 画 网格
 
 	// float w = 0.03;

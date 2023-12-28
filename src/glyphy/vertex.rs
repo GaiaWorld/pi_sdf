@@ -4,6 +4,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use super::geometry::aabb::AabbEXT;
 
 #[wasm_bindgen]
+#[derive(Debug, Clone)]
 pub struct GlyphInfo {
     pub(crate) extents: Aabb,
 
@@ -33,6 +34,115 @@ impl GlyphInfo {
     }
 }
 
+impl GlyphInfo {
+    /**
+     * 顶点数据，每字符 一个 四边形，2个三角形，6个顶点
+     *
+     * 拐点: 0, 0, 1, 1
+     *
+     * 通过 glyph_vertex_encode 函数 编码，数据如下：
+     *    - 位置信息: x, y
+     *	  - corner_x/corner_y: 0 代表 左/上，1代表 右/下
+     *	  - 纹理信息: 纹理 起始位置, corner_x/corner_y, 格子个数（宽，高）
+     */
+    pub fn add_glyph_vertices(
+        &self,
+        font_size: Option<f32>, // = 1.0
+        extents: Option<&mut Aabb>,
+    ) -> [GlyphyVertex; 4] {
+        let font_size = if let Some(v) = font_size { v } else { 1.0 };
+        let r = [
+            self.encode_corner(0.0, 0.0, font_size),
+            self.encode_corner(0.0, 1.0, font_size),
+            self.encode_corner(1.0, 0.0, font_size),
+            self.encode_corner(1.0, 1.0, font_size),
+        ];
+
+        if let Some(extents) = extents {
+            extents.clear();
+            for i in 0..4 {
+                let p = Point::new(r[i].x, r[i].y);
+                extents.add(p);
+            }
+        }
+
+        return r;
+    }
+
+    pub fn add_glyph_uv(&self) -> [GlyphyUV; 4] {
+        let r = [
+            self.encode_corner2(0.0, 0.0),
+            self.encode_corner2(0.0, 1.0),
+            self.encode_corner2(1.0, 0.0),
+            self.encode_corner2(1.0, 1.0),
+        ];
+
+        return r;
+    }
+
+    pub fn encode_corner2(&self, cx: f32, cy: f32) -> GlyphyUV {
+        return self.glyph_vertex_encode2(cx, cy);
+    }
+
+    pub fn encode_corner(&self, cx: f32, cy: f32, font_size: f32) -> GlyphyVertex {
+        let vx = font_size * ((1.0 - cx) * self.extents.mins.x + cx * self.extents.maxs.x);
+
+        let vy = font_size * ((1.0 - cy) * self.extents.mins.y + cy * self.extents.maxs.y);
+
+        return self.glyph_vertex_encode(vx, vy, cx, cy);
+    }
+
+    /**
+     * 顶点 编码
+     */
+    pub fn glyph_vertex_encode(
+        &self,
+        x: f32,
+        y: f32,
+        corner_x: f32,
+        corner_y: f32, // 0 代表 左/上，1代表 右/下
+    ) -> GlyphyVertex {
+        let encoded = glyph_encode(
+            self.atlas_x as i32,
+            self.atlas_y as i32,
+            corner_x as i32,
+            corner_y as i32,
+            self.nominal_w as i32,
+            self.nominal_h as i32,
+        );
+
+        return GlyphyVertex {
+            x,
+            y,
+            g16hi: encoded >> 16,
+            g16lo: encoded & 0xFFFF,
+        };
+    }
+
+    /**
+     * 顶点 编码
+     */
+    pub fn glyph_vertex_encode2(
+        &self,
+        corner_x: f32,
+        corner_y: f32, // 0 代表 左/上，1代表 右/下
+    ) -> GlyphyUV {
+        let encoded = glyph_encode(
+            self.atlas_x as i32,
+            self.atlas_y as i32,
+            corner_x as i32,
+            corner_y as i32,
+            self.nominal_w as i32,
+            self.nominal_h as i32,
+        );
+
+        return GlyphyUV {
+            g16hi: encoded >> 16,
+            g16lo: encoded & 0xFFFF,
+        };
+    }
+}
+
 pub struct GlyphyVertex {
     // 位置信息
     // 就是 该字符 包围盒 对应 的 位置
@@ -47,73 +157,13 @@ pub struct GlyphyVertex {
     pub g16lo: i32,
 }
 
-/**
- * 顶点数据，每字符 一个 四边形，2个三角形，6个顶点
- *
- * 拐点: 0, 0, 1, 1
- *
- * 通过 glyph_vertex_encode 函数 编码，数据如下：
- *    - 位置信息: x, y
- *	  - corner_x/corner_y: 0 代表 左/上，1代表 右/下
- *	  - 纹理信息: 纹理 起始位置, corner_x/corner_y, 格子个数（宽，高）
- */
-pub fn add_glyph_vertices(
-    gi: &GlyphInfo,
-    font_size: Option<f32>, // = 1.0
-    extents: Option<&mut Aabb>,
-) -> [GlyphyVertex; 4] {
-    let font_size = if let Some(v) = font_size { v } else { 1.0 };
-    let r = [
-        encode_corner(0.0, 0.0, gi, font_size),
-        encode_corner(0.0, 1.0, gi, font_size),
-        encode_corner(1.0, 0.0, gi, font_size),
-        encode_corner(1.0, 1.0, gi, font_size),
-    ];
-
-    if let Some(extents) = extents {
-        extents.clear();
-        for i in 0..4 {
-            let p = Point::new(r[i].x, r[i].y);
-            extents.add(p);
-        }
-    }
-
-    return r;
-}
-
-pub fn encode_corner(cx: f32, cy: f32, gi: &GlyphInfo, font_size: f32) -> GlyphyVertex {
-    let vx = font_size * ((1.0 - cx) * gi.extents.mins.x + cx * gi.extents.maxs.x);
-
-    let vy = font_size * ((1.0 - cy) * gi.extents.mins.y + cy * gi.extents.maxs.y);
-
-    return glyph_vertex_encode(vx, vy, cx, cy, gi);
-}
-
-/**
- * 顶点 编码
- */
-pub fn glyph_vertex_encode(
-    x: f32,
-    y: f32,
-    corner_x: f32,
-    corner_y: f32, // 0 代表 左/上，1代表 右/下
-    gi: &GlyphInfo,
-) -> GlyphyVertex {
-    let encoded = glyph_encode(
-        gi.atlas_x as i32,
-        gi.atlas_y as i32,
-        corner_x as i32,
-        corner_y as i32,
-        gi.nominal_w as i32,
-        gi.nominal_h as i32,
-    );
-
-    return GlyphyVertex {
-        x,
-        y,
-        g16hi: encoded >> 16,
-        g16lo: encoded & 0xFFFF,
-    };
+pub struct GlyphyUV {
+    // Glyph 信息，具体包含内容如下：
+    //   + 纹理 起始位置
+    //   + corner_x / corner_y: 0 代表 左 / 上，1代表 右 / 下
+    //   + 格子个数（宽，高）
+    pub g16hi: i32,
+    pub g16lo: i32,
 }
 
 pub fn glyph_encode(

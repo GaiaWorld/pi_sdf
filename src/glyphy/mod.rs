@@ -5,4 +5,3 @@ pub mod outline;
 pub mod sdf;
 pub mod util;
 pub mod vertex;
-pub mod blob_new;

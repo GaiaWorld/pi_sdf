@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>字体：正常，粗体，描边，阴影，外发光</title>
+</head>
+
+<body>
+    <label for="char" style="position: relative; left:10%;">(0, 0) 在左下角</label>
+    <br><br>
+
+    <label for="dubug" style="position: relative; left:10%;">进入调试模式：</label>
+    <input type="checkbox" id="debug" value=false style="position: relative; left:10%;">
+    <br><br>
+    
+    <label for="char" style="position: relative; left:10%;">输入字符：</label>
+    <input type="text" id="char" value="魔" placeholder="输入字符" style="position: relative; left:10%;">
+    <br><br>
+    <label for="char_size" style="position: relative; left:10%;">像素大小：</label>
+    <input type="text" id="char_size" value="64" placeholder="像素大小" style="position: relative; left:10%;">
+    <br><br>
+    <canvas id="sdf-canvas" width="512" height="512" style="position: absolute; left: 150px; width:512px;height:512px;"></canvas>
+    <br><br>
+    <div id="debug_canvas" >
+        <form>
+            <fieldset>
+                <legend>贝塞尔曲线</legend>
+                <input type="checkbox" id="isBezierRender">
+                <label for="isBezierRender">是否渲染</label><br>
+                <input type="radio" id="bezierFill" name="bezier" value="fill" checked>
+                <label for="bezierFill">Fill: 红色</label><br>
+                <input type="radio" id="bezierStroke" name="bezier" value="stroke">
+                <label for="bezierStroke">Stroke: 红色</label><br>
+                <input type="checkbox" id="bezierEndpoints">
+                <label for="bezierEndpoints">Endpoints: 紫</label>
+            </fieldset>
+            <fieldset>
+                <legend>圆弧</legend>
+                <input type="checkbox" id="isArcRender" checked>
+                <label for="isArcRender">是否渲染</label><br>
+                <input type="radio" id="arcFill" name="arc" value="fill" checked>
+                <label for="arcFill">Fill: 绿色</label><br>
+                <input type="radio" id="arcStroke" name="arc" value="stroke">
+                <label for="arcStroke">Stroke: 绿色</label><br>
+                <input type="checkbox" id="arcEndpoints" checked>
+                <label for="arcEndpoints">Endpoints: 蓝色</label>
+            </fieldset>
+            <fieldset>
+                <legend>SDF</legend>
+                <input type="checkbox" id="grid" checked>
+                <label for="grid">画网格（此时，左键点击格子，会出现格子对应的端点【黑色】）</label><br>
+
+                <input type="checkbox" id="isSDFRender">
+                <label for="isSDFRender">渲染 SDF（没实现）</label><br>
+                </label>
+            </fieldset>
+        </form>
+        <!-- <label>圆弧 端点 数量：</label><label id="arc_count">：</label> -->
+        <br>
+        <!-- <label>贝塞尔曲线 端点 数量：</label><label id="bezier_count"></label> -->
+        <br>
+        <label id="data_texture_pixels"></label>
+        <br>
+        <canvas id="font-canvas" width="3000" height="4000" style="width:3000px;height:4000px"></canvas>
+    </div>    
+    <script type="module" src="app.js"></script>
+</body>
+
+</html>

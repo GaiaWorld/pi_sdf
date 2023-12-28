@@ -1,167 +1,44 @@
-use std::char;
-
 use ab_glyph_rasterizer::{point, Rasterizer};
 use allsorts::{
-    binary::read::ReadScope,
-    font::MatchingPresentation,
-    font_data::{DynamicFontTableProvider, FontData},
-    outline::{OutlineBuilder, OutlineSink},
+    outline::OutlineSink,
     pathfinder_geometry::{line_segment::LineSegment2F, vector::Vector2F},
-    tables::{glyf::GlyfTable, loca::LocaTable, FontTableProvider},
-    tag, Font,
 };
-// use freetype_sys::FT_Vector;
 use image::{ImageBuffer, Rgba};
+
 use wasm_bindgen::prelude::wasm_bindgen;
-// use parry2d::math::Point;
 
 use crate::{glyphy::geometry::arcs::GlyphyArcAccumulator, Point};
+use parry2d::bounding_volume::Aabb;
+
+use crate::{
+    font::FontFace,
+    glyphy::{
+        blob::{line_encode, snap, BlobArc, Extents, UnitArc},
+        geometry::{
+            aabb::AabbEXT,
+            arc::{Arc, ArcEndpoint},
+            line::Line,
+            point::PointExt,
+            vector::VectorEXT,
+        },
+        util::{is_inf, GLYPHY_INFINITY},
+        vertex::GlyphInfo,
+    },
+};
+
+pub static MIN_FONT_SIZE: f32 = 10.0;
+
+pub static TOLERANCE: f32 = 10.0 / 1024.;
+
+pub static ENLIGHTEN_MAX: f32 = 0.0001; /* Per EM */
+
+pub static EMBOLDEN_MAX: f32 = 0.0001; /* Per EM */
 
 pub struct User {
     pub accumulate: GlyphyArcAccumulator,
     pub path_str: String,
     pub svg_paths: Vec<String>,
     pub svg_endpoints: Vec<[f32; 2]>,
-}
-
-// pub extern "C" fn move_to(to: *const FT_Vector, user: *mut c_void) -> i32 {
-//     let to = unsafe { &*to };
-//     let user = unsafe { &mut *(user as *mut User) };
-
-//     if !user.accumulate.result.is_empty() {
-//         println!("+ Z");
-//         user.accumulate.close_path();
-//         user.path_str.push_str("Z");
-//         user.svg_paths.push(user.path_str.clone());
-//         user.path_str.clear();
-//     }
-//     println!("M {} {} ", to.x, to.y);
-
-//     user.accumulate
-//         .move_to(Point::new(to.x as f32, to.y as f32));
-//     user.path_str.push_str(&format!("M {} {}", to.x, to.y));
-//     user.svg_endpoints.push([to.x as f32, to.y as f32]);
-
-//     return 0;
-// }
-
-// pub extern "C" fn line_to(to: *const FT_Vector, user: *mut c_void) -> i32 {
-//     let to = unsafe { &*to };
-//     println!("+ L {} {} ", to.x, to.y);
-
-//     let user = unsafe { &mut *(user as *mut User) };
-//     user.accumulate
-//         .line_to(Point::new(to.x as f32, to.y as f32));
-//     user.path_str.push_str(&format!("L {} {}", to.x, to.y));
-//     user.svg_endpoints.push([to.x as f32, to.y as f32]);
-
-//     return 0;
-// }
-
-// pub extern "C" fn conic_to(
-//     control: *const FT_Vector,
-//     to: *const FT_Vector,
-//     user: *mut c_void,
-// ) -> i32 {
-//     let control = unsafe { &*control };
-//     let to = unsafe { &*to };
-//     println!("+ Q {} {} {} {} ", control.x, control.y, to.x, to.y);
-
-//     let user = unsafe { &mut *(user as *mut User) };
-//     user.accumulate.conic_to(
-//         Point::new(control.x as f32, control.y as f32),
-//         Point::new(to.x as f32, to.y as f32),
-//     );
-//     user.svg_endpoints.push([to.x as f32, to.y as f32]);
-//     return 0;
-// }
-
-// pub extern "C" fn cubic_to(
-//     control1: *const FT_Vector,
-//     control2: *const FT_Vector,
-//     to: *const FT_Vector,
-//     user: *mut c_void,
-// ) -> i32 {
-//     let control1 = unsafe { &*control1 };
-//     let control2 = unsafe { &*control2 };
-//     let to = unsafe { &*to };
-//     println!(
-//         "+ C {} {} {} {} {} {} ",
-//         control1.x, control1.y, control2.x, control2.y, to.x, to.y
-//     );
-
-//     let _user = unsafe { &mut *(user as *mut User) };
-
-//     return 0;
-// }
-
-#[wasm_bindgen]
-pub struct FontFace {
-    pub(crate) _data: Vec<u8>,
-    pub(crate) font: Font<DynamicFontTableProvider<'static>>,
-    pub(crate) glyf: GlyfTable<'static>,
-    _glyf_data: Vec<u8>,
-    _loca_data: Vec<u8>,
-    pub(crate) _loca: LocaTable<'static>,
-}
-
-impl FontFace {
-    pub fn new(_data: Vec<u8>) -> Self {
-        let d: &'static Vec<u8> = unsafe { std::mem::transmute(&_data) };
-        let scope = ReadScope::new(d);
-        let font_file = scope.read::<FontData<'static>>().unwrap();
-        // font_file.table_provider(index)
-
-        let provider = font_file.table_provider(0).unwrap();
-        let font: Font<DynamicFontTableProvider<'static>> = Font::new(provider).unwrap().unwrap();
-
-        let _loca_data = font
-            .font_table_provider
-            .read_table_data(tag::LOCA)
-            .unwrap()
-            .to_vec();
-        let l: &'static Vec<u8> = unsafe { std::mem::transmute(&_loca_data) };
-
-        let loca = ReadScope::new(&l)
-            .read_dep::<LocaTable<'_>>((
-                usize::from(font.maxp_table.num_glyphs),
-                font.head_table()
-                    .unwrap()
-                    .ok_or("missing head table")
-                    .unwrap()
-                    .index_to_loc_format,
-            ))
-            .unwrap();
-        let _loca: LocaTable<'static> = unsafe { std::mem::transmute(loca) };
-        let loca_ref = unsafe { std::mem::transmute(&_loca) };
-
-        let _glyf_data = font
-            .font_table_provider
-            .read_table_data(tag::GLYF)
-            .unwrap()
-            .to_vec();
-        let g: &'static Vec<u8> = unsafe { std::mem::transmute(&_glyf_data) };
-
-        let glyf = ReadScope::new(g)
-            .read_dep::<GlyfTable<'_>>(loca_ref)
-            .unwrap();
-        // todo!()
-        Self {
-            _data,
-            font,
-            glyf,
-            _glyf_data,
-            _loca,
-            _loca_data,
-        }
-    }
-
-    pub fn to_outline(&mut self, ch: char, sink: &mut impl OutlineSink) {
-        let (glyph_index, _) =
-            self.font
-                .lookup_glyph_index(ch, MatchingPresentation::NotRequired, None);
-        let _ = self.glyf.visit(glyph_index, sink);
-    }
 }
 
 #[wasm_bindgen]
@@ -233,10 +110,7 @@ impl OutlineSink for GlyphVisitor {
             self.svg_endpoints.push([to.x as f32, to.y as f32]);
         } else {
             self.rasterizer.draw_line(
-                point(
-                    self.previous.x * self.scale,
-                    (self.previous.y + 500.) * self.scale,
-                ),
+                point(self.previous.x * self.scale, self.previous.y * self.scale),
                 point(to.x, to.y),
             );
         }
@@ -254,12 +128,9 @@ impl OutlineSink for GlyphVisitor {
             self.svg_endpoints.push([to.x, to.y]);
         } else {
             self.rasterizer.draw_quad(
-                point(
-                    self.previous.x * self.scale,
-                    (self.previous.y + 500.) * self.scale,
-                ),
-                point(control.x * self.scale, (control.y + 500.) * self.scale),
-                point(to.x * self.scale, (to.y + 500.) * self.scale),
+                point(self.previous.x * self.scale, self.previous.y * self.scale),
+                point(control.x * self.scale, control.y * self.scale),
+                point(to.x * self.scale, to.y * self.scale),
             );
         }
         self.previous = to;
@@ -295,15 +166,10 @@ impl OutlineSink for GlyphVisitor {
                 self.svg_endpoints
                     .push([self.start.x as f32, self.start.y as f32]);
             } else {
+                let x = self.previous.x * self.scale;
                 self.rasterizer.draw_line(
-                    point(
-                        self.previous.x * self.scale,
-                        (self.previous.y + 500.) * self.scale,
-                    ),
-                    point(
-                        self.start.x * self.scale,
-                        (self.start.y + 500.) * self.scale,
-                    ),
+                    point(x, (self.previous.y) * self.scale),
+                    point(self.start.x * self.scale, self.start.y * self.scale),
                 )
             }
         }
@@ -316,4 +182,266 @@ impl OutlineSink for GlyphVisitor {
         }
         // println!("close()");
     }
+}
+
+pub fn encode_uint_arc_data(
+    result_arcs: Vec<(Vec<&Arc>, Aabb)>,
+    extents: &Aabb,
+    min_width: f32,
+    min_height: f32,
+) -> Vec<Vec<UnitArc>> {
+    let glyph_width = extents.width();
+    let glyph_height = extents.height();
+
+    let width_cells = (glyph_width / min_width).round() as usize;
+    let height_cells = (glyph_height / min_height).round() as usize;
+    // println!(
+    //     "width_cells: {}, height_cells: {}",
+    //     width_cells, height_cells
+    // );
+
+    let mut data = vec![
+        vec![
+            UnitArc {
+                parent_cell: Extents {
+                    min_x: 0.,
+                    min_y: 0.,
+                    max_x: 0.,
+                    max_y: 0.
+                },
+                offset: 0,
+                sdf: 0.0,
+                show: "".to_owned(),
+                data: Vec::with_capacity(8),
+                origin_data: vec![],
+                key: "".to_string()
+            };
+            width_cells
+        ];
+        height_cells
+    ];
+
+    // println!("result_arc: {:?}", result_arc.len());
+
+    let glyph_width = extents.width();
+    let glyph_height = extents.height();
+    let c = extents.center();
+    let unit = glyph_width.max(glyph_height);
+
+    for (near_arcs, cell) in result_arcs {
+        let mut near_endpoints = Vec::with_capacity(8);
+        let mut _p1 = Point::new(0.0, 0.0);
+
+        for i in 0..near_arcs.len() {
+            let arc = near_arcs[i];
+
+            if i == 0 || !_p1.equals(&arc.p0) {
+                let endpoint = ArcEndpoint::new(arc.p0.x, arc.p0.y, GLYPHY_INFINITY);
+                near_endpoints.push(endpoint);
+                _p1 = arc.p0;
+            }
+
+            let endpoint = ArcEndpoint::new(arc.p1.x, arc.p1.y, arc.d);
+            near_endpoints.push(endpoint);
+            _p1 = arc.p1;
+        }
+
+        let begin = cell.mins - extents.mins;
+        let end = cell.maxs - extents.mins;
+        let begin_x = (begin.x / min_width).round() as usize;
+        let begin_y = (begin.y / min_height).round() as usize;
+
+        let end_x = (end.x / min_width).round() as usize;
+        let end_y = (end.y / min_height).round() as usize;
+        let parent_cell = Extents {
+            min_x: cell.mins.x,
+            min_y: cell.mins.y,
+            max_x: cell.maxs.x,
+            max_y: cell.maxs.y,
+        };
+
+        let mut line_result = None;
+        let mut arc_result = None;
+        if near_endpoints.len() == 2 && near_endpoints[1].d == 0.0 {
+            let start = &near_endpoints[0];
+            let end = &near_endpoints[1];
+
+            let mut line = Line::from_points(
+                snap(&start.p, &extents, glyph_width, glyph_height),
+                snap(&end.p, &extents, glyph_width, glyph_height),
+            );
+
+            // Shader的最后 要加回去
+            line.c -= line.n.dot(&c.into_vector());
+            // shader 的 decode 要 乘回去
+            line.c /= unit;
+
+            let line_key = near_endpoints[0].get_line_key(&near_endpoints[1]);
+            let le = line_encode(line);
+
+            let mut line_data = ArcEndpoint::new(0.0, 0.0, 0.0);
+            line_data.line_key = Some(line_key);
+            line_data.line_encode = Some(le);
+
+            line_result = Some((line_data, start.clone(), end.clone()));
+        } else {
+            if near_endpoints.len() == 4
+                && is_inf(near_endpoints[2].d)
+                && near_endpoints[0].p.x == near_endpoints[3].p.x
+                && near_endpoints[0].p.y == near_endpoints[3].p.y
+            {
+                let e0 = near_endpoints[2].clone();
+                let e1 = near_endpoints[3].clone();
+                let e2 = near_endpoints[1].clone();
+
+                near_endpoints.clear();
+                near_endpoints.push(e0);
+                near_endpoints.push(e1);
+                near_endpoints.push(e2);
+            }
+
+            // 编码到纹理：该格子 对应 的 圆弧数据
+            let mut key = "".to_string();
+            for endpoint in &near_endpoints {
+                key.push_str(&format!(
+                    "{}_{}_{}_",
+                    endpoint.p.x, endpoint.p.y, endpoint.d
+                ));
+            }
+            arc_result = Some(key);
+        }
+
+        // If the arclist is two arcs that can be combined in encoding if reordered, do that.
+
+        for i in begin_x..end_x {
+            for j in begin_y..end_y {
+                let unit_arc = &mut data[j][i];
+
+                if let Some((line_data, start, end)) = line_result.as_ref() {
+                    unit_arc.data.push(line_data.clone());
+                    // println!("1row: {}, col: {} line_data: {:?}n \n", row, col, unit_arc.data.len());
+                    unit_arc.origin_data.push(start.clone());
+                    unit_arc.origin_data.push(end.clone());
+                    unit_arc.parent_cell = parent_cell;
+                } else {
+                    let key = arc_result.as_ref().unwrap();
+                    unit_arc.data.extend_from_slice(&near_endpoints);
+                    unit_arc.key = key.clone();
+                }
+            }
+        }
+    }
+
+    // for i in 0..32{
+    //     for j in 0..32{
+    //         println!("x: {}, y: {}, data: {:?}", j, i, data[i][j]);
+    //     }
+    // }
+
+    data
+}
+
+#[wasm_bindgen]
+pub fn get_char_arc_debug(char: String) -> BlobArc {
+    console_error_panic_hook::set_once();
+
+    let _ = console_log::init_with_level(log::Level::Debug);
+    let buffer = include_bytes!("../source/msyh.ttf").to_vec();
+    log::info!("1111111111");
+    let mut ft_face = FontFace::new(buffer);
+    log::info!("22222222char: {}", char);
+    let char = char.chars().next().unwrap();
+    log::info!("13333333");
+    let arcs = ft_face.get_char_arc(char);
+    log::info!("44444444444");
+    arcs
+}
+
+pub fn to_arc_cmds(endpoints: &Vec<ArcEndpoint>) -> (Vec<Vec<String>>, Vec<[f32; 2]>) {
+    let mut _cmd = vec![];
+    let mut cmd_array = vec![];
+    let mut current_point = None;
+    let mut pts = vec![];
+    for ep in endpoints {
+        pts.push([ep.p.x, ep.p.y]);
+
+        if ep.d == GLYPHY_INFINITY {
+            if current_point.is_none() || !ep.p.equals(current_point.as_ref().unwrap()) {
+                if _cmd.len() > 0 {
+                    cmd_array.push(_cmd);
+                    _cmd = vec![];
+                }
+                _cmd.push(format!(" M ${}, ${}", ep.p.x, ep.p.y));
+                current_point = Some(ep.p);
+            }
+        } else if ep.d == 0.0 {
+            assert!(current_point.is_some());
+            if current_point.is_some() && !ep.p.equals(current_point.as_ref().unwrap()) {
+                _cmd.push(format!(" L {}, {}", ep.p.x, ep.p.y));
+                current_point = Some(ep.p);
+            }
+        } else {
+            assert!(current_point.is_some());
+            let mut _current_point = current_point.as_ref().unwrap();
+            if !ep.p.equals(_current_point) {
+                let arc = Arc::new(_current_point.clone(), ep.p, ep.d);
+                let center = arc.center();
+                let radius = arc.radius();
+                let start_v = _current_point - center;
+                let start_angle = start_v.sdf_angle();
+
+                let end_v = ep.p - (center);
+                let end_angle = end_v.sdf_angle();
+
+                // 大于0，顺时针绘制
+                let cross = start_v.sdf_cross(&end_v);
+
+                _cmd.push(arc_to_svg_a(
+                    center.x,
+                    center.y,
+                    radius,
+                    start_angle,
+                    end_angle,
+                    cross < 0.0,
+                ));
+
+                _current_point = &ep.p;
+            }
+        }
+    }
+    if _cmd.len() > 0 {
+        cmd_array.push(_cmd);
+        _cmd = vec![]
+    }
+
+    return (cmd_array, pts);
+}
+
+pub fn arc_to_svg_a(
+    x: f32,
+    y: f32,
+    radius: f32,
+    _start_angle: f32,
+    end_angle: f32,
+    anticlockwise: bool,
+) -> String {
+    // 计算圆弧结束点坐标
+    let end_x = x + radius * end_angle.cos();
+    let end_y = y + radius * end_angle.sin();
+
+    // large-arc-flag 的值为 0 或 1，决定了弧线是大于还是小于或等于 180 度
+    let large_arc_flag = '0'; // endAngle - startAngle <= Math.PI ? '0' : '1';
+
+    // sweep-flag 的值为 0 或 1，决定了弧线是顺时针还是逆时针方向
+    let sweep_flag = if anticlockwise { '0' } else { '1' };
+
+    // 返回 SVG "A" 命令参数
+    return format!(
+        "A {} {} 0 {} {} {} {}",
+        radius, radius, large_arc_flag, sweep_flag, end_x, end_y
+    );
+}
+
+pub fn create_indices() -> [u16; 6] {
+    [0, 1, 2, 1, 2, 3]
 }

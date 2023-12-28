@@ -60,6 +60,13 @@ impl ArcEndpoint {
     pub fn get_xy(&self) -> Vec<f32> {
         vec![self.p.x, self.p.y]
     }
+
+    pub fn get_line_key(&self, ep1: &ArcEndpoint) -> String {
+        format!(
+            "{}_{}_{}_{}_{}_{}_",
+            self.p.x, self.p.y, self.d, ep1.p.x, ep1.p.y, ep1.d
+        )
+    }
 }
 
 // d 几何意义 为 tan( 圆心角 / 4 )
@@ -434,7 +441,11 @@ impl Arc {
         }
     }
 
-    pub fn projection_to_bound(&self, aabb: &Aabb, segment: &Segment) -> (Range<f32>, Segment, f32) {
+    pub fn projection_to_bound(
+        &self,
+        aabb: &Aabb,
+        segment: &Segment,
+    ) -> (Range<f32>, Segment, f32) {
         if segment.a.y == segment.b.y {
             self.projection_to_row_bound(aabb, segment)
         } else {

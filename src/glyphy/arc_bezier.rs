@@ -48,6 +48,7 @@ pub fn approximate_bezier_arc_error(
     a: &Arc,
     approximate_deviation: fn(f32, f32) -> f32,
 ) -> f32 {
+    
     assert!(b0.p0 == a.p0);
     assert!(b0.p3 == a.p1);
 
