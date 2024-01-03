@@ -1,14 +1,11 @@
-use env_logger::Env;
-use parry2d::na::{self, Vector3};
+use parry2d::na::{self};
 use tracing::Level;
 use tracing_subscriber::fmt::Subscriber;
 
 // use nalgebra::Vector3;
 use pi_sdf::{font::FontFace, glyphy::blob::TexData, utils::create_indices};
 use pi_wgpu as wgpu;
-use wgpu::{
-    util::DeviceExt, Backend, BlendState, ColorTargetState, Dx12Compiler, InstanceDescriptor,
-};
+use wgpu::{util::DeviceExt, BlendState, ColorTargetState};
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
@@ -798,7 +795,7 @@ fn main() {
     // let window = winit::window::Window::new(&event_loop).unwrap();
     #[cfg(not(target_arch = "wasm32"))]
     {
-        // env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
+        env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
         pollster::block_on(run(event_loop, window));
     }
     #[cfg(target_arch = "wasm32")]

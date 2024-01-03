@@ -1,15 +1,11 @@
-use env_logger::Env;
-use parry2d::na::{self, Vector3};
+use parry2d::na::{self};
 use tracing::Level;
 use tracing_subscriber::fmt::Subscriber;
 
 // use nalgebra::Vector3;
-use pi_sdf::{font::FontFace, glyphy::blob::TexData, svg::Svg2, utils::create_indices};
+use pi_sdf::{glyphy::blob::TexData, svg::Svg2, utils::create_indices};
 use pi_wgpu as wgpu;
-use usvg::Color;
-use wgpu::{
-    util::DeviceExt, Backend, BlendState, ColorTargetState, Dx12Compiler, InstanceDescriptor,
-};
+use wgpu::{util::DeviceExt, BlendState, ColorTargetState};
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
@@ -607,11 +603,12 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         usage: wgpu::BufferUsages::VERTEX,
     });
 
-    let stroke_color_and_width_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("u_outline_buffer"),
-        contents: bytemuck::cast_slice(&stroke_color_and_width),
-        usage: wgpu::BufferUsages::VERTEX,
-    });
+    let stroke_color_and_width_buffer =
+        device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("u_outline_buffer"),
+            contents: bytemuck::cast_slice(&stroke_color_and_width),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
 
     let index_data = create_indices();
     let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -814,7 +811,7 @@ fn main() {
     // let window = winit::window::Window::new(&event_loop).unwrap();
     #[cfg(not(target_arch = "wasm32"))]
     {
-        // env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
+        env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
         pollster::block_on(run(event_loop, window));
     }
     #[cfg(target_arch = "wasm32")]

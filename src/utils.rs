@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use ab_glyph_rasterizer::{point, Rasterizer};
 use allsorts::{
@@ -352,7 +352,7 @@ pub fn get_char_arc_debug(char: String) -> BlobArc {
     log::info!("22222222char: {}", char);
     let char = char.chars().next().unwrap();
     log::info!("13333333");
-    let (arcs, set) = ft_face.get_char_arc(char);
+    let (arcs, _map) = ft_face.get_char_arc(char);
     log::info!("44444444444");
     arcs
 }

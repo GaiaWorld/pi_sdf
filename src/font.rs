@@ -1,7 +1,4 @@
-use std::{
-    char,
-    collections::{HashMap, HashSet},
-};
+use std::{char, collections::HashMap};
 
 use allsorts::{
     binary::read::ReadScope,
@@ -19,10 +16,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::{
     glyphy::{
-        blob::{
-            recursion_near_arcs_of_cell, travel_data, BlobArc, EncodeError, TexData, TexInfo,
-            UnitArc,
-        },
+        blob::{recursion_near_arcs_of_cell, travel_data, BlobArc, EncodeError, TexData, TexInfo},
         geometry::{
             aabb::{AabbEXT, Direction},
             arc::Arc,

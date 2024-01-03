@@ -1,7 +1,6 @@
 use std::{collections::HashMap, io};
 
 use allsorts::{
-    cff::outline,
     outline::OutlineSink,
     pathfinder_geometry::{line_segment::LineSegment2F, vector::Vector2F},
 };
@@ -137,7 +136,7 @@ impl Svg {
         let width_cells = (extents.width() / min_width).floor();
         let height_cells = (extents.height() / min_height).floor();
 
-        let (unit_arcs, set) = encode_uint_arc_data(result_arcs, &extents, min_width, min_height);
+        let (unit_arcs, _map) = encode_uint_arc_data(result_arcs, &extents, min_width, min_height);
 
         let [min_sdf, max_sdf] = travel_data(&unit_arcs);
         let blob_arc = BlobArc {
