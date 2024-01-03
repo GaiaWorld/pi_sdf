@@ -1,3 +1,5 @@
+use std::collections::{HashMap, HashSet};
+
 use ab_glyph_rasterizer::{point, Rasterizer};
 use allsorts::{
     outline::OutlineSink,
@@ -22,7 +24,6 @@ use crate::{
             vector::VectorEXT,
         },
         util::{is_inf, GLYPHY_INFINITY},
-        vertex::GlyphInfo,
     },
 };
 
@@ -50,7 +51,7 @@ pub struct GlyphVisitor {
     pub(crate) svg_endpoints: Vec<[f32; 2]>,
 
     scale: f32,
-    start: Point,
+    pub(crate) start: Point,
     previous: Point,
 }
 
@@ -136,24 +137,33 @@ impl OutlineSink for GlyphVisitor {
         self.previous = to;
     }
 
-    fn cubic_curve_to(&mut self, _control: LineSegment2F, _to: Vector2F) {
+    fn cubic_curve_to(&mut self, control: LineSegment2F, to: Vector2F) {
         // 字形数据没有三次贝塞尔曲线
-        todo!();
-        // println!(
-        //     "curve_to({}, {}, {}, {}, {}, {})",
-        //     control.from_x(),
-        //     control.from_y(),
-        //     control.to_x(),
-        //     control.to_y(),
-        //     to.x(),
-        //     to.y()
-        // );
+        let control1 = Point::new(control.from_x(), control.from_y());
+        let control2 = Point::new(control.to_x(), control.to_y());
+        let to = Point::new(to.x(), to.y());
 
-        // let control_from = Point::new(control.from_x(), (control.from_y()));
-        // let control_to = Point::new(control.to_x(), (control.to_y()));
-        // let to = Point::new(to.x(), (to.x()));
-        // self.accumulate.cubic_to(control_from, control_to, to);
-        // self.previous = to;
+        log::info!(
+            "+ C {}, {}, {}, {}, {}, {}",
+            control1.x,
+            control1.y,
+            control2.x,
+            control2.y,
+            to.x,
+            to.y
+        );
+
+        if self.scale > 0.02 {
+            self.accumulate.cubic_to(control1, control2, to);
+            self.svg_endpoints.push([to.x, to.y]);
+        } else {
+            self.rasterizer.draw_cubic(
+                point(self.previous.x * self.scale, self.previous.y * self.scale),
+                point(control1.x * self.scale, control1.y * self.scale),
+                point(control1.x * self.scale, control1.y * self.scale),
+                point(to.x * self.scale, to.y * self.scale),
+            );
+        }
     }
 
     fn close(&mut self) {
@@ -189,16 +199,12 @@ pub fn encode_uint_arc_data(
     extents: &Aabb,
     min_width: f32,
     min_height: f32,
-) -> Vec<Vec<UnitArc>> {
+) -> (Vec<Vec<UnitArc>>, HashMap<String, u64>) {
     let glyph_width = extents.width();
     let glyph_height = extents.height();
 
     let width_cells = (glyph_width / min_width).round() as usize;
     let height_cells = (glyph_height / min_height).round() as usize;
-    // println!(
-    //     "width_cells: {}, height_cells: {}",
-    //     width_cells, height_cells
-    // );
 
     let mut data = vec![
         vec![
@@ -221,12 +227,12 @@ pub fn encode_uint_arc_data(
         height_cells
     ];
 
-    // println!("result_arc: {:?}", result_arc.len());
-
     let glyph_width = extents.width();
     let glyph_height = extents.height();
     let c = extents.center();
     let unit = glyph_width.max(glyph_height);
+
+    let mut map = HashMap::with_capacity(32 * 32);
 
     for (near_arcs, cell) in result_arcs {
         let mut near_endpoints = Vec::with_capacity(8);
@@ -312,11 +318,9 @@ pub fn encode_uint_arc_data(
         }
 
         // If the arclist is two arcs that can be combined in encoding if reordered, do that.
-
         for i in begin_x..end_x {
             for j in begin_y..end_y {
                 let unit_arc = &mut data[j][i];
-
                 if let Some((line_data, start, end)) = line_result.as_ref() {
                     unit_arc.data.push(line_data.clone());
                     // println!("1row: {}, col: {} line_data: {:?}n \n", row, col, unit_arc.data.len());
@@ -330,15 +334,11 @@ pub fn encode_uint_arc_data(
                 }
             }
         }
+        let key = data[begin_y][begin_x].get_key();
+        let ptr: *const UnitArc = &data[begin_y][begin_x];
+        map.insert(key, ptr as u64);
     }
-
-    // for i in 0..32{
-    //     for j in 0..32{
-    //         println!("x: {}, y: {}, data: {:?}", j, i, data[i][j]);
-    //     }
-    // }
-
-    data
+    (data, map)
 }
 
 #[wasm_bindgen]
@@ -352,7 +352,7 @@ pub fn get_char_arc_debug(char: String) -> BlobArc {
     log::info!("22222222char: {}", char);
     let char = char.chars().next().unwrap();
     log::info!("13333333");
-    let arcs = ft_face.get_char_arc(char);
+    let (arcs, set) = ft_face.get_char_arc(char);
     log::info!("44444444444");
     arcs
 }

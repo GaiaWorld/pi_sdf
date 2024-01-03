@@ -1,4 +1,7 @@
-use std::char;
+use std::{
+    char,
+    collections::{HashMap, HashSet},
+};
 
 use allsorts::{
     binary::read::ReadScope,
@@ -16,7 +19,10 @@ use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::{
     glyphy::{
-        blob::{recursion_near_arcs_of_cell, travel_data, BlobArc, EncodeError, TexData, TexInfo},
+        blob::{
+            recursion_near_arcs_of_cell, travel_data, BlobArc, EncodeError, TexData, TexInfo,
+            UnitArc,
+        },
         geometry::{
             aabb::{AabbEXT, Direction},
             arc::Arc,
@@ -155,7 +161,7 @@ impl FontFace {
         extents
     }
 
-    pub fn get_char_arc(&mut self, char: char) -> BlobArc {
+    pub fn get_char_arc(&mut self, char: char) -> (BlobArc, HashMap<String, u64>) {
         // log::error!("get_char_arc: {:?}", char);
 
         let mut sink = GlyphVisitor::new(1.0);
@@ -230,7 +236,7 @@ impl FontFace {
         // let width_cells = (extents.width() / min_width).floor();
         // let height_cells = (extents.height() / min_height).floor();
 
-        let unit_arcs = encode_uint_arc_data(result_arcs, &extents, min_width, min_height);
+        let (unit_arcs, map) = encode_uint_arc_data(result_arcs, &extents, min_width, min_height);
         // println!("unit_arcs[14][5]: {:?}", unit_arcs[14][5]);
 
         let [min_sdf, max_sdf] = travel_data(&unit_arcs);
@@ -252,7 +258,7 @@ impl FontFace {
 
         // gi.extents.set(&extents);
 
-        blob_arc
+        (blob_arc, map)
     }
 
     pub fn out_tex_data(
@@ -275,12 +281,11 @@ impl FontFace {
         let mut last_offset1 = (*offset_x1, *offset_x1);
 
         for char in text {
-            let mut blod_arc = self.get_char_arc(char);
-            let (data_map, size) =
-                blod_arc.encode_data_tex(data_tex, width0, offset_x0, offset_y0)?;
-
-            let mut info = blod_arc
-                .encode_index_tex(index_tex, width1, offset_x1, offset_y1, data_map, size)?;
+            let (mut blod_arc, map) = self.get_char_arc(char);
+            let size = blod_arc.encode_data_tex(&map, data_tex, width0, offset_x0, offset_y0)?;
+            // println!("data_map: {}", map.len());
+            let mut info =
+                blod_arc.encode_index_tex(index_tex, width1, offset_x1, offset_y1, map, size)?;
 
             info.index_offset = last_offset1;
             info.data_offset = (*offset_x0, *offset_y0);

@@ -1,4 +1,7 @@
-use std::{collections::HashMap, ops::Range};
+use std::{
+    collections::{HashMap, HashSet},
+    ops::Range,
+};
 
 // use freetype_sys::FT_New_Face;
 // use parry2d::na::ComplexField;
@@ -50,6 +53,7 @@ pub struct UnitArc {
 
     pub key: String,
 }
+
 #[wasm_bindgen]
 impl UnitArc {
     pub fn get_data_len(&self) -> usize {
@@ -57,13 +61,9 @@ impl UnitArc {
     }
 
     pub fn get_key(&self) -> String {
-        // let time = std::time::Instant::now();
-        // let mut key = String::with_capacity(64);
-        // let r = unsafe { key.as_mut_vec() };
         if self.data.len() == 1 && self.data[0].line_key.is_some() {
             // 线段
             return self.data[0].line_key.as_ref().unwrap().clone();
-            
         } else {
             return self.key.clone();
         }
@@ -124,60 +124,26 @@ impl BlobArc {
     // 按数据去重，并编码到纹理
     pub fn encode_data_tex(
         &self,
+        map: &HashMap<String, u64>,
         data_tex: &mut Vec<u8>,
         data_tex_width: usize,
         offset_x: &mut usize,
         offset_y: &mut usize,
-    ) -> Result<(HashMap<String, u64>, usize), EncodeError> {
-        let mut map = HashMap::new();
-        let mut num_endpoints = 0;
-
-        let mut j = 0;
-        for row in &self.data {
-            let mut i = 0;
-            for unit_arc in row {
-                num_endpoints += unit_arc.data.len();
-                let key = unit_arc.get_key();
-                // println!("x: {}, y: {}", i, j);
-                // if key != unit_arc.key{
-
-                // } 
-                if key.len() > 0 {
-                    map.insert(key, (unit_arc as *const UnitArc) as u64);
-                }
-                i += 1;
-            }
-            j += 1;
-        }
-        // let time = std::time::Instant::now();
-        // let mut l = 0.0;
-        // for row in &self.data {
-        //     for unit_arc in row {
-        //         unit_arc.get_key();
-        //     }
-        // }
-        // println!("time: {:?}", time.elapsed());
-        // println!("l: {}", l);
-        // println!("总共有{}个点", num_endpoints);
-        // println!(
-        //     "平均每个格子有{}个点",
-        //     num_endpoints as f32 / (self.data.len() * self.data[0].len()) as f32
-        // );
-        // println!("map: {}", map.len());
-        match self.encode_data_tex_impl(&mut map, data_tex, data_tex_width, *offset_x, *offset_y) {
-            Ok(len) => return Ok((map, len)),
+    ) -> Result<usize, EncodeError> {
+        match self.encode_data_tex_impl(map, data_tex, data_tex_width, *offset_x, *offset_y) {
+            Ok(len) => return Ok(len),
             Err(err) => {
                 if let EncodeError::NewLine = err {
                     *offset_x = 0;
                     *offset_y += 8;
                     let len = self.encode_data_tex_impl(
-                        &mut map,
+                        &map,
                         data_tex,
                         data_tex_width,
                         *offset_x,
                         *offset_y,
                     )?;
-                    return Ok((map, len));
+                    return Ok(len);
                 } else {
                     return Err(err);
                 }
@@ -187,7 +153,7 @@ impl BlobArc {
 
     fn encode_data_tex_impl(
         &self,
-        map: &mut HashMap<String, u64>,
+        map: &HashMap<String, u64>,
         data_tex: &mut Vec<u8>,
         data_tex_width: usize,
         offset_x: usize,
@@ -197,7 +163,7 @@ impl BlobArc {
         let glyph_width = self.extents.width();
         let glyph_height = self.extents.height();
 
-        for v in map.values_mut() {
+        for v in map.values() {
             let unit_arc = unsafe { &mut *(*v as *mut UnitArc) };
             unit_arc.offset = len;
 
@@ -249,7 +215,6 @@ impl BlobArc {
         data_tex_len: usize,
     ) -> Result<TexInfo, EncodeError> {
         let max_offset = data_tex_len;
-        // println!("data_tex_len: {}", data_tex_len);
         // 计算sdf的 梯度等级
         let mut level = (2usize.pow(14) / max_offset) - 1;
         if level < 1 {
@@ -260,19 +225,11 @@ impl BlobArc {
         let sdf_step = sdf_range / level as f32;
 
         // 2 * grid_w * grid_h 个 Uint8
-        let mut len = 0usize;
-
-        // println!(
-        //     "========== h: {}, w: {}",
-        //     self.data.len(),
-        //     self.data[0].len()
-        // );
         for i in 0..self.data.len() {
             let row = &mut self.data[i];
             for j in 0..row.len() {
                 let unit_arc = &mut row[j];
                 let key = unit_arc.get_key();
-                // println!("key: {}", key);
                 if !key.is_empty() {
                     let map_arc_data = data_tex_map.get(&key);
                     if map_arc_data.is_none() {
@@ -292,7 +249,6 @@ impl BlobArc {
 
                     let cell_size = self.cell_size;
                     let is_interval = sdf.abs() <= cell_size * 0.5f32.sqrt();
-                    // println!("is_interval: {}, num_points:{}, offset: {},max_offset: {}, sdf: {}, min_sdf: {}, sdf_step: {}", is_interval, num_points, offset, max_offset, sdf, self.min_sdf, sdf_step);
                     let [encode, _] = encode_to_uint16(
                         is_interval,
                         num_points as f32,
@@ -307,7 +263,6 @@ impl BlobArc {
                     index_tex[index + 1] = (encode as i32 >> 8) as u8;
 
                     unit_arc.show = format!("{}", num_points2);
-                    len += 1;
                 }
             }
         }
@@ -315,8 +270,8 @@ impl BlobArc {
         let glyph_width = self.extents.width();
         let glyph_height = self.extents.height();
 
-        let grid_w = (glyph_width / self.cell_size).floor();
-        let grid_h = (glyph_height / self.cell_size).floor();
+        let grid_w = (glyph_width / self.cell_size).round();
+        let grid_h = (glyph_height / self.cell_size).round();
 
         *offset_x += grid_w as usize;
         *offset_y += grid_h as usize;
