@@ -2,7 +2,7 @@
 // import * as opentype from 'opentype.js';
 // import { GLYPHY_INFINITY } from './glyphy/util';
 // import { add_glyph_vertices, GlyphInfo } from './glyphy/vertex';
-import { get_char_arc_debug } from './pkg/pi_sdf.js';
+import { get_char_arc_debug, compute_svg_debug } from './pkg/pi_sdf.js';
 // import { delete_glyph, set_glyph } from './sdf/glyph';
 export const GLYPHY_INFINITY = Infinity;
 export const GLYPHY_EPSILON = 1e-4;
@@ -141,7 +141,8 @@ export class DrawText {
 
     set_char(char) {
         if (this.char !== char[0]) {
-            this.arcs = get_char_arc_debug(char[0])
+            // this.arcs = get_char_arc_debug(char[0])
+            this.arcs = compute_svg_debug();
         }
         this.char = char[0];
 
@@ -239,7 +240,7 @@ export class DrawText {
             let xy = endpoint.get_xy();
             let p = new Point(xy[0], xy[1]);
             console.log(`draw_network_endpoints: (${i}, ${j}): p = (${p.x}, ${p.y}), d = ${endpoint.d}`);
-            ctx.arc(p.x, p.y, 20, 0, 2 * Math.PI);
+            ctx.arc(p.x, p.y, 5, 0, 2 * Math.PI);
             ctx.fill();
         }
         ctx.restore();
@@ -330,9 +331,10 @@ export class DrawText {
         const transform = ctx.getTransform();
         const originX = transform.e;
         const originY = transform.f;
-
+        let width_cells = (extents.max_x - extents.min_x) / cellSize;
+        let height_cells = (extents.max_y - extents.min_y) / cellSize;
         console.log(`origin: ${originX}, ${originY}`)
-        for (let i = 0; i <= arcs.width_cells; i++) {
+        for (let i = 0; i <= width_cells; i++) {
             let posX = i * cellSize;
 
             // 设置笔触样式和线宽
@@ -342,11 +344,12 @@ export class DrawText {
             // 画竖线
             ctx.beginPath();
             ctx.moveTo(posX, 0.0);
-            ctx.lineTo(posX, arcs.height_cells * cellSize);
+            ctx.lineTo(posX, height_cells * cellSize);
             ctx.stroke();
         }
 
-        for (let j = 0; j <= arcs.height_cells; j++) {
+        
+        for (let j = 0; j <= height_cells; j++) {
             let posY = j * cellSize;
 
             // 设置笔触样式和线宽
@@ -356,7 +359,7 @@ export class DrawText {
             // 画横线
             ctx.beginPath();
             ctx.moveTo(0, posY);
-            ctx.lineTo(arcs.width_cells * cellSize, posY);
+            ctx.lineTo(width_cells * cellSize, posY);
             ctx.stroke();
         }
 
@@ -367,8 +370,9 @@ export class DrawText {
         ctx.fillStyle = 'black';
 
         // 在每个网格的中心写入数字
-        for (let j = 0; j < arcs.height_cells; j++) {
-            for (let i = 0; i < arcs.width_cells; i++) {
+        
+        for (let j = 0; j < height_cells; j++) {
+            for (let i = 0; i < width_cells; i++) {
                 let posX = (i + 0.5) * cellSize;
                 let posY = (j + 0.5) * cellSize;
                 let unit = arcs.get_unit_arc(i, j);
@@ -420,7 +424,7 @@ export class DrawText {
         this.ctx.scale(1, -1);
         for (let pt of pts) {
             this.ctx.beginPath();
-            this.ctx.arc(pt[0], pt[1], 8, 0, Math.PI * 2);
+            this.ctx.arc(pt[0], pt[1], 4, 0, Math.PI * 2);
             this.ctx.fillStyle = color;
             this.ctx.fill();
         }

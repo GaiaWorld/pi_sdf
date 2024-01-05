@@ -512,7 +512,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     });
 
     let translation = [
-        0.0f32, 0.0, // 第一个字位置
+        20.0f32, 20.0, // 第一个字位置
         0.0, 0.0, // 第二个字位置
         0.0, 0.0, // 第一个字位置
         0.0, 0.0, // 第二个字位置
@@ -530,12 +530,12 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     for info in &texs_info {
         index_info.push(info.index_offset.0 as f32);
         index_info.push(info.index_offset.1 as f32);
-        index_info.push(32.0);
-        index_info.push(32.0);
+        index_info.push(info.grid_w);
+        index_info.push(info.grid_h);
 
         data_offset.push(info.data_offset.0 as f32);
         data_offset.push(info.data_offset.1 as f32);
-
+        println!("info.cell_size: {}", info.cell_size);
         let check = info.cell_size * 0.5 * 2.0f32.sqrt();
         u_info.push(info.max_offset as f32);
         u_info.push(info.min_sdf as f32);
@@ -549,15 +549,13 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
     let mut index = 0;
     for attr in &attributes {
-        let fill = attr.fill.as_ref().unwrap();
-
-        if let usvg::Paint::Color(color) = fill.paint {
-            fill_color[index * 4] = color.red as f32 / 255.0;
-            fill_color[index * 4 + 1] = color.green as f32 / 255.0;
-            fill_color[index * 4 + 2] = color.blue as f32 / 255.0;
-            fill_color[index * 4 + 3] = 1.0;
-        } else {
-            fill_color[index * 4 + 3] = 1.0;
+        if let Some(fill) = &attr.fill {
+            if let usvg::Paint::Color(color) = fill.paint {
+                fill_color[index * 4] = color.red as f32 / 255.0;
+                fill_color[index * 4 + 1] = color.green as f32 / 255.0;
+                fill_color[index * 4 + 2] = color.blue as f32 / 255.0;
+                fill_color[index * 4 + 3] = if attr.is_close { 1.0 } else { 0.0 };
+            }
         }
 
         if let Some(stroke) = &attr.stroke {
@@ -565,7 +563,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 stroke_color_and_width[index * 4] = color.red as f32 / 255.0;
                 stroke_color_and_width[index * 4 + 1] = color.green as f32 / 255.0;
                 stroke_color_and_width[index * 4 + 2] = color.blue as f32 / 255.0;
-                stroke_color_and_width[index * 4 + 3] = stroke.width.get() * 3.0;
+                stroke_color_and_width[index * 4 + 3] = stroke.width.get();
             }
         }
         index += 1;

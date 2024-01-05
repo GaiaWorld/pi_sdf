@@ -15,6 +15,7 @@ use crate::glyphy::geometry::point::PointExt;
 use crate::glyphy::util::{is_zero, GLYPHY_INFINITY, GLYPHY_MAX_D};
 use crate::Point;
 
+#[derive(Clone)]
 pub struct GlyphyArcAccumulator {
     pub(crate) tolerance: f32,
     pub(crate) max_d: f32,

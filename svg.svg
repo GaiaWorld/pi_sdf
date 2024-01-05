@@ -6,13 +6,13 @@
     <!-- 椭圆 -->
     <ellipse cx="320" cy="60" rx="50" ry="25" style="fill:yellow;stroke:purple;stroke-width:2" />
     <!-- 直线 -->
-    <!-- <line x1="20" y1="100" x2="120" y2="180" style="stroke:rgb(255,0,0);stroke-width:2" /> -->
+    <line x1="20" y1="100" x2="120" y2="180" style="stroke:rgb(255,0,0);stroke-width:2" />
     <!-- 多边形 -->
     <polygon points="270,110 350,170 320,220 220,210 200,160" style="fill:lime;stroke:purple;stroke-width:1" />
     <!-- 多段线 -->
-    <!-- <polyline points="20,220 40,225 60,240 80,320 120,340 180,320" style="fill:none;stroke:black;stroke-width:3" /> -->
+    <polyline points="20,220 40,225 60,240 80,320 120,340 180,320" style="fill:none;stroke:black;stroke-width:3" />
     <!-- 路径 -->
-    <!-- <path d="M 220 350 q 90 -180 180 0" stroke="blue" stroke-width="5" fill="none" /> -->
+    <path d="M 210 30 C 210 250 25 190 110 150" stroke="blue" stroke-width="2" fill="none" />
     <!-- 虚线 -->
     <!-- <path d="M10 400 l215 0" style="fill:none;stroke:black;stroke-width:3;stroke-dasharray:10,10"/> -->
 </svg>

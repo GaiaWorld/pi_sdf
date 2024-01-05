@@ -26,6 +26,10 @@ naga = "0.12"
 bytemuck = { version = "1.4", features = [ "derive" ] }
 usvg = "0.37"
 
+
+[target."cfg(target_arch = \"wasm32\")".dependencies.web-sys]
+web-sys = {version = "0.3", features = ["Window", "Performance"]}
+
 [dev-dependencies]
 pollster = "0.3"
 env_logger = "0.10"

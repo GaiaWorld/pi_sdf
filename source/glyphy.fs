@@ -536,7 +536,7 @@ void main() {
                             + mix(gradientColor3, gradientColor4, (gradient - gradientAmount3) / (gradientAmount4 - gradientAmount3)) * (step(gradientAmount3, gradient) * step(gradient, gradientAmount4) )
                             + gradientColor4 * step(gradientAmount4, gradient);
 							
-    faceColor.rgb   		= mix(faceColor.rgb, gradientColor, step(0.05, gradientLength));
+    // faceColor.rgb   		= mix(faceColor.rgb, gradientColor, step(0.05, gradientLength));
 	// faceColor.rgb *= 0.0;
 	
 	float outlineSofeness 	= 0.8;

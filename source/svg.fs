@@ -499,13 +499,13 @@ void main() {
 
 	// 每渲染像素对应Distance
 	// 1024. 是数据生成时用的计算范围
-	float distancePerPixel = 1.;
+	float distancePerPixel = 1.0;
 
 	float weight = u_weightAndOffset.x;
 	sdist = sdist - weight * distancePerPixel;
 
-	float alpha = antialias(sdist);
-	vec4 faceColor = vec4(u_fillColor.rgb, alpha);
+	float alpha = 1.0 - smoothstep(-distancePerPixel, 0., sdist); // antialias(sdist);
+	vec4 faceColor = vec4(u_fillColor.rgb, alpha * u_fillColor.a);
 	
     // gradient
     vec3 gradientColor1     = vec3(u_gradient[0][0], u_gradient[0][1], u_gradient[0][2]);
@@ -539,48 +539,18 @@ void main() {
     // faceColor.rgb   		= mix(faceColor.rgb, gradientColor, step(0.05, gradientLength));
 	// faceColor.rgb *= 0.0;
 	
-	float outlineSofeness 	= 0.8;
+	float outlineSofeness 	= 0.7;
 	float outlineWidth 		= u_strokeColorAndWidth.w * distancePerPixel;
 	vec4 outlineColor 		= vec4(u_strokeColorAndWidth.xyz, 1.0);
 	// outlineColor.rgb *=0.0;
-	float outline 			= (1.0 - smoothstep(0., outlineWidth, abs(sdist))) * step(-0.1, sdist);
-	float alphaOutline 		= min(outline, 1.0 - alpha) * step(0.001, outline);
+	float outline 			= (1.0 - smoothstep(0., outlineWidth * 1.2, abs(sdist)));// * step(-0.1, sdist);
+	float alphaOutline 		= outline; //min(outline, 1.0 - alpha) * step(0.001, outline);
 	float outlineFactor 	= smoothstep(0.0, outlineSofeness, alphaOutline);
-	outlineColor.a 			= outlineFactor;
+	// outlineColor.a 			= outlineFactor;
 	vec4 finalColor 		= mix(faceColor, outlineColor, outlineFactor);
 	// finalColor.a = antialias(finalColor.a);
 
-	// gl_FragColor = finalColor;
-
-	// gl_FragColor = vec4(sdist * 0.05 + 0.4);
-
-	float edgeCotrol = u_weightAndOffset.z;
-	float right = step(edgeCotrol * 1.2 - 0.1, lp.x);
-	
-	float d = abs(fwidth(lp.x));
-	fragColor = mix(
-		finalColor,
-		vec4(
-			floor(
-				((sdist + u_info.y * d) / u_info.z * 0.5 + 0.5) * 16.
-			) / 16.
-		),
-		right
-	);
+	fragColor = finalColor;
 	fragColor.rgb *= fragColor.a;
-	// fragColor.rgb = gradientColor;
 
-
-	// fragColor = faceColor;
-	// fragColor.rgb *= fragColor.a;
-	// 画 网格
-
-	// float w = 0.03;
-	// gl_FragColor = vec4(alpha, 0.0, 0.0, 1.0);
-	// if (fract(p.x) < w || fract(p.x) > 1.0 - w) {
-	// 	gl_FragColor.g = 1.0;
-	// }
-	// if (fract(p.y) < w || fract(p.y) > 1.0 - w) {
-	// 	gl_FragColor.b = 1.0;
-	// }
 }

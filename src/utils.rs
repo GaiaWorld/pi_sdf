@@ -9,7 +9,7 @@ use image::{ImageBuffer, Rgba};
 
 use wasm_bindgen::prelude::wasm_bindgen;
 
-use crate::{glyphy::geometry::arcs::GlyphyArcAccumulator, Point};
+use crate::{glyphy::geometry::arcs::GlyphyArcAccumulator, svg::Svg2, Point};
 use parry2d::bounding_volume::Aabb;
 
 use crate::{
@@ -52,7 +52,7 @@ pub struct GlyphVisitor {
 
     scale: f32,
     pub(crate) start: Point,
-    previous: Point,
+    pub(crate) previous: Point,
 }
 
 #[wasm_bindgen]
@@ -330,6 +330,7 @@ pub fn encode_uint_arc_data(
                 } else {
                     let key = arc_result.as_ref().unwrap();
                     unit_arc.data.extend_from_slice(&near_endpoints);
+                    unit_arc.parent_cell = parent_cell;
                     unit_arc.key = key.clone();
                 }
             }
@@ -354,6 +355,18 @@ pub fn get_char_arc_debug(char: String) -> BlobArc {
     log::info!("13333333");
     let (arcs, _map) = ft_face.get_char_arc(char);
     log::info!("44444444444");
+    arcs
+}
+
+#[wasm_bindgen]
+pub fn compute_svg_debug() -> BlobArc {
+    console_error_panic_hook::set_once();
+
+    let _ = console_log::init_with_level(log::Level::Debug);
+    let buffer = include_bytes!("../svg.svg").to_vec();
+    let mut svg = Svg2::new(buffer);
+    let sink = svg.compute_endpoints();
+    let (arcs, _) = svg.compute_near_arc(sink[0].accumulate.result.clone());
     arcs
 }
 

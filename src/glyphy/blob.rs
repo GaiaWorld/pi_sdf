@@ -823,7 +823,9 @@ pub fn recursion_near_arcs_of_cell<'a>(
 
     let glyph_width = extents.width();
     let glyph_height = extents.height();
-    if arcs.len() <= 2
+    if (arcs.len() <= 2 
+    // && float_equals(cell_width, cell_height, Some(0.01))
+) 
         || (cell_width * 32.0 - glyph_width).abs() < 0.1
             && (cell_height * 32.0 - glyph_height).abs() < 0.1
     {
