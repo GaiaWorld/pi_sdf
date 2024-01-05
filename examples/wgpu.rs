@@ -571,8 +571,8 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     for info in &texs_info {
         index_info.push(info.index_offset.0 as f32);
         index_info.push(info.index_offset.1 as f32);
-        index_info.push(32.0);
-        index_info.push(32.0);
+        index_info.push(info.grid_w);
+        index_info.push(info.grid_w);
 
         data_offset.push(info.data_offset.0 as f32);
         data_offset.push(info.data_offset.1 as f32);
