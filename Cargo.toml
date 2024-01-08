@@ -15,17 +15,14 @@ allsorts = { version = "0.14", default-features = false,  features = ["flate2_ru
 ab_glyph_rasterizer = "0.1"
 image = "0.24"
 wasm-bindgen = "0.2"
-serde-wasm-bindgen = "0.5"
-getrandom = { version = "0.2", features = ["js"]}
 console_log = "1.0"
-console_error_panic_hook = "0.1"
-pi_share = "=0.4.7"
 svg = "0.14"
 pi_wgpu = { registry = "yn", version = "0.1",features = ["use_wgpu"] }
-naga = "0.12"
-bytemuck = { version = "1.4", features = [ "derive" ] }
 usvg = "0.37"
-
+# console_error_panic_hook = "0.1"
+# pi_share = "=0.4.7"
+# serde-wasm-bindgen = "0.5"
+# getrandom = { version = "0.2", features = ["js"]}
 
 [target."cfg(target_arch = \"wasm32\")".dependencies.web-sys]
 web-sys = {version = "0.3", features = ["Window", "Performance"]}
@@ -36,6 +33,8 @@ env_logger = "0.10"
 winit = { registry = "yn", version = "0.27" }
 tracing = "0.1"
 tracing-subscriber = "0.3"
+bytemuck = { version = "1.4", features = [ "derive" ] }
+naga = "0.12"
 
 [profile.release]
 debug = true

@@ -344,7 +344,7 @@ pub fn encode_uint_arc_data(
 
 #[wasm_bindgen]
 pub fn get_char_arc_debug(char: String) -> BlobArc {
-    console_error_panic_hook::set_once();
+    // console_error_panic_hook::set_once();
 
     let _ = console_log::init_with_level(log::Level::Debug);
     let buffer = include_bytes!("../source/msyh.ttf").to_vec();
@@ -360,7 +360,7 @@ pub fn get_char_arc_debug(char: String) -> BlobArc {
 
 #[wasm_bindgen]
 pub fn compute_svg_debug() -> BlobArc {
-    console_error_panic_hook::set_once();
+    // console_error_panic_hook::set_once();
 
     let _ = console_log::init_with_level(log::Level::Debug);
     let buffer = include_bytes!("../svg.svg").to_vec();
