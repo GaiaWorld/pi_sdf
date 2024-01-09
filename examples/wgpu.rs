@@ -76,7 +76,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
     // let time = std::time::Instant::now();
     let tex_size = (1024, 1024);
-    let text = "我".to_string();
+    let text = "间减降讲江奖而二尔达大打搭哒莫魔默模摸老捞捞牢佬没每玫妹目木发觉送i东方军事对抗肌肤纳斯达克就服你四个点不足以在不产生歧义的情况下拟合椭圆（不要忘记一般椭圆可以任意旋转）。您至少需要五个才能获得精确的解决方案，或者需要更多才能以最小二乘方式拟合。为了更详细的解释，我找到了这个。因此，回答您的第二个问题（假设我理解正确）：如果可用点少于5个，则不会，但结合使用，最终返回更多，具体取决于特定检测到的轮廓。".to_string();
     let mut tex_data = TexData {
         index_tex: vec![0; tex_size.0 * tex_size.1 * 2],
         index_offset_x: 0,
@@ -126,7 +126,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         usage: wgpu::BufferUsages::UNIFORM,
     });
 
-    let scale = [64.0f32, 64.0];
+    let scale = [32.0f32, 32.0];
     let scale_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Index Buffer"),
         contents: bytemuck::cast_slice(scale.as_slice()),
@@ -248,7 +248,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     });
 
     let gradient = [
-        1.0f32, 0.0, 1.0, 0.0, // 第一个
+        1.0f32, 0.0, 0.0, 0.0, // 第一个
         1.0f32, 0.0, 0.0, 0.4, // 第二个
         0.0f32, 0.0, 1.0, 0.6, // 第三个
         1.0f32, 1.0, 0.0, 1.0, // 第四个
@@ -561,13 +561,11 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         usage: wgpu::BufferUsages::VERTEX,
     });
 
-    let translation = [
-        10.0f32, 64.0, // 第一个字位置
-        80.0, 64.0, // 第二个字位置
-    ];
+    let mut translation = vec![];
     let mut index_info = vec![];
     let mut data_offset = vec![];
     let mut u_info = vec![];
+    let mut index = 0;
     for info in &texs_info {
         index_info.push(info.index_offset.0 as f32);
         index_info.push(info.index_offset.1 as f32);
@@ -582,6 +580,13 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         u_info.push(info.min_sdf as f32);
         u_info.push(info.sdf_step as f32);
         u_info.push(check);
+
+        let x = index % 15;
+        let y = index / 15;
+        translation.push(x as f32 * 32.0 + 10.0);
+        translation.push(y as f32 * 32.0 + 10.0);
+
+        index += 1;
     }
     println!("index_info: {:?}", index_info);
     println!("translation: {:?}", translation);

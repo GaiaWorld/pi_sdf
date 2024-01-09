@@ -271,7 +271,10 @@ impl BlobArc {
         let grid_h = (glyph_height / self.cell_size).round();
 
         *offset_x += grid_w as usize;
-        *offset_y += grid_h as usize;
+        if *offset_x >= index_tex_width{
+            *offset_x = 0;
+            *offset_y += grid_h as usize;
+        }
 
         let cell_size = self.cell_size;
         self.show.push_str(&format!("<br> var max_offset = {:.2}, min_sdf = {:.2}, max_sdf = {:.2}, sdf_step = {:.2}, cell_size = {:.2} <br>", max_offset, self.min_sdf, self.max_sdf, sdf_step, cell_size));

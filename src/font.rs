@@ -275,6 +275,7 @@ impl FontFace {
         let mut last_offset1 = (*offset_x1, *offset_x1);
 
         for char in text {
+            println!("char: {}", char);
             let (mut blod_arc, map) = self.get_char_arc(char);
             let size = blod_arc.encode_data_tex(&map, data_tex, width0, offset_x0, offset_y0)?;
             // println!("data_map: {}", map.len());
@@ -288,7 +289,7 @@ impl FontFace {
             if size % 8 != 0 {
                 *offset_x0 += 1;
             }
-
+            // println!("info.index_offset: {:?}", info.index_offset);
             last_offset1 = (*offset_x1, *offset_y1);
 
             infos.push(info);

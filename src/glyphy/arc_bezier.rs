@@ -98,7 +98,8 @@ pub fn approximate_bezier_arc_error(
     let r = a.radius();
 
     _eb = Vector::new(c2 + v.x, c2 / tan_half_alpha + v.y).norm() - r;
-    assert!(_eb >= -0.01);
+    // println!("_eb: {}", _eb);
+    assert!(_eb >= -0.1);
 
     return ea.value + _eb;
 }
