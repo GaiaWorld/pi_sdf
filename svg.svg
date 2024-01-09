@@ -14,5 +14,5 @@
     <!-- 路径 -->
     <path d="M 210 30 C 210 250 25 190 110 150" stroke="blue" stroke-width="2" fill="none" />
     <!-- 虚线 -->
-    <!-- <path d="M10 400 l215 0" style="fill:none;stroke:black;stroke-width:3;stroke-dasharray:10,10"/> -->
+    <path d="M10 400 l215 0" style="fill:none;stroke:black;stroke-width:3;stroke-dasharray:20,10"/>
 </svg>

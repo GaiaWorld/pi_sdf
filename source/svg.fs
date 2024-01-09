@@ -36,6 +36,8 @@ layout (location = 4) in vec2 u_data_offset;
 layout (location = 5) in vec4 u_info;
 layout (location = 6) in vec4 u_fillColor; 
 layout (location = 7) in vec4 u_strokeColorAndWidth;
+layout (location = 8) in vec2 u_pos;
+layout (location = 9) in vec4 u_startAndStep;
 
 out vec4 fragColor;
 
@@ -548,9 +550,18 @@ void main() {
 	float outlineFactor 	= smoothstep(0.0, outlineSofeness, alphaOutline);
 	// outlineColor.a 			= outlineFactor;
 	vec4 finalColor 		= mix(faceColor, outlineColor, outlineFactor);
-	// finalColor.a = antialias(finalColor.a);
+	
+	// 虚线处理
+	vec2 start = u_startAndStep.xy;
+	float u_step = u_startAndStep.z + u_startAndStep.w;
+	float a1 = mod(length(u_pos - start), u_step);
+	a1 = smoothstep(0.0, 1.0, -(a1 - u_startAndStep.z + 0.2));
 
-	fragColor = finalColor;
+	float a2 = mod(length(u_pos - start) + u_startAndStep.w, u_step);
+	a2 = smoothstep(0.0, 1.0, (a2 - u_startAndStep.w + 0.2));
+  
+	float a = a1 * a2;
+	fragColor = vec4(finalColor.xyz, finalColor.w * a);
+	// fragColor = vec4(a, 0.0, 0.0, 1.0);
 	fragColor.rgb *= fragColor.a;
-
 }

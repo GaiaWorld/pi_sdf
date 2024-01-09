@@ -512,7 +512,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     });
 
     let translation = [
-        20.0f32, 20.0, // 第一个字位置
+        0.0f32, 0.0, // 第一个字位置
         0.0, 0.0, // 第二个字位置
         0.0, 0.0, // 第一个字位置
         0.0, 0.0, // 第二个字位置
@@ -526,7 +526,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     let mut u_info = vec![];
     let mut fill_color = vec![0.0; attributes.len() * 4];
     let mut stroke_color_and_width = vec![0.0; attributes.len() * 4];
-
+    let mut start_and_step = Vec::with_capacity(attributes.len() * 4);
     for info in &texs_info {
         index_info.push(info.index_offset.0 as f32);
         index_info.push(info.index_offset.1 as f32);
@@ -558,6 +558,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
             }
         }
 
+        let mut step = [100000.0, 100000.0];
         if let Some(stroke) = &attr.stroke {
             if let usvg::Paint::Color(color) = stroke.paint {
                 stroke_color_and_width[index * 4] = color.red as f32 / 255.0;
@@ -565,32 +566,44 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 stroke_color_and_width[index * 4 + 2] = color.blue as f32 / 255.0;
                 stroke_color_and_width[index * 4 + 3] = stroke.width.get();
             }
+
+            if let Some(dasharray) = &stroke.dasharray {
+                step[0] = dasharray[0];
+                step[1] = dasharray[1];
+            }
         }
+
+        start_and_step.push(attr.start.x);
+        start_and_step.push(attr.start.y);
+        start_and_step.push(step[0]);
+        start_and_step.push(step[1]);
+
         index += 1;
     }
     println!("fill_color: {:?}", fill_color);
     println!("stroke_color_and_width: {:?}", stroke_color_and_width);
+    println!("start_and_step: {:?}", start_and_step);
 
     let index_info_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("Index Buffer"),
+        label: Some("index_info_buffer"),
         contents: bytemuck::cast_slice(index_info.as_slice()),
         usage: wgpu::BufferUsages::VERTEX,
     });
 
     let translation_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("Index Buffer"),
+        label: Some("translation_buffer"),
         contents: bytemuck::cast_slice(translation.as_slice()),
         usage: wgpu::BufferUsages::VERTEX,
     });
 
     let data_offset_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("Index Buffer"),
+        label: Some("data_offset_buffer"),
         contents: bytemuck::cast_slice(data_offset.as_slice()),
         usage: wgpu::BufferUsages::VERTEX,
     });
 
     let u_info_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("Index Buffer"),
+        label: Some("u_info_buffer"),
         contents: bytemuck::cast_slice(&u_info),
         usage: wgpu::BufferUsages::VERTEX,
     });
@@ -603,10 +616,16 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
     let stroke_color_and_width_buffer =
         device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("u_outline_buffer"),
+            label: Some("stroke_color_and_width_buffer"),
             contents: bytemuck::cast_slice(&stroke_color_and_width),
             usage: wgpu::BufferUsages::VERTEX,
         });
+
+    let start_and_step_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("start_and_step_buffer"),
+        contents: bytemuck::cast_slice(&start_and_step),
+        usage: wgpu::BufferUsages::VERTEX,
+    });
 
     let index_data = create_indices();
     let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -688,6 +707,15 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                         format: wgpu::VertexFormat::Float32x4,
                         offset: 0,
                         shader_location: 6,
+                    }],
+                },
+                wgpu::VertexBufferLayout {
+                    array_stride: std::mem::size_of::<[f32; 4]>() as wgpu::BufferAddress,
+                    step_mode: wgpu::VertexStepMode::Instance,
+                    attributes: &[wgpu::VertexAttribute {
+                        format: wgpu::VertexFormat::Float32x4,
+                        offset: 0,
+                        shader_location: 7,
                     }],
                 },
             ],
@@ -783,6 +811,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     rpass.set_vertex_buffer(4, u_info_buffer.slice(..));
                     rpass.set_vertex_buffer(5, fill_color_buffer.slice(..));
                     rpass.set_vertex_buffer(6, stroke_color_and_width_buffer.slice(..));
+                    rpass.set_vertex_buffer(7, start_and_step_buffer.slice(..));
                     // rpass.insert_debug_marker("Draw!");
 
                     rpass.draw_indexed(0..6, 0, 0..count as u32);

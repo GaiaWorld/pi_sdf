@@ -76,7 +76,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
     // let time = std::time::Instant::now();
     let tex_size = (1024, 1024);
-    let text = "魔魔".to_string();
+    let text = "我".to_string();
     let mut tex_data = TexData {
         index_tex: vec![0; tex_size.0 * tex_size.1 * 2],
         index_offset_x: 0,

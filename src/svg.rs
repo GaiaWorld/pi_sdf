@@ -260,6 +260,7 @@ pub struct Attribute {
     pub fill: Option<Fill>,
     pub stroke: Option<Stroke>,
     pub is_close: bool,
+    pub start: Point,
 }
 
 pub struct Svg2 {
@@ -447,11 +448,12 @@ impl Svg2 {
                     }else{
                         sink.close();
                     }
-
+                    let p = path.data.points().first().unwrap();
                     attributes.push(Attribute {
                         fill: path.fill,
                         stroke: path.stroke,
-                        is_close
+                        is_close,
+                        start: Point::new(p.x, p.y)
                     });
 
                     let (mut blob_arc, map) = self.compute_near_arc(sink.accumulate.result);
