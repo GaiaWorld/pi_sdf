@@ -1683,6 +1683,7 @@ dependencies = [
  "console_log",
  "env_logger",
  "image",
+ "kurbo",
  "lazy_static",
  "log",
  "naga",

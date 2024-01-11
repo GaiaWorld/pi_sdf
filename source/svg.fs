@@ -541,11 +541,11 @@ void main() {
     // faceColor.rgb   		= mix(faceColor.rgb, gradientColor, step(0.05, gradientLength));
 	// faceColor.rgb *= 0.0;
 	
-	float outlineSofeness 	= 0.7;
+	float outlineSofeness 	= 0.8;
 	float outlineWidth 		= u_strokeColorAndWidth.w * distancePerPixel;
 	vec4 outlineColor 		= vec4(u_strokeColorAndWidth.xyz, 1.0);
 	// outlineColor.rgb *=0.0;
-	float outline 			= (1.0 - smoothstep(0., outlineWidth * 1.2, abs(sdist)));// * step(-0.1, sdist);
+	float outline 			= (1.0 - smoothstep(0., outlineWidth, abs(sdist)));// * step(-0.1, sdist);
 	float alphaOutline 		= outline; //min(outline, 1.0 - alpha) * step(0.001, outline);
 	float outlineFactor 	= smoothstep(0.0, outlineSofeness, alphaOutline);
 	// outlineColor.a 			= outlineFactor;

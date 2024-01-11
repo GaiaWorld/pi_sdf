@@ -3,7 +3,7 @@ use tracing::Level;
 use tracing_subscriber::fmt::Subscriber;
 
 // use nalgebra::Vector3;
-use pi_sdf::{glyphy::blob::TexData, svg::Svg2, utils::create_indices};
+use pi_sdf::{glyphy::blob::TexData, svg::Svg, utils::create_indices};
 use pi_wgpu as wgpu;
 use wgpu::{util::DeviceExt, BlendState, ColorTargetState};
 use winit::{
@@ -72,7 +72,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     // println!("vs: {:?}", vs);
     // println!("fs: {:?}", fs);
     let buffer = std::fs::read("svg.svg").unwrap();
-    let mut svg = Svg2::new(buffer);
+    let mut svg = Svg::new(buffer);
 
     // let time = std::time::Instant::now();
     let tex_size = (1024, 1024);
@@ -535,7 +535,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
         data_offset.push(info.data_offset.0 as f32);
         data_offset.push(info.data_offset.1 as f32);
-        println!("info.cell_size: {}", info.cell_size);
+        // println!("info.cell_size: {}", info.cell_size);
         let check = info.cell_size * 0.5 * 2.0f32.sqrt();
         u_info.push(info.max_offset as f32);
         u_info.push(info.min_sdf as f32);
