@@ -7,9 +7,10 @@ use allsorts::{
 };
 use image::{ImageBuffer, Rgba};
 
+use usvg::{Color, Fill, NonZeroPositiveF32, Paint, Stroke};
 use wasm_bindgen::prelude::wasm_bindgen;
 
-use crate::{glyphy::geometry::arcs::GlyphyArcAccumulator, svg::Svg2, Point};
+use crate::{glyphy::geometry::arcs::GlyphyArcAccumulator, Point};
 use parry2d::bounding_volume::Aabb;
 
 use crate::{
@@ -358,17 +359,17 @@ pub fn get_char_arc_debug(char: String) -> BlobArc {
     arcs
 }
 
-#[wasm_bindgen]
-pub fn compute_svg_debug() -> BlobArc {
-    // console_error_panic_hook::set_once();
+// #[wasm_bindgen]
+// pub fn compute_svg_debug() -> BlobArc {
+//     // console_error_panic_hook::set_once();
 
-    let _ = console_log::init_with_level(log::Level::Debug);
-    let buffer = include_bytes!("../svg.svg").to_vec();
-    let mut svg = Svg2::new(buffer);
-    let sink = svg.compute_endpoints();
-    let (arcs, _) = svg.compute_near_arc(sink[0].accumulate.result.clone());
-    arcs
-}
+//     let _ = console_log::init_with_level(log::Level::Debug);
+//     let buffer = include_bytes!("../svg.svg").to_vec();
+//     let mut svg = Svg::new(buffer);
+//     let sink = compute_endpoints();
+//     let (arcs, _) = svg.compute_near_arc(sink[0].accumulate.result.clone());
+//     arcs
+// }
 
 pub fn to_arc_cmds(endpoints: &Vec<ArcEndpoint>) -> (Vec<Vec<String>>, Vec<[f32; 2]>) {
     let mut _cmd = vec![];
@@ -457,4 +458,49 @@ pub fn arc_to_svg_a(
 
 pub fn create_indices() -> [u16; 6] {
     [0, 1, 2, 1, 2, 3]
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct Attribute {
+    pub fill: Option<Fill>,
+    pub stroke: Option<Stroke>,
+    pub is_close: bool,
+    pub start: Point,
+}
+
+impl Attribute {
+    pub fn set_fill_color(&mut self, r: u8, g: u8, b: u8) {
+        let fill = Fill::from_paint(Paint::Color(Color::new_rgb(r, g, b)));
+        self.fill = Some(fill);
+    }
+
+    pub fn set_stroke_color(&mut self, r: u8, g: u8, b: u8) {
+        if let Some(stroke) = &mut self.stroke {
+            stroke.paint = Paint::Color(Color::new_rgb(r, g, b));
+        } else {
+            let mut stroke = Stroke::default();
+            stroke.paint = Paint::Color(Color::new_rgb(r, g, b));
+            self.stroke = Some(stroke);
+        }
+    }
+
+    pub fn set_stroke_width(&mut self, width: f32) {
+        if let Some(stroke) = &mut self.stroke {
+            stroke.width = NonZeroPositiveF32::new(width).unwrap();
+        } else {
+            let mut stroke = Stroke::default();
+            stroke.width = NonZeroPositiveF32::new(width).unwrap();
+            self.stroke = Some(stroke);
+        }
+    }
+
+    pub fn set_stroke_dasharray(&mut self, dasharray: Vec<f32>) {
+        if let Some(stroke) = &mut self.stroke {
+            stroke.dasharray = Some(dasharray)
+        } else {
+            let mut stroke = Stroke::default();
+            stroke.dasharray = Some(dasharray);
+            self.stroke = Some(stroke);
+        }
+    }
 }

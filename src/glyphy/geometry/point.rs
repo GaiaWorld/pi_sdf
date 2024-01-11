@@ -1,6 +1,7 @@
 use crate::{glyphy::geometry::line::Line, Point};
 use crate::glyphy::geometry::signed_vector::SignedVector;
 use crate::glyphy::util::float_equals;
+use allsorts::pathfinder_geometry::vector::Vector2F;
 use parry2d::math::Vector;
 
 pub trait PointExt {
@@ -33,6 +34,8 @@ pub trait PointExt {
      * this 是否等于 p
      */
     fn equals(&self, p: &Point) -> bool;
+
+    fn into_vec2f(&self) -> Vector2F;
 }
 
 impl PointExt for Point {
@@ -64,5 +67,9 @@ impl PointExt for Point {
 
     fn equals(&self, p: &Point) -> bool {
         return float_equals(self.x, p.x, None) && float_equals(self.y, p.y, None);
+    }
+
+    fn into_vec2f(&self) -> Vector2F {
+        Vector2F::new(self.x, self.y)
     }
 }

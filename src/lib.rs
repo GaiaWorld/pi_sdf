@@ -6,6 +6,7 @@ pub mod utils;
 pub mod svg;
 pub mod render_path;
 pub mod font;
+pub mod shape;
 
 pub type Point = parry2d::math::Point<f32>;
 pub type Matrix4 = parry2d::na::Matrix4<f32>;

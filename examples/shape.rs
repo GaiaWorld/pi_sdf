@@ -1,9 +1,16 @@
-use parry2d::na::{self};
+use parry2d::{
+    bounding_volume::Aabb,
+    na::{self},
+};
 use tracing::Level;
 use tracing_subscriber::fmt::Subscriber;
 
 // use nalgebra::Vector3;
-use pi_sdf::{glyphy::blob::TexData, svg::Svg, utils::create_indices};
+use pi_sdf::{
+    glyphy::blob::TexData,
+    shape::{Circle, Ellipse, Path, PathVerb, Polygon, Polyline, Rect, Segment, Shapes},
+    Point, utils::create_indices,
+};
 use pi_wgpu as wgpu;
 use wgpu::{util::DeviceExt, BlendState, ColorTargetState};
 use winit::{
@@ -71,12 +78,9 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
     // println!("vs: {:?}", vs);
     // println!("fs: {:?}", fs);
-    let buffer = std::fs::read("svg.svg").unwrap();
-    let mut svg = Svg::new(buffer);
 
     // let time = std::time::Instant::now();
     let tex_size = (1024, 1024);
-
     let mut tex_data = TexData {
         index_tex: vec![0; tex_size.0 * tex_size.1 * 2],
         index_offset_x: 0,
@@ -88,9 +92,10 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         data_tex_width: tex_size.0,
     };
     let time = std::time::Instant::now();
-    let (texs_info, attributes) = svg.out_tex_data(&mut tex_data).unwrap();
+    let shapes = create_shape();
+    let (texs_info, attributes) = shapes.out_tex_data(&mut tex_data).unwrap();
     println!("out_tex_data: {:?}", time.elapsed());
-    let vertexs = svg.verties();
+    let vertexs = shapes.verties();
     println!("vertexs: {:?}", vertexs);
 
     let view_matrix = na::Matrix4::<f32>::identity();
@@ -535,7 +540,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
         data_offset.push(info.data_offset.0 as f32);
         data_offset.push(info.data_offset.1 as f32);
-        // println!("info.cell_size: {}", info.cell_size);
+        println!("info.cell_size: {}", info.cell_size);
         let check = info.cell_size * 0.5 * 2.0f32.sqrt();
         u_info.push(info.max_offset as f32);
         u_info.push(info.min_sdf as f32);
@@ -827,6 +832,90 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
             _ => {}
         }
     });
+}
+
+fn create_shape() -> Shapes {
+    let mut shapes = Shapes::new(Aabb::new(Point::new(0.0, 0.0), Point::new(400.0, 400.0)));
+    // 矩形
+    let mut rect = Rect::new(120.0, 70.0, -100.0, -50.0);
+    rect.attribute.set_fill_color(0, 0, 255);
+    rect.attribute.set_stroke_color(0, 0, 0);
+    rect.attribute.set_stroke_width(2.0);
+    shapes.add_shape(Box::new(rect));
+
+    // 圆
+    let mut circle = Circle::new(200.0, 60.0, 40.0).unwrap();
+    circle.attribute.set_fill_color(0, 0, 255);
+    circle.attribute.set_stroke_color(0, 0, 0);
+    circle.attribute.set_stroke_width(2.0);
+    shapes.add_shape(Box::new(circle));
+
+    // 椭圆
+    let mut ellipse = Ellipse::new(320.0, 60.0, 50.0, 25.0);
+    ellipse.attribute.set_fill_color(0, 0, 255);
+    ellipse.attribute.set_stroke_color(0, 0, 0);
+    ellipse.attribute.set_stroke_width(2.0);
+    shapes.add_shape(Box::new(ellipse));
+
+    // 线段
+    let mut segment = Segment::new(Point::new(20.0, 100.0), Point::new(120.0, 180.0));
+    segment.attribute.set_stroke_color(255, 0, 0);
+    segment.attribute.set_stroke_width(2.0);
+    shapes.add_shape(Box::new(segment));
+
+    // 多边形
+    let mut polygon = Polygon::new(vec![
+        Point::new(270.0, 110.0),
+        Point::new(350.0, 170.0),
+        Point::new(320.0, 220.0),
+        Point::new(220.0, 210.0),
+        Point::new(200.0, 160.0),
+    ]);
+    polygon.attribute.set_fill_color(0, 255, 0);
+    polygon.attribute.set_stroke_color(0, 0, 0);
+    polygon.attribute.set_stroke_width(2.0);
+    shapes.add_shape(Box::new(polygon));
+
+    // 多段线
+    let mut polyline: Polyline = Polyline::new(vec![
+        Point::new(20., 220.),
+        Point::new(40., 225.),
+        Point::new(60., 240.),
+        Point::new(80., 320.),
+        Point::new(120., 340.),
+        Point::new(180., 320.),
+    ]);
+    polyline.attribute.set_fill_color(0, 255, 0);
+    polyline.attribute.set_stroke_color(0, 0, 0);
+    polyline.attribute.set_stroke_width(2.0);
+    shapes.add_shape(Box::new(polyline));
+
+    // 路径
+    let mut path = Path::new(
+        vec![PathVerb::MoveTo, PathVerb::CubicTo],
+        vec![
+            Point::new(210., 30.),
+            Point::new(210., 250.),
+            Point::new(25., 190.),
+            Point::new(110., 150.),
+        ],
+    );
+    // polygon.attribute.set_fill_color(0, 255, 0);
+    path.attribute.set_stroke_color(0, 255, 255);
+    path.attribute.set_stroke_width(2.0);
+    shapes.add_shape(Box::new(path));
+
+    // 虚线
+    let mut path = Path::new(
+        vec![PathVerb::MoveTo, PathVerb::LineToRelative],
+        vec![Point::new(10., 400.), Point::new(215., 0.)],
+    );
+    path.attribute.set_stroke_dasharray(vec![20., 10.]);
+    path.attribute.set_stroke_color(0, 0, 0);
+    path.attribute.set_stroke_width(3.0);
+    shapes.add_shape(Box::new(path));
+
+    shapes
 }
 
 fn main() {
