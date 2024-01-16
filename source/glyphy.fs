@@ -14,7 +14,7 @@ precision highp float;
 // 如果 晶格的 sdf 在 [-check, check]，该晶格 和 字体轮廓 可能 相交 
 layout(set = 1, binding = 0) uniform vec4 uColor; 
 layout(set = 1, binding = 1) uniform vec4 u_outline;
-layout(set = 1, binding = 2) uniform vec4 u_weightAndOffset;
+layout(set = 1, binding = 2) uniform float u_weight;
 layout(set = 1, binding = 3) uniform vec4 u_gradientStarteEnd;
 layout(set = 1, binding = 4) uniform mat4 u_gradient;
 
@@ -501,7 +501,7 @@ void main() {
 	// 1024. 是数据生成时用的计算范围
 	float distancePerPixel = 1.;
 
-	float weight = u_weightAndOffset.x;
+	float weight = u_weight;
 	sdist = sdist - weight * distancePerPixel;
 
 	float alpha = antialias(sdist);
@@ -548,39 +548,7 @@ void main() {
 	float outlineFactor 	= smoothstep(0.0, outlineSofeness, alphaOutline);
 	outlineColor.a 			= outlineFactor;
 	vec4 finalColor 		= mix(faceColor, outlineColor, outlineFactor);
-	// finalColor.a = antialias(finalColor.a);
 
-	// gl_FragColor = finalColor;
-
-	// gl_FragColor = vec4(sdist * 0.05 + 0.4);
-
-	float edgeCotrol = u_weightAndOffset.z;
-	float right = step(edgeCotrol * 1.2 - 0.1, lp.x);
-	
-	float d = abs(fwidth(lp.x));
-	fragColor = mix(
-		finalColor,
-		vec4(
-			floor(
-				((sdist + u_info.y * d) / u_info.z * 0.5 + 0.5) * 16.
-			) / 16.
-		),
-		right
-	);
+	fragColor = finalColor;
 	fragColor.rgb *= fragColor.a;
-	// fragColor.rgb = gradientColor;
-
-
-	// fragColor = faceColor;
-	// fragColor.rgb *= fragColor.a;
-	// 画 网格
-
-	// float w = 0.03;
-	// gl_FragColor = vec4(alpha, 0.0, 0.0, 1.0);
-	// if (fract(p.x) < w || fract(p.x) > 1.0 - w) {
-	// 	gl_FragColor.g = 1.0;
-	// }
-	// if (fract(p.y) < w || fract(p.y) > 1.0 - w) {
-	// 	gl_FragColor.b = 1.0;
-	// }
 }

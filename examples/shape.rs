@@ -222,7 +222,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         ],
         label: None,
     });
-
+    // 渐变开始位置和结束位置
     let u_gradient_start_end: [f32; 4] = [-0.5, -0.5, 0.5, 0.5];
     let u_gradient_start_end_buffer =
         device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -231,13 +231,15 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
             usage: wgpu::BufferUsages::UNIFORM,
         });
 
-    let u_weight_and_offset: [f32; 4] = [0.0, 0.0, 1.0, 0.0];
-    let u_weight_and_offset_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+    // 是否粗体300 -> -1； 600 -> 1
+    let u_weight: [f32; 1] = [0.0];
+    let u_weight_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("u_weight_and_offset_buffer"),
-        contents: bytemuck::cast_slice(&u_weight_and_offset),
+        contents: bytemuck::cast_slice(&u_weight),
         usage: wgpu::BufferUsages::UNIFORM,
     });
 
+    //渐变控制点
     let gradient = [
         1.0f32, 0.0, 0.0, 0.0, // 第一个
         1.0f32, 0.0, 0.0, 0.4, // 第二个
@@ -259,7 +261,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Uniform,
                     has_dynamic_offset: false,
-                    min_binding_size: wgpu::BufferSize::new(16),
+                    min_binding_size: wgpu::BufferSize::new(4),
                 },
                 count: None,
             },
@@ -292,9 +294,9 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
             wgpu::BindGroupEntry {
                 binding: 0,
                 resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                    buffer: &u_weight_and_offset_buffer,
+                    buffer: &u_weight_buffer,
                     offset: 0,
-                    size: wgpu::BufferSize::new(16),
+                    size: wgpu::BufferSize::new(4),
                 }),
             },
             wgpu::BindGroupEntry {
@@ -516,23 +518,19 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         usage: wgpu::BufferUsages::VERTEX,
     });
 
-    let translation = [
-        0.0f32, 0.0, // 第一个字位置
-        0.0, 0.0, // 第二个字位置
-        0.0, 0.0, // 第一个字位置
-        0.0, 0.0, // 第二个字位置
-        0.0, 0.0, // 第一个字位置
-        0.0, 0.0, // 第二个字位置
-        0.0, 0.0, // 第一个字位置
-        0.0, 0.0, // 第二个字位置
-    ];
-    let mut index_info = vec![];
-    let mut data_offset = vec![];
-    let mut u_info = vec![];
-    let mut fill_color = vec![0.0; attributes.len() * 4];
-    let mut stroke_color_and_width = vec![0.0; attributes.len() * 4];
-    let mut start_and_step = Vec::with_capacity(attributes.len() * 4);
+    // svg中有多少个标签就有多少个以下数据
+    let mut translation = vec![]; // 每个标签的位置
+    let mut index_info = vec![]; // 每个标签的索引纹理的偏移和宽高
+    let mut data_offset = vec![]; // 每个标签的数据纹偏移
+    let mut u_info = vec![]; // 每个标签的sdf信息
+    let mut fill_color = vec![0.0; attributes.len() * 4]; // 每个标签的填充颜色
+    let mut stroke_color_and_width = vec![0.0; attributes.len() * 4];// 每个标签的描边颜色和描边宽度
+    let mut start_and_step = Vec::with_capacity(attributes.len() * 4); // 每个标签的虚线描边信息
     for info in &texs_info {
+        translation.push(0.0);
+        translation.push(0.0);
+
+
         index_info.push(info.index_offset.0 as f32);
         index_info.push(info.index_offset.1 as f32);
         index_info.push(info.grid_w);
@@ -559,16 +557,19 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 fill_color[index * 4] = color.red as f32 / 255.0;
                 fill_color[index * 4 + 1] = color.green as f32 / 255.0;
                 fill_color[index * 4 + 2] = color.blue as f32 / 255.0;
+                // 如果不是封闭路径，将填充颜色设置为0
                 fill_color[index * 4 + 3] = if attr.is_close { 1.0 } else { 0.0 };
             }
         }
 
+        // 当不需要虚线时，见这两个值填无穷大
         let mut step = [100000.0, 100000.0];
         if let Some(stroke) = &attr.stroke {
             if let usvg::Paint::Color(color) = stroke.paint {
                 stroke_color_and_width[index * 4] = color.red as f32 / 255.0;
                 stroke_color_and_width[index * 4 + 1] = color.green as f32 / 255.0;
                 stroke_color_and_width[index * 4 + 2] = color.blue as f32 / 255.0;
+                // 如果不需要描边时，将描边宽度设置为0.0
                 stroke_color_and_width[index * 4 + 3] = stroke.width.get();
             }
 
@@ -838,8 +839,11 @@ fn create_shape() -> Shapes {
     let mut shapes = Shapes::new(Aabb::new(Point::new(0.0, 0.0), Point::new(400.0, 400.0)));
     // 矩形
     let mut rect = Rect::new(120.0, 70.0, -100.0, -50.0);
+    // 填充颜色 默认0. 0. 0. 0.
     rect.attribute.set_fill_color(0, 0, 255);
+    // 描边颜色 默认 0. 0. 0. 
     rect.attribute.set_stroke_color(0, 0, 0);
+    // 描边宽度，默认0.0
     rect.attribute.set_stroke_width(2.0);
     shapes.add_shape(Box::new(rect));
 

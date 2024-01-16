@@ -76,7 +76,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
     // let time = std::time::Instant::now();
     let tex_size = (1024, 1024);
-    let text = "间减降讲江奖而二尔达大打搭哒莫魔默模摸老捞捞牢佬没每玫妹目木发觉送i东方军事对抗肌肤纳斯达克就服你四个点不足以在不产生歧义的情况下拟合椭圆（不要忘记一般椭圆可以任意旋转）。您至少需要五个才能获得精确的解决方案，或者需要更多才能以最小二乘方式拟合。为了更详细的解释，我找到了这个。因此，回答您的第二个问题（假设我理解正确）：如果可用点少于5个，则不会，但结合使用，最终返回更多，具体取决于特定检测到的轮廓。".to_string();
+    let text = "间".to_string();
     let mut tex_data = TexData {
         index_tex: vec![0; tex_size.0 * tex_size.1 * 2],
         index_offset_x: 0,
@@ -240,10 +240,10 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         usage: wgpu::BufferUsages::UNIFORM,
     });
 
-    let u_weight_and_offset: [f32; 4] = [0.0, 0.0, 1.0, 0.0];
-    let u_weight_and_offset_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("u_weight_and_offset_buffer"),
-        contents: bytemuck::cast_slice(&u_weight_and_offset),
+    let u_weight: [f32; 1] = [0.0];
+    let u_weight_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("u_weight_buffer"),
+        contents: bytemuck::cast_slice(&u_weight),
         usage: wgpu::BufferUsages::UNIFORM,
     });
 
@@ -288,7 +288,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Uniform,
                     has_dynamic_offset: false,
-                    min_binding_size: wgpu::BufferSize::new(16),
+                    min_binding_size: wgpu::BufferSize::new(4),
                 },
                 count: None,
             },
@@ -337,9 +337,9 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
             wgpu::BindGroupEntry {
                 binding: 2,
                 resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                    buffer: &u_weight_and_offset_buffer,
+                    buffer: &u_weight_buffer,
                     offset: 0,
-                    size: wgpu::BufferSize::new(16),
+                    size: wgpu::BufferSize::new(4),
                 }),
             },
             wgpu::BindGroupEntry {

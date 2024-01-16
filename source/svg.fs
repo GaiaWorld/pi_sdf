@@ -13,7 +13,7 @@ precision highp float;
 // (max_offset, min_sdf, sdf_step, check)
 // 如果 晶格的 sdf 在 [-check, check]，该晶格 和 字体轮廓 可能 相交 
 
-layout(set = 1, binding = 0) uniform vec4 u_weightAndOffset;
+layout(set = 1, binding = 0) uniform float u_weight;
 layout(set = 1, binding = 1) uniform vec4 u_gradientStarteEnd;
 layout(set = 1, binding = 2) uniform mat4 u_gradient;
 
@@ -503,7 +503,7 @@ void main() {
 	// 1024. 是数据生成时用的计算范围
 	float distancePerPixel = 1.0;
 
-	float weight = u_weightAndOffset.x;
+	float weight = u_weight;
 	sdist = sdist - weight * distancePerPixel;
 
 	float alpha = 1.0 - smoothstep(-distancePerPixel, 0., sdist); // antialias(sdist);
