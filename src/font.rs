@@ -4,7 +4,7 @@ use allsorts::{
     binary::read::ReadScope,
     font::MatchingPresentation,
     font_data::{DynamicFontTableProvider, FontData},
-    outline::{OutlineBuilder, OutlineSink},
+    outline::OutlineBuilder,
     tables::{glyf::GlyfTable, loca::LocaTable, FontTableProvider, HeadTable},
     tag, Font,
 };
@@ -96,14 +96,35 @@ impl FontFace {
         }
     }
 
+	pub fn font(&self) -> &Font<DynamicFontTableProvider> {
+		&self.font
+	}
+
+	/// 水平宽度
+	pub fn horizontal_advance(&mut self, char: char) -> f32 {
+		let (glyph_index, _) =
+		self.font
+			.lookup_glyph_index(char, MatchingPresentation::NotRequired, None);
+		match self.font.horizontal_advance(glyph_index) {
+			Some(r) => r as f32 / self.units_per_em as f32,
+			None => 0.0,
+		}
+	}
+
+	pub fn ascender(&self) -> f32 {
+		self.font.hhea_table.ascender as f32 / self.units_per_em as f32
+	}
+
+	pub fn descender(&self) -> f32 {
+		self.font.hhea_table.descender as f32 / self.units_per_em as f32
+	}
+
+	pub fn max_box(&self) -> &Aabb {
+		&self.max_box
+	}
+
     pub fn verties(&self) -> [f32; 16] {
-        let head_table = self
-            .font
-            .head_table()
-            .unwrap()
-            .ok_or("missing head table")
-            .unwrap();
-        let upem = head_table.units_per_em as f32;
+        let upem = self.units_per_em as f32;
         let mut extents = self.max_box;
         extents.scale(1.0 / upem, 1.0 / upem);
 
@@ -155,13 +176,22 @@ impl FontFace {
         extents
     }
 
-    pub fn get_char_arc(&mut self, char: char) -> (BlobArc, HashMap<String, u64>) {
-        // log::error!("get_char_arc: {:?}", char);
-
-        let mut sink = GlyphVisitor::new(1.0);
+	pub fn to_outline(&mut self, ch: char) -> GlyphVisitor {
+		let mut sink = GlyphVisitor::new(1.0);
         sink.accumulate.tolerance = self.units_per_em as f32 * TOLERANCE;
+		
+        let (glyph_index, _) =
+            self.font
+                .lookup_glyph_index(ch, MatchingPresentation::NotRequired, None);
+		// let r = self.font.horizontal_advance(glyph_index);
+		// let r1 = self.font.vertical_advance(glyph_index);
+		// println!("horizontal_advance, char: {}: horizontal_advance:{:?}, vertical_advance: {:?}", ch, r, r1);
+		let _ = self.glyf.visit(glyph_index, &mut sink);
+		sink
+    }
 
-        self.to_outline(char, &mut sink);
+    pub fn get_char_arc(&self, mut sink: GlyphVisitor) -> (BlobArc, HashMap<String, u64>) {
+        // log::error!("get_char_arc: {:?}", char);
 
         let endpoints = &mut sink.accumulate.result;
         if endpoints.len() > 0 {
@@ -276,7 +306,8 @@ impl FontFace {
 
         for char in text {
             println!("char: {}", char);
-            let (mut blod_arc, map) = self.get_char_arc(char);
+			let outline = self.to_outline(char);
+            let (mut blod_arc, map) = self.get_char_arc(outline);
             let size = blod_arc.encode_data_tex(&map, data_tex, width0, offset_x0, offset_y0)?;
             // println!("data_map: {}", map.len());
             let mut info =
@@ -298,10 +329,4 @@ impl FontFace {
         Ok(infos)
     }
 
-    fn to_outline(&mut self, ch: char, sink: &mut impl OutlineSink) {
-        let (glyph_index, _) =
-            self.font
-                .lookup_glyph_index(ch, MatchingPresentation::NotRequired, None);
-        let _ = self.glyf.visit(glyph_index, sink);
-    }
 }

@@ -354,7 +354,8 @@ pub fn get_char_arc_debug(char: String) -> BlobArc {
     log::info!("22222222char: {}", char);
     let char = char.chars().next().unwrap();
     log::info!("13333333");
-    let (arcs, _map) = ft_face.get_char_arc(char);
+	let outline = ft_face.to_outline(char);
+    let (arcs, _map) = ft_face.get_char_arc(outline);
     log::info!("44444444444");
     arcs
 }
