@@ -17,6 +17,7 @@ layout(set = 1, binding = 1) uniform vec4 u_outline; // 描边颜色rgb + 描边
 layout(set = 1, binding = 2) uniform float u_weight; // 文字粗细（300=-1， 500 = 0， 600 = 1）
 layout(set = 1, binding = 3) uniform vec4 u_gradientStarteEnd; // 渐变端点
 layout(set = 1, binding = 4) uniform mat4 u_gradient; // 渐变颜色， 最多支持四种颜色
+layout(set = 1, binding = 5) uniform vec4 outer_glow_color_and_dist; // 外发光颜色(xyz)和发散范围(w)
 
 layout(set = 2, binding = 0) uniform sampler index_tex_samp; // 索引纹理，采样
 layout(set = 2, binding = 1) uniform texture2D u_index_tex; // 索引纹理
@@ -486,6 +487,17 @@ float antialias(float d) {
 	return clamp(r, 0.0, 1.0);
 }
 
+vec4 outer_glow(float dist_f_, vec4 color_v4_, vec4 input_color_v4_, float radius_f_) {
+    // dist_f_ > radius_f_ 结果为 0
+    // dist_f_ < 0 结果为 1
+    // dist_f_ > 0 && dist_f_ < radius_f_ 则 dist_f_ 越大 a_f 越小，范围 0 ~ 1
+    float a_f = abs(clamp(dist_f_ / radius_f_, 0.0, 1.0) - 1.0);
+    // pow：平滑 a_f
+    // max and min：防止在物体内部渲染
+    float b_f = min(max(0.0, dist_f_), pow(a_f, 5.0));
+    return color_v4_ + input_color_v4_ * b_f;
+}
+
 void main() {
 	vec2 nominal_size = vec2(index_offset_and_size.zw);
 	vec2 p = uv * nominal_size;
@@ -550,5 +562,6 @@ void main() {
 	vec4 finalColor 		= mix(faceColor, outlineColor, outlineFactor);
 
 	fragColor = finalColor;
+	fragColor = outer_glow(sdist, fragColor, vec4(outer_glow_color_and_dist.xyz, 1.0) , outer_glow_color_and_dist.w);
 	fragColor.rgb *= fragColor.a;
 }

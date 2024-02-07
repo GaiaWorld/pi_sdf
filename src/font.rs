@@ -207,9 +207,7 @@ impl FontFace {
 
         let mut p0 = Point::new(0., 0.);
 
-        // 添加 抗锯齿的 空隙
-
-        // println!("extents2: {:?}", extents);
+        // 将圆弧控制点变成圆弧
         let mut near_arcs = Vec::with_capacity(endpoints.len());
         let mut arcs = Vec::with_capacity(endpoints.len());
         for i in 0..endpoints.len() {
@@ -228,6 +226,7 @@ impl FontFace {
         let mut result_arcs = vec![];
         let mut temp = Vec::with_capacity(arcs.len());
         let (ab1, ab2) = extents.half(Direction::Col);
+        // 二分法递归细分格子，知道格子周围的圆弧数量小于二或者小于32/1停止
         recursion_near_arcs_of_cell(
             &extents,
             &ab1,
@@ -259,7 +258,7 @@ impl FontFace {
 
         // let width_cells = (extents.width() / min_width).floor();
         // let height_cells = (extents.height() / min_height).floor();
-
+        // 根据最小格子大小计算每个格子的圆弧数据
         let (unit_arcs, map) = encode_uint_arc_data(result_arcs, &extents, min_width, min_height);
         // println!("unit_arcs[14][5]: {:?}", unit_arcs[14][5]);
 

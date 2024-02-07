@@ -203,8 +203,9 @@ pub fn encode_uint_arc_data(
 ) -> (Vec<Vec<UnitArc>>, HashMap<String, u64>) {
     let glyph_width = extents.width();
     let glyph_height = extents.height();
-
+    // 格子列的数量
     let width_cells = (glyph_width / min_width).round() as usize;
+    // 格子行的数量
     let height_cells = (glyph_height / min_height).round() as usize;
 
     let mut data = vec![
@@ -234,7 +235,8 @@ pub fn encode_uint_arc_data(
     let unit = glyph_width.max(glyph_height);
 
     let mut map = HashMap::with_capacity(32 * 32);
-
+    // 二分计算时，个格子的大小会不一样
+    // 统一以最小格子细分
     for (near_arcs, cell) in result_arcs {
         let mut near_endpoints = Vec::with_capacity(8);
         let mut _p1 = Point::new(0.0, 0.0);
@@ -269,6 +271,7 @@ pub fn encode_uint_arc_data(
 
         let mut line_result = None;
         let mut arc_result = None;
+        // 如果是线段段都编码
         if near_endpoints.len() == 2 && near_endpoints[1].d == 0.0 {
             let start = &near_endpoints[0];
             let end = &near_endpoints[1];
@@ -277,7 +280,6 @@ pub fn encode_uint_arc_data(
                 snap(&start.p, &extents, glyph_width, glyph_height),
                 snap(&end.p, &extents, glyph_width, glyph_height),
             );
-
             // Shader的最后 要加回去
             line.c -= line.n.dot(&c.into_vector());
             // shader 的 decode 要 乘回去
@@ -338,6 +340,7 @@ pub fn encode_uint_arc_data(
         }
         let key = data[begin_y][begin_x].get_key();
         let ptr: *const UnitArc = &data[begin_y][begin_x];
+        // 使用map 去重每个格子的数据纹理
         map.insert(key, ptr as u64);
     }
     (data, map)
