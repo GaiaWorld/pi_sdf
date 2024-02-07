@@ -69,31 +69,32 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         },
     });
 
-    // println!("vs: {:?}", vs);
-    // println!("fs: {:?}", fs);
+    // 加载字体文件
     let buffer = std::fs::read("./source/msyh.ttf").unwrap();
     let mut ft_face = FontFace::new(buffer);
 
     // let time = std::time::Instant::now();
     let tex_size = (1024, 1024);
+    // 需要渲染的字符串
     let text = "间".to_string();
+    // 纹理数据
     let mut tex_data = TexData {
-        index_tex: vec![0; tex_size.0 * tex_size.1 * 2],
-        index_offset_x: 0,
+        index_tex: vec![0; tex_size.0 * tex_size.1 * 2], // 索引纹理数据
+        index_offset_x: 0,                               // 从哪个偏移值开始写
         index_offset_y: 0,
-        index_tex_width: tex_size.0,
-        data_tex: vec![0; tex_size.0 * tex_size.1 * 4],
+        index_tex_width: tex_size.0,                    // 索引纹理宽
+        data_tex: vec![0; tex_size.0 * tex_size.1 * 4], // 数据纹理数据
         data_offset_x: 0,
         data_offset_y: 0,
         data_tex_width: tex_size.0,
     };
     let time = std::time::Instant::now();
-    let texs_info = ft_face.out_tex_data(&text, &mut tex_data).unwrap();
+    let texs_info = ft_face.out_tex_data(&text, &mut tex_data).unwrap(); // 将字符串的sdf数据写入纹理
     println!("out_tex_data: {:?}", time.elapsed());
-    let vertexs = ft_face.verties();
+    let vertexs = ft_face.verties(); // 获取网格数据
     println!("vertexs: {:?}", vertexs);
 
-    let view_matrix = na::Matrix4::<f32>::identity();
+    let view_matrix = na::Matrix4::<f32>::identity(); // 视口矩阵
     let view_matrix_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Index Buffer"),
         contents: bytemuck::cast_slice(view_matrix.as_slice()),
@@ -101,6 +102,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     });
     println!("view_matrix.as_slice(): {:?}", view_matrix.as_slice());
 
+    // 投影矩阵
     let proj_matrix = na::Orthographic3::<f32>::new(
         0.0,
         window_size.width as f32,
@@ -119,13 +121,14 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         proj_matrix.as_matrix().as_slice()
     );
 
+    // 斜体, 第一个值为正切值，第二个写死为网格最小y坐标
     let slope = [0.35, vertexs[1]];
     let slope_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Index Buffer"),
         contents: bytemuck::cast_slice(&slope),
         usage: wgpu::BufferUsages::UNIFORM,
     });
-
+    // 字体缩放
     let scale = [32.0f32, 32.0];
     let scale_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Index Buffer"),
@@ -217,14 +220,14 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         ],
         label: None,
     });
-
+    // 字体颜色
     let font_color: [f32; 4] = [1.0, 0.0, 0.0, 1.0];
     let font_color_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("font_color Buffer"),
         contents: bytemuck::cast_slice(&font_color),
         usage: wgpu::BufferUsages::UNIFORM,
     });
-
+    // 渐变
     let u_gradient_start_end: [f32; 4] = [-0.5, -0.5, 0.5, 0.5];
     let u_gradient_start_end_buffer =
         device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -232,7 +235,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
             contents: bytemuck::cast_slice(&u_gradient_start_end),
             usage: wgpu::BufferUsages::UNIFORM,
         });
-
+    // 描边颜色和宽度, 索引0,1,2 为颜色，3为宽度
     let u_outline: [f32; 4] = [0.2, 0.9, 0.2, 2.0];
     let u_outline_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("u_outline_buffer"),
@@ -240,13 +243,16 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         usage: wgpu::BufferUsages::UNIFORM,
     });
 
+    // 粗体
+    // 300 -> -1
+    // 600 -> 1
     let u_weight: [f32; 1] = [0.0];
     let u_weight_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("u_weight_buffer"),
         contents: bytemuck::cast_slice(&u_weight),
         usage: wgpu::BufferUsages::UNIFORM,
     });
-
+    // 渐变控制点
     let gradient = [
         1.0f32, 0.0, 0.0, 0.0, // 第一个
         1.0f32, 0.0, 0.0, 0.4, // 第二个
@@ -258,6 +264,17 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         contents: bytemuck::cast_slice(&gradient),
         usage: wgpu::BufferUsages::UNIFORM,
     });
+
+    // 外发光颜色和发散范围
+    let outer_glow_color_and_dist = [
+        1.0f32, 0.5, 0.0, 10.0, // 第一个
+    ];
+    let outer_glow_color_and_dist_buffer =
+        device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("u_weight_and_offset_buffer"),
+            contents: bytemuck::cast_slice(&outer_glow_color_and_dist),
+            usage: wgpu::BufferUsages::UNIFORM,
+        });
 
     let bind_group_layout1 = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: None,
@@ -312,6 +329,16 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 },
                 count: None,
             },
+            wgpu::BindGroupLayoutEntry {
+                binding: 5,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: wgpu::BufferSize::new(16),
+                },
+                count: None,
+            },
         ],
     });
 
@@ -358,10 +385,18 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     size: wgpu::BufferSize::new(64),
                 }),
             },
+            wgpu::BindGroupEntry {
+                binding: 5,
+                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                    buffer: &outer_glow_color_and_dist_buffer,
+                    offset: 0,
+                    size: wgpu::BufferSize::new(16),
+                }),
+            },
         ],
         label: None,
     });
-
+    // 创建索引纹理
     let index_tex = &tex_data.index_tex;
     let index_texture_extent = wgpu::Extent3d {
         width: tex_size.0 as u32,
@@ -450,19 +485,19 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         ],
         label: None,
     });
-
-    let data_tex_size_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("u_weight_and_offset_buffer"),
-        contents: bytemuck::cast_slice(&[tex_size.0 as f32, tex_size.1 as f32]),
-        usage: wgpu::BufferUsages::UNIFORM,
-    });
-
+    // 创建数据纹理
     let data_tex = &tex_data.data_tex;
     let data_texture_extent = wgpu::Extent3d {
         width: tex_size.0 as u32,
         height: tex_size.1 as u32,
         depth_or_array_layers: 1,
     };
+    let data_tex_size_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("u_weight_and_offset_buffer"),
+        contents: bytemuck::cast_slice(&[tex_size.0 as f32, tex_size.1 as f32]),
+        usage: wgpu::BufferUsages::UNIFORM,
+    });
+
     let data_tex_sampler = device.create_sampler(&wgpu::SamplerDescriptor::default());
     let data_texture = device.create_texture(&wgpu::TextureDescriptor {
         label: None,
@@ -554,33 +589,36 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
     let swapchain_capabilities = surface.get_capabilities(&adapter);
     let swapchain_format = swapchain_capabilities.formats[0];
-
+    // 创建网格数据
     let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Index Buffer"),
         contents: bytemuck::cast_slice(&vertexs),
         usage: wgpu::BufferUsages::VERTEX,
     });
 
-    let mut translation = vec![];
-    let mut index_info = vec![];
-    let mut data_offset = vec![];
-    let mut u_info = vec![];
+    // 以下为实例化数据
+    let mut translation = vec![]; // 每个字符的位置
+    let mut index_info = vec![]; // 每个字符索引纹理的信息
+    let mut data_offset = vec![]; // 每个字符数据纹理的偏移
+    let mut u_info = vec![]; // sdf 附带的信息
     let mut index = 0;
     for info in &texs_info {
-        index_info.push(info.index_offset.0 as f32);
+        index_info.push(info.index_offset.0 as f32); // 每个字符索引纹理的偏移
         index_info.push(info.index_offset.1 as f32);
-        index_info.push(info.grid_w);
-        index_info.push(info.grid_w);
+        index_info.push(info.grid_w); // 每个字符索引纹理宽
+        index_info.push(info.grid_w); // 每个字符索引纹理高
 
-        data_offset.push(info.data_offset.0 as f32);
-        data_offset.push(info.data_offset.1 as f32);
+        data_offset.push(info.data_offset.0 as f32); // 每个字符数据纹理的偏移
+        data_offset.push(info.data_offset.1 as f32); // 每个字符数据纹理的偏移
 
+        // sdf 附带的信息
         let check = info.cell_size * 0.5 * 2.0f32.sqrt();
         u_info.push(info.max_offset as f32);
         u_info.push(info.min_sdf as f32);
         u_info.push(info.sdf_step as f32);
         u_info.push(check);
 
+        // 每个字符的位置
         let x = index % 15;
         let y = index / 15;
         translation.push(x as f32 * 32.0 + 10.0);
