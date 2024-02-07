@@ -12,20 +12,20 @@ precision highp float;
 
 // (max_offset, min_sdf, sdf_step, check)
 // 如果 晶格的 sdf 在 [-check, check]，该晶格 和 字体轮廓 可能 相交 
-layout(set = 1, binding = 0) uniform vec4 uColor; 
-layout(set = 1, binding = 1) uniform vec4 u_outline;
-layout(set = 1, binding = 2) uniform float u_weight;
-layout(set = 1, binding = 3) uniform vec4 u_gradientStarteEnd;
-layout(set = 1, binding = 4) uniform mat4 u_gradient;
+layout(set = 1, binding = 0) uniform vec4 uColor; // 文字颜色
+layout(set = 1, binding = 1) uniform vec4 u_outline; // 描边颜色rgb + 描边宽度u_outline.w
+layout(set = 1, binding = 2) uniform float u_weight; // 文字粗细（300=-1， 500 = 0， 600 = 1）
+layout(set = 1, binding = 3) uniform vec4 u_gradientStarteEnd; // 渐变端点
+layout(set = 1, binding = 4) uniform mat4 u_gradient; // 渐变颜色， 最多支持四种颜色
 
-layout(set = 2, binding = 0) uniform sampler index_tex_samp;
-layout(set = 2, binding = 1) uniform texture2D u_index_tex;
-layout(set = 2, binding = 2) uniform vec2 index_tex_size;
+layout(set = 2, binding = 0) uniform sampler index_tex_samp; // 索引纹理，采样
+layout(set = 2, binding = 1) uniform texture2D u_index_tex; // 索引纹理
+layout(set = 2, binding = 2) uniform vec2 index_tex_size; // 数据纹理尺寸（单位： 像素）
 
-layout(set = 3, binding = 0) uniform sampler data_tex_samp;
-layout(set = 3, binding = 1) uniform texture2D u_data_tex;
-layout(set = 3, binding = 2) uniform vec2 data_tex_size;
-
+layout(set = 3, binding = 0) uniform sampler data_tex_samp; // 数据纹理采样
+layout(set = 3, binding = 1) uniform texture2D u_data_tex; // 数据纹理
+layout(set = 3, binding = 2) uniform vec2 data_tex_size; // 数据纹理尺寸（单位： 像素）
+ 
 
 // (网格的边界-宽, 网格的边界-高, z, w)
 // z(有效位 低15位) --> (高7位:纹理偏移.x, 中6位:网格宽高.x, 低2位: 00) 
