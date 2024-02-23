@@ -53,7 +53,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     let vs = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: None,
         source: wgpu::ShaderSource::Glsl {
-            shader: include_str!("../source/svg.vs").into(),
+            shader: include_str!("../source/glyphy.vs").into(),
             stage: naga::ShaderStage::Vertex,
             defines: Default::default(),
         },
@@ -63,7 +63,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     let fs = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: None,
         source: wgpu::ShaderSource::Glsl {
-            shader: include_str!("../source/svg.fs").into(),
+            shader: include_str!("../source/glyphy.fs").into(),
             stage: naga::ShaderStage::Fragment,
             defines: Default::default(),
         },
@@ -245,6 +245,14 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         usage: wgpu::BufferUsages::UNIFORM,
     });
 
+    let outer_glow_color_and_dist = vec![0.0f32, 0.0, 0.0, 0.0];
+    let outer_glow_color_and_dist_buffer =
+        device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("outer_glow_color_and_dist"),
+            contents: bytemuck::cast_slice(&outer_glow_color_and_dist),
+            usage: wgpu::BufferUsages::UNIFORM,
+        });
+
     let bind_group_layout1 = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: None,
         entries: &[
@@ -278,6 +286,16 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 },
                 count: None,
             },
+            wgpu::BindGroupLayoutEntry {
+                binding: 3,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: wgpu::BufferSize::new(16),
+                },
+                count: None,
+            },
         ],
     });
 
@@ -306,6 +324,14 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     buffer: &u_gradient_buffer,
                     offset: 0,
                     size: wgpu::BufferSize::new(64),
+                }),
+            },
+            wgpu::BindGroupEntry {
+                binding: 3,
+                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                    buffer: &outer_glow_color_and_dist_buffer,
+                    offset: 0,
+                    size: wgpu::BufferSize::new(16),
                 }),
             },
         ],

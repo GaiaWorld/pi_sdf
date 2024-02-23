@@ -60,7 +60,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     let vs = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: None,
         source: wgpu::ShaderSource::Glsl {
-            shader: include_str!("../source/svg.vs").into(),
+            shader: include_str!("../source/glyphy.vs").into(),
             stage: naga::ShaderStage::Vertex,
             defines: Default::default(),
         },
@@ -70,7 +70,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     let fs = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: None,
         source: wgpu::ShaderSource::Glsl {
-            shader: include_str!("../source/svg.fs").into(),
+            shader: include_str!("../source/glyphy.fs").into(),
             stage: naga::ShaderStage::Fragment,
             defines: Default::default(),
         },

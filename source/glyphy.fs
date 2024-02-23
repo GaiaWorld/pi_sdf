@@ -535,7 +535,7 @@ void main() {
 	sdist = sdist - weight * distancePerPixel;
 
 	float alpha = antialias(sdist);
-	vec4 faceColor = vec4(u_fillColor.rgb, alpha);
+	vec4 faceColor = vec4(u_fillColor.rgb, alpha * u_fillColor.a);
 	
     // gradient
     vec3 gradientColor1     = vec3(u_gradient[0][0], u_gradient[0][1], u_gradient[0][2]);
@@ -573,8 +573,8 @@ void main() {
 	float outlineWidth 		= u_strokeColorAndWidth.w * distancePerPixel;
 	vec4 outlineColor 		= vec4(u_strokeColorAndWidth.xyz, 1.0);
 	// outlineColor.rgb *=0.0;
-	float outline 			= (1.0 - smoothstep(0., outlineWidth, abs(sdist))) * step(-0.1, sdist);
-	float alphaOutline 		= min(outline, 1.0 - alpha) * step(0.001, outline);
+	float outline 			= (1.0 - smoothstep(0., outlineWidth, abs(sdist)));// * step(-0.1, sdist);
+	float alphaOutline 		= outline;//min(outline, 1.0 - alpha) * step(0.001, outline);
 	float outlineFactor 	= smoothstep(0.0, outlineSofeness, alphaOutline);
 	outlineColor.a 			= outlineFactor;
 	vec4 finalColor 		= mix(faceColor, outlineColor, outlineFactor);
