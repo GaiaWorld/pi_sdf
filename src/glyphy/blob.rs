@@ -503,7 +503,7 @@ pub struct TexData {
 // }
 
 #[wasm_bindgen(getter_with_clone)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct TexInfo {
     pub grid_w: f32,
     pub grid_h: f32,
