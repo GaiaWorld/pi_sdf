@@ -220,14 +220,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         ],
         label: None,
     });
-    // 字体颜色
-    let font_color: [f32; 4] = [1.0, 0.0, 0.0, 1.0];
-    let font_color_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("font_color Buffer"),
-        contents: bytemuck::cast_slice(&font_color),
-        usage: wgpu::BufferUsages::UNIFORM,
-    });
-    // 渐变
+
     let u_gradient_start_end: [f32; 4] = [-0.5, -0.5, 0.5, 0.5];
     let u_gradient_start_end_buffer =
         device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -235,24 +228,14 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
             contents: bytemuck::cast_slice(&u_gradient_start_end),
             usage: wgpu::BufferUsages::UNIFORM,
         });
-    // 描边颜色和宽度, 索引0,1,2 为颜色，3为宽度
-    let u_outline: [f32; 4] = [0.2, 0.9, 0.2, 2.0];
-    let u_outline_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("u_outline_buffer"),
-        contents: bytemuck::cast_slice(&u_outline),
+
+    let u_weight_and_offset: [f32; 4] = [0.0, 0.0, 1.0, 0.0];
+    let u_weight_and_offset_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("u_weight_and_offset_buffer"),
+        contents: bytemuck::cast_slice(&u_weight_and_offset),
         usage: wgpu::BufferUsages::UNIFORM,
     });
 
-    // 粗体
-    // 300 -> -1
-    // 600 -> 1
-    let u_weight: [f32; 1] = [0.0];
-    let u_weight_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("u_weight_buffer"),
-        contents: bytemuck::cast_slice(&u_weight),
-        usage: wgpu::BufferUsages::UNIFORM,
-    });
-    // 渐变控制点
     let gradient = [
         1.0f32, 0.0, 0.0, 0.0, // 第一个
         1.0f32, 0.0, 0.0, 0.4, // 第二个
@@ -265,10 +248,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         usage: wgpu::BufferUsages::UNIFORM,
     });
 
-    // 外发光颜色和发散范围
-    let outer_glow_color_and_dist = [
-        1.0f32, 0.5, 0.0, 10.0, // 第一个
-    ];
+    let outer_glow_color_and_dist = vec![1.0f32, 0.5, 0.0, 10.0];
     let outer_glow_color_and_dist_buffer =
         device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("u_weight_and_offset_buffer"),
@@ -305,32 +285,12 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Uniform,
                     has_dynamic_offset: false,
-                    min_binding_size: wgpu::BufferSize::new(4),
-                },
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 3,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: wgpu::BufferSize::new(16),
-                },
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 4,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
                     min_binding_size: wgpu::BufferSize::new(64),
                 },
                 count: None,
             },
             wgpu::BindGroupLayoutEntry {
-                binding: 5,
+                binding: 3,
                 visibility: wgpu::ShaderStages::FRAGMENT,
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Uniform,
@@ -348,7 +308,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
             wgpu::BindGroupEntry {
                 binding: 0,
                 resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                    buffer: &font_color_buffer,
+                    buffer: &u_weight_and_offset_buffer,
                     offset: 0,
                     size: wgpu::BufferSize::new(16),
                 }),
@@ -356,7 +316,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
             wgpu::BindGroupEntry {
                 binding: 1,
                 resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                    buffer: &u_outline_buffer,
+                    buffer: &u_gradient_start_end_buffer,
                     offset: 0,
                     size: wgpu::BufferSize::new(16),
                 }),
@@ -364,29 +324,13 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
             wgpu::BindGroupEntry {
                 binding: 2,
                 resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                    buffer: &u_weight_buffer,
-                    offset: 0,
-                    size: wgpu::BufferSize::new(4),
-                }),
-            },
-            wgpu::BindGroupEntry {
-                binding: 3,
-                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                    buffer: &u_gradient_start_end_buffer,
-                    offset: 0,
-                    size: wgpu::BufferSize::new(16),
-                }),
-            },
-            wgpu::BindGroupEntry {
-                binding: 4,
-                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
                     buffer: &u_gradient_buffer,
                     offset: 0,
                     size: wgpu::BufferSize::new(64),
                 }),
             },
             wgpu::BindGroupEntry {
-                binding: 5,
+                binding: 3,
                 resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
                     buffer: &outer_glow_color_and_dist_buffer,
                     offset: 0,
@@ -396,6 +340,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         ],
         label: None,
     });
+
     // 创建索引纹理
     let index_tex = &tex_data.index_tex;
     let index_texture_extent = wgpu::Extent3d {
@@ -485,19 +430,19 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         ],
         label: None,
     });
-    // 创建数据纹理
-    let data_tex = &tex_data.data_tex;
-    let data_texture_extent = wgpu::Extent3d {
-        width: tex_size.0 as u32,
-        height: tex_size.1 as u32,
-        depth_or_array_layers: 1,
-    };
+
     let data_tex_size_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("u_weight_and_offset_buffer"),
         contents: bytemuck::cast_slice(&[tex_size.0 as f32, tex_size.1 as f32]),
         usage: wgpu::BufferUsages::UNIFORM,
     });
 
+    let data_tex = &tex_data.data_tex;
+    let data_texture_extent = wgpu::Extent3d {
+        width: tex_size.0 as u32,
+        height: tex_size.1 as u32,
+        depth_or_array_layers: 1,
+    };
     let data_tex_sampler = device.create_sampler(&wgpu::SamplerDescriptor::default());
     let data_texture = device.create_texture(&wgpu::TextureDescriptor {
         label: None,
@@ -601,7 +546,13 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     let mut index_info = vec![]; // 每个字符索引纹理的信息
     let mut data_offset = vec![]; // 每个字符数据纹理的偏移
     let mut u_info = vec![]; // sdf 附带的信息
+    let mut fill_color = vec![];
+    let mut stroke_color_and_width = vec![];
+    let mut start_and_step = vec![];
+    // 外发光颜色和发散范围
+
     let mut index = 0;
+
     for info in &texs_info {
         index_info.push(info.index_offset.0 as f32); // 每个字符索引纹理的偏移
         index_info.push(info.index_offset.1 as f32);
@@ -624,34 +575,60 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         translation.push(x as f32 * 32.0 + 10.0);
         translation.push(y as f32 * 32.0 + 10.0);
 
+        fill_color.extend([1.0f32, 0.0, 0.0, 1.0]);
+        stroke_color_and_width.extend([0.0f32, 1.0, 0.0, 1.0]);
+        start_and_step.extend([0.0f32, 0.0, 1000000.0, 1000000.0]);
         index += 1;
     }
+
     println!("index_info: {:?}", index_info);
     println!("translation: {:?}", translation);
     println!("data_offset: {:?}", data_offset);
     println!("u_info: {:?}", u_info);
+    println!("fill_color: {:?}", fill_color);
+    println!("stroke_color_and_width: {:?}", stroke_color_and_width);
+    println!("start_and_step: {:?}", start_and_step);
 
     let index_info_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("Index Buffer"),
+        label: Some("index_info_buffer"),
         contents: bytemuck::cast_slice(index_info.as_slice()),
         usage: wgpu::BufferUsages::VERTEX,
     });
 
     let translation_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("Index Buffer"),
+        label: Some("translation_buffer"),
         contents: bytemuck::cast_slice(translation.as_slice()),
         usage: wgpu::BufferUsages::VERTEX,
     });
 
     let data_offset_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("Index Buffer"),
+        label: Some("data_offset_buffer"),
         contents: bytemuck::cast_slice(data_offset.as_slice()),
         usage: wgpu::BufferUsages::VERTEX,
     });
 
     let u_info_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("Index Buffer"),
+        label: Some("u_info_buffer"),
         contents: bytemuck::cast_slice(&u_info),
+        usage: wgpu::BufferUsages::VERTEX,
+    });
+
+    let fill_color_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("font_color Buffer"),
+        contents: bytemuck::cast_slice(&fill_color),
+        usage: wgpu::BufferUsages::VERTEX,
+    });
+
+    let stroke_color_and_width_buffer =
+        device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("stroke_color_and_width_buffer"),
+            contents: bytemuck::cast_slice(&stroke_color_and_width),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+
+    let start_and_step_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("start_and_step_buffer"),
+        contents: bytemuck::cast_slice(&start_and_step),
         usage: wgpu::BufferUsages::VERTEX,
     });
 
@@ -717,6 +694,33 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                         format: wgpu::VertexFormat::Float32x4,
                         offset: 0,
                         shader_location: 4,
+                    }],
+                },
+                wgpu::VertexBufferLayout {
+                    array_stride: std::mem::size_of::<[f32; 4]>() as wgpu::BufferAddress,
+                    step_mode: wgpu::VertexStepMode::Instance,
+                    attributes: &[wgpu::VertexAttribute {
+                        format: wgpu::VertexFormat::Float32x4,
+                        offset: 0,
+                        shader_location: 5,
+                    }],
+                },
+                wgpu::VertexBufferLayout {
+                    array_stride: std::mem::size_of::<[f32; 4]>() as wgpu::BufferAddress,
+                    step_mode: wgpu::VertexStepMode::Instance,
+                    attributes: &[wgpu::VertexAttribute {
+                        format: wgpu::VertexFormat::Float32x4,
+                        offset: 0,
+                        shader_location: 6,
+                    }],
+                },
+                wgpu::VertexBufferLayout {
+                    array_stride: std::mem::size_of::<[f32; 4]>() as wgpu::BufferAddress,
+                    step_mode: wgpu::VertexStepMode::Instance,
+                    attributes: &[wgpu::VertexAttribute {
+                        format: wgpu::VertexFormat::Float32x4,
+                        offset: 0,
+                        shader_location: 7,
                     }],
                 },
             ],
@@ -812,6 +816,9 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     rpass.set_vertex_buffer(2, translation_buffer.slice(..));
                     rpass.set_vertex_buffer(3, data_offset_buffer.slice(..));
                     rpass.set_vertex_buffer(4, u_info_buffer.slice(..));
+                    rpass.set_vertex_buffer(5, fill_color_buffer.slice(..));
+                    rpass.set_vertex_buffer(6, stroke_color_and_width_buffer.slice(..));
+                    rpass.set_vertex_buffer(7, start_and_step_buffer.slice(..));
                     // rpass.insert_debug_marker("Draw!");
 
                     rpass.draw_indexed(0..6, 0, 0..len as u32);

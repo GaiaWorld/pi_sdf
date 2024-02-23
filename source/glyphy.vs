@@ -16,14 +16,20 @@ layout (location = 1) in vec4 index_info;
 layout (location = 2) in vec2 translation;
 layout (location = 3) in vec2 data_offset;
 layout (location = 4) in vec4 info;
-
-layout (location = 5) out vec2 uv;
-layout (location = 6) out vec2 lp;
-layout (location = 7) out vec4 u_index_info;
-layout (location = 8) out vec2 u_data_offset;
-layout (location = 9) out vec4 u_info;
+layout (location = 5) in vec4 fillColor; 
+layout (location = 6) in vec4 strokeColorAndWidth;
+layout (location = 7) in vec4 startAndStep;
 
 
+layout (location = 1) out vec2 uv;
+layout (location = 2) out vec2 lp;
+layout (location = 3) out vec4 u_index_info;
+layout (location = 4) out vec2 u_data_offset;
+layout (location = 5) out vec4 u_info;
+layout (location = 6) out vec4 u_fillColor;
+layout (location = 7) out vec4 u_strokeColorAndWidth;
+layout (location = 8) out vec2 u_pos;
+layout (location = 9) out vec4 u_startAndStep;
 
 void main() {
     float x = (slope.y - a_glyph_vertex.y) * slope.x;
@@ -37,4 +43,8 @@ void main() {
     u_index_info = index_info;
     u_data_offset = data_offset;
     u_info = info;
+    u_fillColor = fillColor;
+    u_strokeColorAndWidth = strokeColorAndWidth;
+    u_pos = vec2(pos1.x, pos1.y);
+    u_startAndStep = startAndStep;
 }

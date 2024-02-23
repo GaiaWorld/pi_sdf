@@ -12,18 +12,17 @@ precision highp float;
 
 // (max_offset, min_sdf, sdf_step, check)
 // 如果 晶格的 sdf 在 [-check, check]，该晶格 和 字体轮廓 可能 相交 
-layout(set = 1, binding = 0) uniform vec4 uColor; 
-layout(set = 1, binding = 1) uniform vec4 u_outline;
-layout(set = 1, binding = 2) uniform float u_weight;
-layout(set = 1, binding = 3) uniform vec4 u_gradientStarteEnd;
-layout(set = 1, binding = 4) uniform mat4 u_gradient;
-layout(set = 1, binding = 5) uniform vec4 outer_glow_color_and_dist; // 外发光颜色(xyz)和发散范围(w)
 
-layout(set = 2, binding = 0) uniform sampler index_tex_samp;
+layout(set = 1, binding = 0) uniform float u_weight; // 字体粗体
+layout(set = 1, binding = 1) uniform vec4 u_gradientStarteEnd; // 渐变
+layout(set = 1, binding = 2) uniform mat4 u_gradient;// 渐变控制点
+layout(set = 1, binding = 3) uniform vec4 outer_glow_color_and_dist; // 外发光颜色和发散范围
+
+layout(set = 2, binding = 0) uniform sampler index_tex_samp; // 索引纹理
 layout(set = 2, binding = 1) uniform texture2D u_index_tex;
 layout(set = 2, binding = 2) uniform vec2 index_tex_size;
 
-layout(set = 3, binding = 0) uniform sampler data_tex_samp;
+layout(set = 3, binding = 0) uniform sampler data_tex_samp; // 数据纹理
 layout(set = 3, binding = 1) uniform texture2D u_data_tex;
 layout(set = 3, binding = 2) uniform vec2 data_tex_size;
 
@@ -31,12 +30,16 @@ layout(set = 3, binding = 2) uniform vec2 data_tex_size;
 // (网格的边界-宽, 网格的边界-高, z, w)
 // z(有效位 低15位) --> (高7位:纹理偏移.x, 中6位:网格宽高.x, 低2位: 00) 
 // w(有效位 低15位) --> (高7位:纹理偏移.y, 中6位:网格宽高.y, 低2位: 00) 
-layout (location = 5) in vec2 uv;
-layout (location = 6) in vec2 lp;
-layout (location = 7) in vec4 index_offset_and_size;
-layout (location = 8) in vec2 u_data_offset;
-layout (location = 9) in vec4 u_info;
-
+layout (location = 1) in vec2 uv; // uv坐标
+layout (location = 2) in vec2 lp; // todo, 渐变用
+// 实例化数据
+layout (location = 3) in vec4 index_offset_and_size; // 每个字符索引纹理的大小和偏移
+layout (location = 4) in vec2 u_data_offset; // 每个字符数据纹理的大小和偏移
+layout (location = 5) in vec4 u_info; // sdf附加数据
+layout (location = 6) in vec4 u_fillColor; // 填充颜色
+layout (location = 7) in vec4 u_strokeColorAndWidth;  // 描边颜色和描边宽度
+layout (location = 8) in vec2 u_pos; // 网格原始坐标，svg虚线用
+layout (location = 9) in vec4 u_startAndStep; // 虚线起点和步进
 
 out vec4 fragColor;
 
@@ -487,6 +490,7 @@ float antialias(float d) {
 	return clamp(r, 0.0, 1.0);
 }
 
+// 外发光
 vec4 outer_glow(float dist_f_, vec4 color_v4_, vec4 input_color_v4_, float radius_f_) {
     // dist_f_ > radius_f_ 结果为 0
     // dist_f_ < 0 结果为 1
@@ -496,6 +500,20 @@ vec4 outer_glow(float dist_f_, vec4 color_v4_, vec4 input_color_v4_, float radiu
     // max and min：防止在物体内部渲染
     float b_f = min(max(0.0, dist_f_), pow(a_f, 5.0));
     return color_v4_ + input_color_v4_ * b_f;
+}
+
+// 虚线处理
+vec4 stroke_dasharray(vec4 input_color,vec4 start_and_step){
+	vec2 start = start_and_step.xy;
+	float u_step = start_and_step.z + start_and_step.w;
+	float a1 = mod(length(u_pos - start), u_step);
+	a1 = smoothstep(0.0, 1.0, -(a1 - start_and_step.z + 0.2));
+
+	float a2 = mod(length(u_pos - start) + start_and_step.w, u_step);
+	a2 = smoothstep(0.0, 1.0, (a2 - start_and_step.w + 0.2));
+
+	float a = a1 * a2;
+	return vec4(input_color.xyz, input_color.w * a);
 }
 
 void main() {
@@ -517,7 +535,7 @@ void main() {
 	sdist = sdist - weight * distancePerPixel;
 
 	float alpha = antialias(sdist);
-	vec4 faceColor = vec4(uColor.rgb, alpha);
+	vec4 faceColor = vec4(u_fillColor.rgb, alpha);
 	
     // gradient
     vec3 gradientColor1     = vec3(u_gradient[0][0], u_gradient[0][1], u_gradient[0][2]);
@@ -552,8 +570,8 @@ void main() {
 	// faceColor.rgb *= 0.0;
 	
 	float outlineSofeness 	= 0.8;
-	float outlineWidth 		= u_outline.w * distancePerPixel;
-	vec4 outlineColor 		= vec4(u_outline.xyz, 1.0);
+	float outlineWidth 		= u_strokeColorAndWidth.w * distancePerPixel;
+	vec4 outlineColor 		= vec4(u_strokeColorAndWidth.xyz, 1.0);
 	// outlineColor.rgb *=0.0;
 	float outline 			= (1.0 - smoothstep(0., outlineWidth, abs(sdist))) * step(-0.1, sdist);
 	float alphaOutline 		= min(outline, 1.0 - alpha) * step(0.001, outline);
@@ -562,6 +580,9 @@ void main() {
 	vec4 finalColor 		= mix(faceColor, outlineColor, outlineFactor);
 
 	fragColor = finalColor;
+	// 外发光
 	fragColor = outer_glow(sdist, fragColor, vec4(outer_glow_color_and_dist.xyz, 1.0) , outer_glow_color_and_dist.w);
+	// 虚线，svg用
+	fragColor = stroke_dasharray(fragColor, u_startAndStep);
 	fragColor.rgb *= fragColor.a;
 }
