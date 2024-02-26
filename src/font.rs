@@ -171,7 +171,7 @@ impl FontFace {
         if glyph_width > glyph_height {
             extents.maxs.y = extents.mins.y + glyph_width;
         } else {
-            extents.maxs.y = extents.mins.x + glyph_height;
+            extents.maxs.x = extents.mins.x + glyph_height;
         };
         extents
     }
