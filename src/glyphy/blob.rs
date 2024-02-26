@@ -148,6 +148,44 @@ impl BlobArc {
         }
     }
 
+	pub fn encode_data_tex1(
+        &self,
+        map: &HashMap<String, u64>,
+    ) -> Vec<u8> { // 返回索引数据和宽高
+        let mut len = 0usize;
+        let glyph_width = self.extents.width();
+        let glyph_height = self.extents.height();
+		let mut data_tex: Vec<u8> = Vec::with_capacity(map.len());
+
+        for v in map.values() {
+            let unit_arc = unsafe { &mut *(*v as *mut UnitArc) };
+            unit_arc.offset = len;
+
+            if unit_arc.data.len() == 1 {
+                assert!(unit_arc.data[0].line_encode.is_some());
+                if let Some(data) = &unit_arc.data[0].line_encode {
+                    write_data_tex_by_width(&mut data_tex, data, &mut len);
+                }
+            } else {
+                for endpoint in &unit_arc.data {
+                    let qx = quantize_x(endpoint.p.x, &self.extents, glyph_width);
+                    let qy = quantize_y(endpoint.p.y, &self.extents, glyph_height);
+                    let rgba = arc_endpoint_encode(qx, qy, endpoint.d);
+
+					write_data_tex_by_width(&mut data_tex, &rgba, &mut len);
+                }
+            }
+
+            // 单元的端点个数超过 3 个，补充一个全零像素代表结束；
+            if unit_arc.data.len() > 3 {
+				write_data_tex_by_width(&mut data_tex, &[0., 0., 0., 0.], &mut len);
+            }
+        }
+
+        data_tex
+    }
+
+
     fn encode_data_tex_impl(
         &self,
         map: &HashMap<String, u64>,
@@ -264,11 +302,7 @@ impl BlobArc {
             }
         }
 
-        let glyph_width = self.extents.width();
-        let glyph_height = self.extents.height();
-
-        let grid_w = (glyph_width / self.cell_size).round();
-        let grid_h = (glyph_height / self.cell_size).round();
+        let (grid_w, grid_h) = self.grid_size();
 
         *offset_x += grid_w as usize;
         if *offset_x >= index_tex_width{
@@ -294,6 +328,98 @@ impl BlobArc {
             data_offset: (0, 0),
         });
     }
+
+	pub fn encode_index_tex1(
+        &mut self,
+        data_tex_map: HashMap<String, u64>,
+        data_tex_len: usize,
+    ) -> (TexInfo, Vec<u8>) {
+        let max_offset = data_tex_len;
+        // 计算sdf的 梯度等级
+        let mut level = (2usize.pow(14) / max_offset) - 1;
+        if level < 1 {
+            level = 1;
+        }
+        let sdf_range = self.max_sdf - self.min_sdf + 0.1;
+        // 量化：将 sdf_range 分成 level 个区间，看 sdf 落在哪个区间
+        let sdf_step = sdf_range / level as f32;
+		let (grid_w, grid_h) = self.grid_size();
+		let (grid_w, grid_h) = (grid_w as usize, grid_h as usize);
+
+		let mut index_tex: Vec<u8> = Vec::with_capacity(grid_w * grid_h * 2);
+
+        // 2 * grid_w * grid_h 个 Uint8
+        for i in 0..self.data.len() {
+            let row = &mut self.data[i];
+            for j in 0..row.len() {
+                let unit_arc = &mut row[j];
+                let key = unit_arc.get_key();
+                if !key.is_empty() {
+                    let map_arc_data = data_tex_map.get(&key);
+                    if map_arc_data.is_none() {
+                        panic!("unit_arc not found");
+                    }
+                    let map_arc_data = unsafe { &*((*map_arc_data.unwrap()) as *const UnitArc) };
+
+                    let mut num_points = map_arc_data.data.len();
+
+                    let num_points2 = num_points;
+                    if num_points > 3 {
+                        num_points = 0;
+                    }
+
+                    let offset = map_arc_data.offset;
+                    let sdf = unit_arc.sdf;
+
+                    let cell_size = self.cell_size;
+                    let is_interval = sdf.abs() <= cell_size * 0.5f32.sqrt();
+                    let [encode, _] = encode_to_uint16(
+                        is_interval,
+                        num_points as f32,
+                        offset as f32,
+                        max_offset as f32,
+                        sdf,
+                        self.min_sdf,
+                        sdf_step,
+                    );
+                    let mut index = (j + i * grid_w) * 2;
+					while index > index_tex.len() {
+						index_tex.push(0);
+						index -= 0;
+					}
+					index_tex.push((encode as i32 & 0xff) as u8);
+					index_tex.push((encode as i32 >> 8) as u8);
+
+                    unit_arc.show = format!("{}", num_points2);
+                }
+            }
+        }
+
+        let cell_size = self.cell_size;
+        self.show.push_str(&format!("<br> var max_offset = {:.2}, min_sdf = {:.2}, max_sdf = {:.2}, sdf_step = {:.2}, cell_size = {:.2} <br>", max_offset, self.min_sdf, self.max_sdf, sdf_step, cell_size));
+
+        return (TexInfo {
+            // unitform
+            cell_size,
+
+            grid_w: grid_w as f32,
+            grid_h: grid_h as f32,
+
+            max_offset,
+
+            min_sdf: self.min_sdf,
+            sdf_step,
+            index_offset: (0, 0),
+            data_offset: (0, 0),
+        }, index_tex);
+    }
+
+	pub fn grid_size(&self) -> (f32, f32) {
+		(
+			(self.extents.width() / self.cell_size).round(),
+			(self.extents.height() / self.cell_size).round()
+		)
+	}
 }
 
 // 取 index 所在的 循环的 起始和结束索引
@@ -627,6 +753,12 @@ fn get_offset(
     Some((x, y))
 }
 
+fn get_offset_by_width(
+    index: usize,
+) -> (usize, usize) {
+    (index % 8, index / 8)
+}
+
 fn write_data_tex(
     data_tex: &mut Vec<u8>,
     src_data: &[f32; 4],
@@ -652,6 +784,33 @@ fn write_data_tex(
         return Err(EncodeError::NewLine);
     }
     Ok(())
+}
+
+// 定宽（宽度为8）
+fn write_data_tex_by_width(
+    data_tex: &mut Vec<u8>,
+    src_data: &[f32; 4],
+    len: &mut usize,
+    // data_tex_height: usize,
+) {
+    // let (x, y) = get_offset_by_width(*len);
+	// let offset = (y + x * 8) * 4;
+	// *len = *len + 1;
+
+	// if data_tex.get(offset).is_none() {
+	// 	return Err(EncodeError::MemoryOverflow);
+	// }
+
+	// data_tex[offset] = src_data[0] as u8;
+	// data_tex[offset + 1] = src_data[1] as u8;
+	// data_tex[offset + 2] = src_data[2] as u8;
+	// data_tex[offset + 3] = src_data[3] as u8;
+
+	data_tex.push(src_data[0] as u8);
+	data_tex.push(src_data[1] as u8);
+	data_tex.push(src_data[2] as u8);
+	data_tex.push(src_data[3] as u8);
+	*len = *len + 1;
 }
 
 pub fn quantize_x(x: f32, extents: &Aabb, glyph_width: f32) -> f32 {
