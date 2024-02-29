@@ -37,6 +37,7 @@ pub struct FontFace {
     _loca_data: Vec<u8>,
     pub(crate) _loca: LocaTable<'static>,
     pub(crate) max_box: Aabb,
+	pub(crate) max_box_normaliz: Aabb,
     pub(crate) units_per_em: u16,
 }
 
@@ -83,6 +84,9 @@ impl FontFace {
         let glyf = ReadScope::new(g)
             .read_dep::<GlyfTable<'_>>(loca_ref)
             .unwrap();
+
+		let mut max_box_normaliz = extents.clone();
+		max_box_normaliz.scale(1.0 / head_table.units_per_em as f32, 1.0 / head_table.units_per_em as f32);
         // todo!()
         Self {
             _data,
@@ -91,6 +95,7 @@ impl FontFace {
             _glyf_data,
             _loca,
             _loca_data,
+			max_box_normaliz,
             max_box: extents,
             units_per_em: head_table.units_per_em,
         }
@@ -123,10 +128,12 @@ impl FontFace {
 		&self.max_box
 	}
 
+	pub fn max_box_normaliz(&self) -> &Aabb {
+        &self.max_box_normaliz
+    }
+
     pub fn verties(&self) -> [f32; 16] {
-        let upem = self.units_per_em as f32;
-        let mut extents = self.max_box;
-        extents.scale(1.0 / upem, 1.0 / upem);
+        let extents = &self.max_box_normaliz;
 
         [
             extents.mins.x,
@@ -190,7 +197,7 @@ impl FontFace {
 		sink
     }
 
-    pub fn get_char_arc(&self, mut sink: GlyphVisitor) -> (BlobArc, HashMap<String, u64>) {
+    pub fn get_char_arc(extents: Aabb,mut sink: GlyphVisitor) -> (BlobArc, HashMap<String, u64>) {
         // log::error!("get_char_arc: {:?}", char);
 
         let endpoints = &mut sink.accumulate.result;
@@ -198,8 +205,6 @@ impl FontFace {
             // 用奇偶规则，计算 每个圆弧的 环绕数
             glyphy_outline_winding_from_even_odd(endpoints, false);
         }
-
-        let extents = self.max_box;
         // println!("extents: {:?}", extents);
 
         let mut min_width = f32::INFINITY;
@@ -311,7 +316,7 @@ impl FontFace {
         for char in text {
             println!("char: {}", char);
 			let outline = self.to_outline(char);
-            let (mut blod_arc, map) = self.get_char_arc(outline);
+            let (mut blod_arc, map) = Self::get_char_arc(self.max_box.clone(), outline);
             let size = blod_arc.encode_data_tex(&map, data_tex, width0, offset_x0, offset_y0)?;
             // println!("data_map: {}", map.len());
             let mut info =
