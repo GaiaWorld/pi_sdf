@@ -127,6 +127,11 @@ impl Svg {
         let offset_y1 = &mut tex_data.index_offset_y;
         let mut last_offset1 = (*offset_x1, *offset_x1);
 
+        let sdf_tex = &mut tex_data.sdf_tex;
+        let sdf_tex1 = &mut tex_data.sdf_tex1;
+        let sdf_tex2 = &mut tex_data.sdf_tex2;
+        let sdf_tex3 = &mut tex_data.sdf_tex3;
+
         let root = &self.tree.root;
         for node in root.children() {
             match node.borrow().clone() {
@@ -181,8 +186,10 @@ impl Svg {
                     let size =
                         blob_arc.encode_data_tex(&map, data_tex, width0, offset_x0, offset_y0)?;
                     println!("data_map: {}", map.len());
-                    let mut info = blob_arc
-                        .encode_index_tex(index_tex, width1, offset_x1, offset_y1, map, size)?;
+                    let mut info = blob_arc.encode_index_tex(
+                        index_tex, width1, offset_x1, offset_y1, map, size, sdf_tex, sdf_tex1,
+                        sdf_tex2, sdf_tex3,
+                    )?;
 
                     info.index_offset = last_offset1;
                     info.data_offset = (*offset_x0, *offset_y0);

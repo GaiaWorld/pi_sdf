@@ -381,7 +381,7 @@ pub struct Path {
 
 impl Path {
     pub fn new(mut verbs: Vec<PathVerb>, mut points: Vec<Point>) -> Self {
-        if points.len()> 2 && !compute_direction(&points) {
+        if points.len() > 2 && !compute_direction(&points) {
             points.reverse();
             verbs.reverse();
 
@@ -489,7 +489,10 @@ impl Shapes {
         ]
     }
 
-    pub fn out_tex_data(&self, tex_data: &mut TexData) -> Result<(Vec<TexInfo>, Vec<Attribute>), EncodeError> {
+    pub fn out_tex_data(
+        &self,
+        tex_data: &mut TexData,
+    ) -> Result<(Vec<TexInfo>, Vec<Attribute>), EncodeError> {
         let mut infos = vec![];
         let mut attributes = vec![];
 
@@ -504,13 +507,20 @@ impl Shapes {
         let offset_y1 = &mut tex_data.index_offset_y;
         let mut last_offset1 = (*offset_x1, *offset_x1);
 
+        let sdf_tex = &mut tex_data.sdf_tex;
+        let sdf_tex1 = &mut tex_data.sdf_tex1;
+        let sdf_tex2 = &mut tex_data.sdf_tex2;
+        let sdf_tex3 = &mut tex_data.sdf_tex3;
+
         for node in &self.shapes {
             let (mut blob_arc, map) =
                 compute_near_arc_impl(self.view_box, node.get_arc_endpoints());
             let size = blob_arc.encode_data_tex(&map, data_tex, width0, offset_x0, offset_y0)?;
             println!("data_map: {}", map.len());
-            let mut info =
-                blob_arc.encode_index_tex(index_tex, width1, offset_x1, offset_y1, map, size)?;
+            let mut info = blob_arc.encode_index_tex(
+                index_tex, width1, offset_x1, offset_y1, map, size, sdf_tex, sdf_tex1, sdf_tex2,
+                sdf_tex3,
+            )?;
 
             info.index_offset = last_offset1;
             info.data_offset = (*offset_x0, *offset_y0);

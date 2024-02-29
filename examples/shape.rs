@@ -90,6 +90,10 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         data_offset_x: 0,
         data_offset_y: 0,
         data_tex_width: tex_size.0,
+        sdf_tex: vec![0; tex_size.0 * tex_size.1],
+        sdf_tex1: vec![0; tex_size.0 * tex_size.1 / 4],
+        sdf_tex2: vec![0; tex_size.0 * tex_size.1 / 16],
+        sdf_tex3: vec![0; tex_size.0 * tex_size.1 / 64], // 数据纹理宽
     };
     let time = std::time::Instant::now();
     let shapes = create_shape();

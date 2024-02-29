@@ -22,6 +22,7 @@ pub trait SegmentEXT {
     fn projection_to_right_area(&self, aabb: &Aabb) -> Option<(Range<f32>, f32)>;
     fn nearest_points_on_line_segments(&self, other: &Segment) -> Segment;
     fn norm_squared(&self) -> f32;
+    fn norm_scale(&self, scale: f32)->f32;
 }
 
 impl SegmentEXT for Segment {
@@ -271,6 +272,10 @@ impl SegmentEXT for Segment {
 
     fn norm_squared(&self) -> f32 {
         (self.a - self.b).norm_squared()
+    }
+
+    fn norm_scale(&self, scale: f32) -> f32 {
+        (self.a  - self.b ).norm()
     }
 }
 

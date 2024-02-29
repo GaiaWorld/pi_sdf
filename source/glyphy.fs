@@ -13,19 +13,24 @@ precision highp float;
 // (max_offset, min_sdf, sdf_step, check)
 // 如果 晶格的 sdf 在 [-check, check]，该晶格 和 字体轮廓 可能 相交 
 
-layout(set = 1, binding = 0) uniform float u_weight; // 字体粗体
-layout(set = 1, binding = 1) uniform vec4 u_gradientStarteEnd; // 渐变
-layout(set = 1, binding = 2) uniform mat4 u_gradient;// 渐变控制点
-layout(set = 1, binding = 3) uniform vec4 outer_glow_color_and_dist; // 外发光颜色和发散范围
+layout(set = 0, binding = 4) uniform float u_weight; // 粗体
+layout(set = 0, binding = 5) uniform vec4 u_gradientStarteEnd; // 渐变
+layout(set = 0, binding = 6) uniform mat4 u_gradient; // 渐变控制点
+layout(set = 0, binding = 7) uniform vec4 outer_glow_color_and_dist; // 外发光颜色和发散范围
+layout(set = 0, binding = 8) uniform vec4 shadow_color; // 阴影颜色
+layout(set = 0, binding = 9) uniform vec3 shadow_offset_and_blur_level; // 阴影偏移和模糊等级
 
-layout(set = 2, binding = 0) uniform sampler index_tex_samp; // 索引纹理
-layout(set = 2, binding = 1) uniform texture2D u_index_tex;
-layout(set = 2, binding = 2) uniform vec2 index_tex_size;
+layout(set = 1, binding = 0) uniform sampler index_tex_samp;
+layout(set = 1, binding = 1) uniform texture2D u_index_tex;
+layout(set = 1, binding = 2) uniform vec2 index_tex_size;
 
-layout(set = 3, binding = 0) uniform sampler data_tex_samp; // 数据纹理
-layout(set = 3, binding = 1) uniform texture2D u_data_tex;
-layout(set = 3, binding = 2) uniform vec2 data_tex_size;
+layout(set = 2, binding = 0) uniform sampler data_tex_samp;
+layout(set = 2, binding = 1) uniform texture2D u_data_tex;
+layout(set = 2, binding = 2) uniform vec2 data_tex_size;
 
+layout(set = 3, binding = 0) uniform sampler sdf_tex_samp;
+layout(set = 3, binding = 1) uniform texture2D u_sdf_tex;
+layout(set = 3, binding = 2) uniform vec2 sdf_tex_size;
 
 // (网格的边界-宽, 网格的边界-高, z, w)
 // z(有效位 低15位) --> (高7位:纹理偏移.x, 中6位:网格宽高.x, 低2位: 00) 
@@ -516,6 +521,16 @@ vec4 stroke_dasharray(vec4 input_color,vec4 start_and_step){
 	return vec4(input_color.xyz, input_color.w * a);
 }
 
+// 阴影模糊
+vec4 shadow_blur(vec4 shadow_color, vec2 offset, float blur_level, vec2 p){
+	float a1 =  textureLod(sampler2D(u_sdf_tex, sdf_tex_samp), get_index_uv(p), 0).r ;
+	float a2 =  textureLod(sampler2D(u_sdf_tex, sdf_tex_samp), get_index_uv(p), 1).r;
+	float a3 =  textureLod(sampler2D(u_sdf_tex, sdf_tex_samp), get_index_uv(p), 2).r;
+	float a4 =  textureLod(sampler2D(u_sdf_tex, sdf_tex_samp), get_index_uv(p), 3).r;
+
+	return vec4(shadow_color.xyz, shadow_color.w * smoothstep(0.1, 0.99, a1));
+}
+
 void main() {
 	vec2 nominal_size = vec2(index_offset_and_size.zw);
 	vec2 p = uv * nominal_size;
@@ -586,6 +601,7 @@ void main() {
 	fragColor = finalColor;
 	// 外发光
 	fragColor = outer_glow(sdist, fragColor, vec4(outer_glow_color_and_dist.xyz, 1.0) , outer_glow_color_and_dist.w);
+	vec4 shadow = shadow_blur(shadow_color, shadow_offset_and_blur_level.xy, shadow_offset_and_blur_level.z, p);
 	// 虚线，svg用
 	fragColor = stroke_dasharray(fragColor, u_startAndStep);
 	fragColor.rgb *= fragColor.a;

@@ -49,6 +49,10 @@ pub struct UnitArc {
     pub origin_data: Vec<ArcEndpoint>, // 原始数据, 用于显示 点 (因为data 对 1, 0 做了优化)
 
     pub key: String,
+    pub s_dist: u8,
+    pub s_dist_1: u64,
+    pub s_dist_2: u64,
+    pub s_dist_3: u64,
 }
 
 #[wasm_bindgen]
@@ -96,6 +100,7 @@ pub struct Extents {
 #[wasm_bindgen]
 impl BlobArc {
     pub fn get_unit_arc(&self, i: usize, j: usize) -> UnitArc {
+        // log::info!("i: {}, j: {}", i, j);
         self.data[j][i].clone()
     }
 
@@ -210,6 +215,10 @@ impl BlobArc {
         offset_y: &mut usize,
         data_tex_map: HashMap<String, u64>,
         data_tex_len: usize,
+        sdf_tex: &mut Vec<u8>, // 字节数 = 4 * 像素个数
+        sdf_tex1: &mut Vec<u8>,
+        sdf_tex2: &mut Vec<u8>,
+        sdf_tex3: &mut Vec<u8>,
     ) -> Result<TexInfo, EncodeError> {
         let max_offset = data_tex_len;
         // 计算sdf的 梯度等级
@@ -223,10 +232,10 @@ impl BlobArc {
 
         // 2 * grid_w * grid_h 个 Uint8
         for i in 0..self.data.len() {
-            let row = &mut self.data[i];
-            for j in 0..row.len() {
-                let unit_arc = &mut row[j];
-                let key = unit_arc.get_key();
+            let len = self.data[i].len();
+            for j in 0..len {
+                // let unit_arc = &mut row[j];
+                let key = self.data[i][j].get_key();
                 if !key.is_empty() {
                     let map_arc_data = data_tex_map.get(&key);
                     if map_arc_data.is_none() {
@@ -242,7 +251,7 @@ impl BlobArc {
                     }
 
                     let offset = map_arc_data.offset;
-                    let sdf = unit_arc.sdf;
+                    let sdf = self.data[i][j].sdf;
 
                     let cell_size = self.cell_size;
                     let is_interval = sdf.abs() <= cell_size * 0.5f32.sqrt();
@@ -255,11 +264,56 @@ impl BlobArc {
                         self.min_sdf,
                         sdf_step,
                     );
-                    let index = (((*offset_x) + j) + ((*offset_y) + i) * index_tex_width) * 2;
+                    let offset_x = *offset_x;
+                    let offset_y = *offset_y;
+
+                    let sdf_index = (offset_x + j) + (offset_y + i) * index_tex_width;
+                    let index = sdf_index * 2;
                     index_tex[index] = (encode as i32 & 0xff) as u8;
                     index_tex[index + 1] = (encode as i32 >> 8) as u8;
 
-                    unit_arc.show = format!("{}", num_points2);
+                    sdf_tex[sdf_index] = self.data[i][j].s_dist;
+
+                    if i % 2 == 1 && j % 2 == 1 {
+                        self.data[i][j].s_dist_1 = (self.data[i][j].s_dist as u64
+                            + self.data[i - 1][j].s_dist as u64
+                            + self.data[i][j - 1].s_dist as u64
+                            + self.data[i - 1][j - 1].s_dist as u64)
+                            / 4;
+
+                        let index1 = (offset_x + j) / 2 + (offset_y + i) / 2 * index_tex_width / 2;
+                        sdf_tex1[index1] = self.data[i][j].s_dist_1 as u8;
+
+                        if i % 4 == 3 && j % 4 == 3 {
+                            self.data[i][j].s_dist_2 = (self.data[i][j].s_dist_1 as u64
+                                + self.data[i - 2][j].s_dist_1 as u64
+                                + self.data[i][j - 2].s_dist_1 as u64
+                                + self.data[i - 2][j - 2].s_dist_1 as u64)
+                                / 4;
+
+                            let index2 =
+                                (offset_x + j) / 4 + (offset_y + i) / 4 * index_tex_width / 4;
+                            sdf_tex2[index2] = self.data[i][j].s_dist_2 as u8;
+
+                            if i % 8 == 7 && j % 8 == 7 {
+                                self.data[i][j].s_dist_3 = (self.data[i][j].s_dist_2 as u64
+                                    + self.data[i - 4][j].s_dist_2 as u64
+                                    + self.data[i][j - 4].s_dist_2 as u64
+                                    + self.data[i - 4][j - 4].s_dist_2 as u64)
+                                    / 4;
+
+                                let index3 =
+                                    (offset_x + j) / 8 + (offset_y + i) / 8 * index_tex_width / 8;
+                                sdf_tex3[index3] = self.data[i][j].s_dist_3 as u8;
+                            }
+                        }
+                    }
+
+                    // println!(
+                    //     "i: {}, j: {}, sdf: {}, sdf1:{}",
+                    //     i, j, self.data[i][j].s_dist, self.data[i][j].s_dist_1
+                    // );
+                    self.data[i][j].show = format!("{}", self.data[i][j].s_dist);
                 }
             }
         }
@@ -271,7 +325,7 @@ impl BlobArc {
         let grid_h = (glyph_height / self.cell_size).round();
 
         *offset_x += grid_w as usize;
-        if *offset_x >= index_tex_width{
+        if *offset_x >= index_tex_width {
             *offset_x = 0;
             *offset_y += grid_h as usize;
         }
@@ -496,6 +550,11 @@ pub struct TexData {
     pub data_offset_x: usize,
     pub data_offset_y: usize,
     pub data_tex_width: usize,
+
+    pub sdf_tex: Vec<u8>, // 字节数 = 4 * 像素个数
+    pub sdf_tex1: Vec<u8>,
+    pub sdf_tex2: Vec<u8>,
+    pub sdf_tex3: Vec<u8>,
 }
 
 // impl TexData{
@@ -503,7 +562,7 @@ pub struct TexData {
 // }
 
 #[wasm_bindgen(getter_with_clone)]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct TexInfo {
     pub grid_w: f32,
     pub grid_h: f32,
@@ -826,11 +885,11 @@ pub fn recursion_near_arcs_of_cell<'a>(
 
     let glyph_width = extents.width();
     let glyph_height = extents.height();
-    if (arcs.len() <= 2 
-    // && float_equals(cell_width, cell_height, Some(0.01))
-) 
-        || (cell_width * 32.0 - glyph_width).abs() < 0.1
-            && (cell_height * 32.0 - glyph_height).abs() < 0.1
+    if (
+        arcs.len() <= 2
+        // && float_equals(cell_width, cell_height, Some(0.01))
+    ) || (cell_width * 32.0 - glyph_width).abs() < 0.1
+        && (cell_height * 32.0 - glyph_height).abs() < 0.1
     {
         result_arcs.push((arcs, cell.clone()));
     } else {

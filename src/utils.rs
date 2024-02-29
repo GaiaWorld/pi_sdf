@@ -10,7 +10,13 @@ use image::{ImageBuffer, Rgba};
 use usvg::{Color, Fill, NonZeroPositiveF32, Paint, Stroke};
 use wasm_bindgen::prelude::wasm_bindgen;
 
-use crate::{glyphy::geometry::arcs::GlyphyArcAccumulator, Point};
+use crate::{
+    glyphy::{
+        geometry::{arcs::GlyphyArcAccumulator, segment::SegmentEXT},
+        sdf::glyphy_sdf_from_arc_list2,
+    },
+    Point,
+};
 use parry2d::bounding_volume::Aabb;
 
 use crate::{
@@ -54,6 +60,7 @@ pub struct GlyphVisitor {
     scale: f32,
     pub(crate) start: Point,
     pub(crate) previous: Point,
+    pub index: usize,
 }
 
 #[wasm_bindgen]
@@ -70,6 +77,7 @@ impl GlyphVisitor {
             scale,
             start: Point::default(),
             previous: Point::default(),
+            index: 0,
         }
     }
 }
@@ -191,6 +199,11 @@ impl OutlineSink for GlyphVisitor {
             self.svg_paths.push(self.path_str.clone());
             self.path_str.clear();
         }
+
+        // let r = self.compute_direction();
+        // let s = if r { "顺时针" } else { "逆时针" };
+        // println!("{}", s);
+        self.index = self.accumulate.result.len();
         // println!("close()");
     }
 }
@@ -222,7 +235,11 @@ pub fn encode_uint_arc_data(
                 show: "".to_owned(),
                 data: Vec::with_capacity(8),
                 origin_data: vec![],
-                key: "".to_string()
+                key: "".to_string(),
+                s_dist: 0,
+                s_dist_1: 0,
+                s_dist_2: 0,
+                s_dist_3: 0
             };
             width_cells
         ];
@@ -336,6 +353,15 @@ pub fn encode_uint_arc_data(
                     unit_arc.parent_cell = parent_cell;
                     unit_arc.key = key.clone();
                 }
+                let p = Point::new(
+                    (i as f32 + 0.5) * min_width + extents.mins.x,
+                    (j as f32 + 0.5) * min_height + extents.mins.y,
+                );
+
+                let sdf = glyphy_sdf_from_arc_list2(&near_arcs, p).0;
+                let a = (160.0 - sdf).clamp(0.0, 255.0);
+                
+                unit_arc.s_dist = a as u8;
             }
         }
         let key = data[begin_y][begin_x].get_key();
@@ -357,7 +383,7 @@ pub fn get_char_arc_debug(char: String) -> BlobArc {
     log::info!("22222222char: {}", char);
     let char = char.chars().next().unwrap();
     log::info!("13333333");
-	let outline = ft_face.to_outline(char);
+    let outline = ft_face.to_outline(char);
     let (arcs, _map) = ft_face.get_char_arc(outline);
     log::info!("44444444444");
     arcs
