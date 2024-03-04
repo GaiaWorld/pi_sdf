@@ -313,17 +313,17 @@ glyphy_index_t decode_glyphy_index(vec4 v, const vec2 nominal_size)
 }
 
 // 取 索引 uv
-vec2 get_index_uv(vec2 nominal_size)
+vec2 get_index_uv(vec2 p)
 {
 	vec2 offset = vec2(index_offset_and_size.xy);
-	return (nominal_size * uv + offset) / index_tex_size;
+	return (p + offset) / index_tex_size;
 }
 
 
 
-glyphy_index_t get_glyphy_index(vec2 nominal_size) {
+glyphy_index_t get_glyphy_index(vec2 nominal_size, vec2 p) {
 	
-	vec2 index_uv = get_index_uv(nominal_size);
+	vec2 index_uv = get_index_uv(p);
 	
 	vec4 c = texture(sampler2D(u_index_tex, index_tex_samp), index_uv).rgba;
 	return decode_glyphy_index(c, nominal_size);
@@ -333,7 +333,7 @@ glyphy_index_t get_glyphy_index(vec2 nominal_size) {
 // 重点 计算 sdf 
 float glyphy_sdf(vec2 p, vec2 nominal_size) {
 
-	glyphy_index_t index_info = get_glyphy_index(nominal_size);
+	glyphy_index_t index_info = get_glyphy_index(nominal_size, p);
 		
 	// if (index_info.sdf >= GLYPHY_INFINITY - GLYPHY_EPSILON) {
 	// 	// 全外面
@@ -497,10 +497,11 @@ float antialias(float d) {
 
 // 外发光
 vec4 outer_glow(float dist_f_, vec4 color_v4_, vec4 input_color_v4_, float radius_f_) {
+	float radius = radius_f_ * 10;
     // dist_f_ > radius_f_ 结果为 0
     // dist_f_ < 0 结果为 1
     // dist_f_ > 0 && dist_f_ < radius_f_ 则 dist_f_ 越大 a_f 越小，范围 0 ~ 1
-    float a_f = abs(clamp(dist_f_ / radius_f_, 0.0, 1.0) - 1.0);
+    float a_f = abs(clamp(dist_f_ / radius, 0.0, 1.0) - 1.0);
     // pow：平滑 a_f
     // max and min：防止在物体内部渲染
     float b_f = min(max(0.0, dist_f_), pow(a_f, 5.0));
@@ -521,19 +522,44 @@ vec4 stroke_dasharray(vec4 input_color,vec4 start_and_step){
 	return vec4(input_color.xyz, input_color.w * a);
 }
 
-// 阴影模糊
-vec4 shadow_blur(vec4 shadow_color, vec2 offset, float blur_level, vec2 p){
-	float a1 =  textureLod(sampler2D(u_sdf_tex, sdf_tex_samp), get_index_uv(p), 0).r ;
-	float a2 =  textureLod(sampler2D(u_sdf_tex, sdf_tex_samp), get_index_uv(p), 1).r;
-	float a3 =  textureLod(sampler2D(u_sdf_tex, sdf_tex_samp), get_index_uv(p), 2).r;
-	float a4 =  textureLod(sampler2D(u_sdf_tex, sdf_tex_samp), get_index_uv(p), 3).r;
+vec4 get_blur_modulus(float blur_level){
+	float level = round(blur_level) % 6.0;
+	if (abs(level - 3.0) < 0.1) {
+		return vec4(1.0, 0.0, 0.0, 0.0);
+	} else if (abs(level - 4.0) < 0.1) {
+		return vec4(0.5, 0.5, 0.0, 0.0);
+	} else if (abs(level - 5.0) < 0.1) {
+		return vec4(0.5, 0.3, 0.2, 0.0);
+	} else if (abs(level - 6.0) < 0.1) {
+		return vec4(0.33, 0.33, 0.33, 0.0);
+	}
 
-	return vec4(shadow_color.xyz, shadow_color.w * smoothstep(0.1, 0.99, a1));
+	return vec4(1.0, 0.0, 0.0, 0.0);
+}
+
+// 阴影模糊
+// 1 => 
+vec4 shadow_blur(vec4 input_color, vec4 shadow_color, vec2 offset, float blur_level, vec2 p){
+	vec2 nominal_size = vec2(index_offset_and_size.zw);
+	vec2 uv1 = vec2(clamp(0.0, 0.99, uv.x - offset.x * 0.7), clamp(0.0, 0.99, uv.y + offset.y * 0.6));
+	vec2 p1 = uv1 * nominal_size;
+
+	float a1 =  textureLod(sampler2D(u_sdf_tex, sdf_tex_samp), get_index_uv(p1), 0).r;
+	float a2 =  textureLod(sampler2D(u_sdf_tex, sdf_tex_samp), get_index_uv(p1), 1).r;
+	float a3 =  textureLod(sampler2D(u_sdf_tex, sdf_tex_samp), get_index_uv(p1), 2).r;
+	// float a4 =  textureLod(sampler2D(u_sdf_tex, sdf_tex_samp), get_index_uv(p1), 3).r;
+	vec4 modulus = get_blur_modulus(blur_level);
+	float a = shadow_color.w * (a1 * modulus.x + a2  * modulus.y + a3 * modulus.z); //+ a4 * modulus.w);
+
+	// return vec4(shadow_color.xyz, smoothstep(0.1, 0.99, a) * shadow_color.w);
+	return mix(input_color, vec4(shadow_color.xyz, smoothstep(0.1, 0.99, a) * shadow_color.w), 1.0 - input_color.w);
 }
 
 void main() {
 	vec2 nominal_size = vec2(index_offset_and_size.zw);
-	vec2 p = uv * nominal_size;
+	vec2 uv1 = vec2(clamp(0.0, 0.99, uv.x), clamp(0.0, 0.99, uv.y));
+	vec2 p = uv1 * nominal_size;
+	// p = vec2(clamp(0.0, nominal_size.x, p.x), clamp(0.0, nominal_size.y, p.y));
 	// 重点：计算 SDF 
 	float gsdist = glyphy_sdf(p, nominal_size);
 	
@@ -599,10 +625,14 @@ void main() {
 	vec4 finalColor 		= mix(faceColor, outlineColor, outlineFactor);
 
 	fragColor = finalColor;
-	// 外发光
-	fragColor = outer_glow(sdist, fragColor, vec4(outer_glow_color_and_dist.xyz, 1.0) , outer_glow_color_and_dist.w);
-	vec4 shadow = shadow_blur(shadow_color, shadow_offset_and_blur_level.xy, shadow_offset_and_blur_level.z, p);
+	// 阴影
+	fragColor = shadow_blur(fragColor, shadow_color, shadow_offset_and_blur_level.xy, shadow_offset_and_blur_level.z, p);
+	if (abs(shadow_color.w - 0.0) < 0.1){
+		// 外发光 只有没有阴影的时候才会有外发光
+		fragColor = outer_glow(sdist, fragColor, vec4(outer_glow_color_and_dist.xyz, 1.0) , outer_glow_color_and_dist.w);
+	}
+	
 	// 虚线，svg用
-	fragColor = stroke_dasharray(fragColor, u_startAndStep);
+	// fragColor = stroke_dasharray(fragColor, u_startAndStep);
 	fragColor.rgb *= fragColor.a;
 }

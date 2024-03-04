@@ -12,7 +12,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::{
     glyphy::{
-        geometry::{arcs::GlyphyArcAccumulator, segment::SegmentEXT},
+        geometry::arcs::GlyphyArcAccumulator,
         sdf::glyphy_sdf_from_arc_list2,
     },
     Point,

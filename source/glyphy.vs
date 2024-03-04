@@ -12,7 +12,6 @@ layout(set = 0, binding = 3) uniform vec2 scale;
 // glyph_vertex_t: x, y; g16hi, g16lo; 
 layout (location = 0) in vec4 a_glyph_vertex; // 顶点、uv
 
-
 layout (location = 1) in vec4 index_info; // 索引纹理宽高（晶格个数）， 索引纹理偏移（单位： 像素）
 layout (location = 2) in vec2 translation; // 位置
 layout (location = 3) in vec2 data_offset; // 数据纹理偏移

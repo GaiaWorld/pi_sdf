@@ -274,7 +274,7 @@ impl SegmentEXT for Segment {
         (self.a - self.b).norm_squared()
     }
 
-    fn norm_scale(&self, scale: f32) -> f32 {
+    fn norm_scale(&self, _scale: f32) -> f32 {
         (self.a  - self.b ).norm()
     }
 }

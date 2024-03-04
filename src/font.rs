@@ -4,7 +4,7 @@ use allsorts::{
     binary::read::ReadScope,
     font::MatchingPresentation,
     font_data::{DynamicFontTableProvider, FontData},
-    outline::{OutlineBuilder, OutlineSink},
+    outline::OutlineBuilder,
     tables::{glyf::GlyfTable, loca::LocaTable, FontTableProvider, HeadTable},
     tag, Font,
 };
@@ -37,7 +37,7 @@ pub struct FontFace {
     _loca_data: Vec<u8>,
     pub(crate) _loca: LocaTable<'static>,
     pub(crate) max_box: Aabb,
-	pub(crate) max_box_normaliz: Aabb,
+    pub(crate) max_box_normaliz: Aabb,
     pub(crate) units_per_em: u16,
 }
 
@@ -85,8 +85,11 @@ impl FontFace {
             .read_dep::<GlyfTable<'_>>(loca_ref)
             .unwrap();
 
-		let mut max_box_normaliz = extents.clone();
-		max_box_normaliz.scale(1.0 / head_table.units_per_em as f32, 1.0 / head_table.units_per_em as f32);
+        let mut max_box_normaliz = extents.clone();
+        max_box_normaliz.scale(
+            1.0 / head_table.units_per_em as f32,
+            1.0 / head_table.units_per_em as f32,
+        );
         // todo!()
         Self {
             _data,
@@ -95,63 +98,92 @@ impl FontFace {
             _glyf_data,
             _loca,
             _loca_data,
-			max_box_normaliz,
+            max_box_normaliz,
             max_box: extents,
             units_per_em: head_table.units_per_em,
         }
     }
 
-	pub fn font(&self) -> &Font<DynamicFontTableProvider> {
-		&self.font
-	}
+    pub fn font(&self) -> &Font<DynamicFontTableProvider> {
+        &self.font
+    }
 
-	/// 水平宽度
-	pub fn horizontal_advance(&mut self, char: char) -> f32 {
-		let (glyph_index, _) =
-		self.font
-			.lookup_glyph_index(char, MatchingPresentation::NotRequired, None);
-		match self.font.horizontal_advance(glyph_index) {
-			Some(r) => r as f32 / self.units_per_em as f32,
-			None => 0.0,
-		}
-	}
+    /// 水平宽度
+    pub fn horizontal_advance(&mut self, char: char) -> f32 {
+        let (glyph_index, _) =
+            self.font
+                .lookup_glyph_index(char, MatchingPresentation::NotRequired, None);
+        match self.font.horizontal_advance(glyph_index) {
+            Some(r) => r as f32 / self.units_per_em as f32,
+            None => 0.0,
+        }
+    }
 
-	pub fn ascender(&self) -> f32 {
-		self.font.hhea_table.ascender as f32 / self.units_per_em as f32
-	}
+    pub fn ascender(&self) -> f32 {
+        self.font.hhea_table.ascender as f32 / self.units_per_em as f32
+    }
 
-	pub fn descender(&self) -> f32 {
-		self.font.hhea_table.descender as f32 / self.units_per_em as f32
-	}
+    pub fn descender(&self) -> f32 {
+        self.font.hhea_table.descender as f32 / self.units_per_em as f32
+    }
 
-	pub fn max_box(&self) -> &Aabb {
-		&self.max_box
-	}
+    pub fn max_box(&self) -> &Aabb {
+        &self.max_box
+    }
 
-	pub fn max_box_normaliz(&self) -> &Aabb {
+    pub fn max_box_normaliz(&self) -> &Aabb {
         &self.max_box_normaliz
     }
 
-    pub fn verties(&self) -> [f32; 16] {
-        let extents = &self.max_box_normaliz;
+    pub fn verties(
+        &self,
+        font_size: f32,
+        shadow_offset: &mut [f32],
+    ) -> [f32; 16] {
+        let mut extents = self.max_box_normaliz.clone();
+
+        let offset_x = shadow_offset[0] / font_size;
+        let offset_y = shadow_offset[1] / font_size;
+        shadow_offset[0] = offset_x;
+        shadow_offset[1] = offset_y;
+
+        let width = extents.width();
+        let height = extents.height();
+
+        let mut min_uv = [0.0f32, 0.0];
+        let mut max_uv = [1.0f32, 1.0];
+        if offset_x < 0.0 {
+            extents.mins.x += offset_x;
+            min_uv[0] += offset_x / width;
+        } else {
+            extents.maxs.x += offset_x;
+            max_uv[0] += offset_x / width;
+        }
+        if offset_y < 0.0 {
+            extents.mins.y += offset_y;
+            min_uv[1] += offset_y / height;
+        } else {
+            extents.maxs.y += offset_y;
+            max_uv[1] += offset_y / height;
+        }
 
         [
             extents.mins.x,
             extents.mins.y,
-            0.0,
-            0.0,
+            min_uv[0],
+            min_uv[1],
             extents.mins.x,
             extents.maxs.y,
-            0.0,
-            1.0,
+            min_uv[0],
+            max_uv[1],
             extents.maxs.x,
             extents.mins.y,
-            1.0,
-            0.0,
+            max_uv[0],
+            min_uv[1],
             extents.maxs.x,
             extents.maxs.y,
-            1.0,
-            1.0,
+            max_uv[0],
+            max_uv[1],
         ]
     }
 
@@ -163,15 +195,15 @@ impl FontFace {
 
         // let per_em = TOLERANCE;
 
-        let upem = head_table.units_per_em as f32;
+        // let upem = head_table.units_per_em as f32;
         // let tolerance = upem * per_em; /* in font design units */
-        let faraway = upem / (MIN_FONT_SIZE * 2.0f32.sqrt());
-        let embolden_max = upem * EMBOLDEN_MAX;
+        // let faraway = upem / (MIN_FONT_SIZE * 2.0f32.sqrt());
+        // let embolden_max = upem * EMBOLDEN_MAX;
 
-        extents.mins.x -= faraway + embolden_max;
-        extents.mins.y -= faraway + embolden_max;
-        extents.maxs.x += faraway + embolden_max;
-        extents.maxs.y += faraway + embolden_max;
+        // extents.mins.x -= faraway + embolden_max;
+        // extents.mins.y -= faraway + embolden_max;
+        // extents.maxs.x += faraway + embolden_max;
+        // extents.maxs.y += faraway + embolden_max;
 
         let glyph_width = extents.maxs.x - extents.mins.x;
         let glyph_height = extents.maxs.y - extents.mins.y;
@@ -180,24 +212,26 @@ impl FontFace {
         } else {
             extents.maxs.x = extents.mins.x + glyph_height;
         };
+        // extents.maxs.x +=  2048.0;
+        // extents.maxs.y +=  2048.0;
         extents
     }
 
-	pub fn to_outline(&mut self, ch: char) -> GlyphVisitor {
-		let mut sink = GlyphVisitor::new(1.0);
+    pub fn to_outline(&mut self, ch: char) -> GlyphVisitor {
+        let mut sink = GlyphVisitor::new(1.0);
         sink.accumulate.tolerance = self.units_per_em as f32 * TOLERANCE;
-		
+
         let (glyph_index, _) =
             self.font
                 .lookup_glyph_index(ch, MatchingPresentation::NotRequired, None);
-		// let r = self.font.horizontal_advance(glyph_index);
-		// let r1 = self.font.vertical_advance(glyph_index);
-		// println!("horizontal_advance, char: {}: horizontal_advance:{:?}, vertical_advance: {:?}", ch, r, r1);
-		let _ = self.glyf.visit(glyph_index, &mut sink);
-		sink
+        // let r = self.font.horizontal_advance(glyph_index);
+        // let r1 = self.font.vertical_advance(glyph_index);
+        // println!("horizontal_advance, char: {}: horizontal_advance:{:?}, vertical_advance: {:?}", ch, r, r1);
+        let _ = self.glyf.visit(glyph_index, &mut sink);
+        sink
     }
 
-    pub fn get_char_arc(extents: Aabb,mut sink: GlyphVisitor) -> (BlobArc, HashMap<String, u64>) {
+    pub fn get_char_arc(extents: Aabb, mut sink: GlyphVisitor) -> (BlobArc, HashMap<String, u64>) {
         // log::error!("get_char_arc: {:?}", char);
 
         let endpoints = &mut sink.accumulate.result;
@@ -315,12 +349,14 @@ impl FontFace {
 
         for char in text {
             println!("char: {}", char);
-			let outline = self.to_outline(char);
+            let outline = self.to_outline(char);
             let (mut blod_arc, map) = Self::get_char_arc(self.max_box.clone(), outline);
             let size = blod_arc.encode_data_tex(&map, data_tex, width0, offset_x0, offset_y0)?;
             // println!("data_map: {}", map.len());
-            let mut info =
-                blod_arc.encode_index_tex(index_tex, width1, offset_x1, offset_y1, map, size, sdf_tex, sdf_tex1, sdf_tex2, sdf_tex3)?;
+            let mut info = blod_arc.encode_index_tex(
+                index_tex, width1, offset_x1, offset_y1, map, size, sdf_tex, sdf_tex1, sdf_tex2,
+                sdf_tex3,
+            )?;
 
             info.index_offset = last_offset1;
             info.data_offset = (*offset_x0, *offset_y0);
@@ -337,5 +373,4 @@ impl FontFace {
 
         Ok(infos)
     }
-
 }

@@ -5,7 +5,7 @@ use tracing_subscriber::fmt::Subscriber;
 // use nalgebra::Vector3;
 use pi_sdf::{font::FontFace, glyphy::blob::TexData, utils::create_indices};
 use pi_wgpu as wgpu;
-use wgpu::{util::DeviceExt, BlendState, ColorTargetState, ImageCopyTexture};
+use wgpu::{util::DeviceExt, BlendState, ColorTargetState};
 use winit::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
@@ -70,7 +70,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     });
 
     // 加载字体文件
-    let buffer = std::fs::read("./source/SOURCEHANSANSK-MEDIUM.ttf").unwrap();
+    let buffer = std::fs::read("./source/msyh.ttf").unwrap();
     let mut ft_face = FontFace::new(buffer);
 
     // let time = std::time::Instant::now();
@@ -95,7 +95,12 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     let time = std::time::Instant::now();
     let texs_info = ft_face.out_tex_data(&text, &mut tex_data).unwrap(); // 将字符串的sdf数据写入纹理
     println!("out_tex_data: {:?}", time.elapsed());
-    let vertexs = ft_face.verties(); // 获取网格数据
+
+    // 字体缩放
+    let scale = [64.0f32, 64.0];
+    // 阴影偏移和模糊等级
+    let mut shadow_offset_and_blur_level = vec![2.0f32, 2., 5.0, 0.0];
+    let vertexs = ft_face.verties(scale[0], &mut shadow_offset_and_blur_level[0..=1]); // 获取网格数据
     println!("vertexs: {:?}", vertexs);
 
     let view_matrix = na::Matrix4::<f32>::identity(); // 视口矩阵
@@ -126,14 +131,13 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     );
 
     // 斜体, 第一个值为正切值，第二个写死为网格最小y坐标
-    let slope = [0.35, vertexs[1]];
+    let slope = [0.0, vertexs[1]];
     let slope_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("slope"),
         contents: bytemuck::cast_slice(&slope),
         usage: wgpu::BufferUsages::UNIFORM,
     });
-    // 字体缩放
-    let scale = [32.0f32, 32.0];
+
     let scale_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("scale"),
         contents: bytemuck::cast_slice(scale.as_slice()),
@@ -167,7 +171,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         usage: wgpu::BufferUsages::UNIFORM,
     });
 
-    let outer_glow_color_and_dist = vec![1.0f32, 0.5, 0.0, 10.0];
+    let outer_glow_color_and_dist = vec![1.0f32, 0.84, 0.0, 5.0];
     let outer_glow_color_and_dist_buffer =
         device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("outer_glow_color_and_dist"),
@@ -175,19 +179,19 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
             usage: wgpu::BufferUsages::UNIFORM,
         });
 
-    let shadow_color = vec![0.0f32, 0., 0.0, 1.0];
+    let shadow_color = vec![0.0f32, 0.0, 0.0, 0.0];
     let shadow_color_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("shadow_color"),
         contents: bytemuck::cast_slice(&shadow_color),
         usage: wgpu::BufferUsages::UNIFORM,
     });
 
-    let shadow_offset_and_blur_level = vec![10.0f32, 10., 1.0, 0.0]; 
-    let shadow_offset_and_blur_level_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("shadow_offset_and_blur_level"),
-        contents: bytemuck::cast_slice(&shadow_offset_and_blur_level),
-        usage: wgpu::BufferUsages::UNIFORM,
-    });
+    let shadow_offset_and_blur_level_buffer =
+        device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("shadow_offset_and_blur_level"),
+            contents: bytemuck::cast_slice(&shadow_offset_and_blur_level),
+            usage: wgpu::BufferUsages::UNIFORM,
+        });
 
     let bind_group_layout0 = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: None,
@@ -688,7 +692,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     });
 
     let swapchain_capabilities = surface.get_capabilities(&adapter);
-    let swapchain_format = swapchain_capabilities.formats[0];
+    let swapchain_format = swapchain_capabilities.formats[1];
     println!("swapchain_format: {:?}", swapchain_capabilities.formats);
     // 创建网格数据
     let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -727,8 +731,8 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         // 每个字符的位置
         let x = index % 15;
         let y = index / 15;
-        translation.push(x as f32 * 32.0 + 10.0);
-        translation.push(y as f32 * 32.0 + 10.0);
+        translation.push(x as f32 * 32.0 + 20.0);
+        translation.push(y as f32 * 32.0 + 20.0);
 
         fill_color[index * 4] = 1.0;
         fill_color[index * 4 + 1] = 0.0;
@@ -959,7 +963,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                             view: &view,
                             resolve_target: None,
                             ops: wgpu::Operations {
-                                load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
+                                load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
                                 store: true,
                             },
                         })],

@@ -283,7 +283,7 @@ impl BlobArc {
 
                     let mut num_points = map_arc_data.data.len();
 
-                    let num_points2 = num_points;
+                    let _num_points2 = num_points;
                     if num_points > 3 {
                         num_points = 0;
                     }
@@ -812,11 +812,6 @@ fn get_offset(
     Some((x, y))
 }
 
-fn get_offset_by_width(
-    index: usize,
-) -> (usize, usize) {
-    (index % 8, index / 8)
-}
 
 fn write_data_tex(
     data_tex: &mut Vec<u8>,
