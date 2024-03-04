@@ -179,7 +179,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
             usage: wgpu::BufferUsages::UNIFORM,
         });
 
-    let shadow_color = vec![0.0f32, 0.0, 0.0, 0.0];
+    let shadow_color = vec![0.0f32, 0.0, 0.0, 1.0];
     let shadow_color_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("shadow_color"),
         contents: bytemuck::cast_slice(&shadow_color),
@@ -963,7 +963,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                             view: &view,
                             resolve_target: None,
                             ops: wgpu::Operations {
-                                load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                                load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
                                 store: true,
                             },
                         })],
