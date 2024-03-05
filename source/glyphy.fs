@@ -523,7 +523,7 @@ vec4 stroke_dasharray(vec4 input_color,vec4 start_and_step){
 }
 
 vec4 get_blur_modulus(float blur_level){
-	float level = round(blur_level) % 6.0;
+	float level = round(blur_level) % 7.0;
 	if (abs(level - 3.0) < 0.1) {
 		return vec4(1.0, 0.0, 0.0, 0.0);
 	} else if (abs(level - 4.0) < 0.1) {
@@ -549,7 +549,7 @@ vec4 shadow_blur(vec4 input_color, vec4 shadow_color, vec2 offset, float blur_le
 	float a3 =  textureLod(sampler2D(u_sdf_tex, sdf_tex_samp), get_index_uv(p1), 2).r;
 	// float a4 =  textureLod(sampler2D(u_sdf_tex, sdf_tex_samp), get_index_uv(p1), 3).r;
 	vec4 modulus = get_blur_modulus(blur_level);
-	float a = shadow_color.w * (a1 * modulus.x + a2  * modulus.y + a3 * modulus.z); //+ a4 * modulus.w);
+	float a = shadow_color.w * (a1 * modulus.x + a2  * modulus.y + a3 * modulus.z); // + a4 * modulus.w);
 
 	// return vec4(shadow_color.xyz, smoothstep(0.1, 0.99, a) * shadow_color.w);
 	return mix(input_color, vec4(shadow_color.xyz, smoothstep(0.1, 0.99, a) * shadow_color.w), 1.0 - input_color.w);
