@@ -1,8 +1,10 @@
+use pi_shape::plane::Point;
+
 use crate::glyphy::geometry::arc::Arc;
 use crate::glyphy::geometry::arc::ArcEndpoint;
 use crate::glyphy::util::GLYPHY_EPSILON;
 use crate::glyphy::util::GLYPHY_INFINITY;
-use crate::Point;
+
 /**
  * SDF 算法
  *
@@ -56,8 +58,8 @@ pub fn glyphy_sdf_from_arc_list(endpoints: &Vec<ArcEndpoint>, p: Point) -> (f32,
             // 在外面
 
             // 取 距离 点c 最近的 圆弧端点 的 距离
-            let la = (arc.p0 - c).norm();
-            let lb = (arc.p1 - c).norm();
+            let la = (arc.p0 - c).length();
+            let lb = (arc.p1 - c).length();
             let udist = if la < lb { la } else { lb };
 
             if udist < min_dist {
@@ -158,8 +160,8 @@ pub fn glyphy_sdf_from_arc_list2(arcs: &Vec<&Arc>, p: Point) -> (f32, usize) {
             // 在外面
 
             // 取 距离 点c 最近的 圆弧端点 的 距离
-            let la = (arc.p0 - c).norm();
-            let lb = (arc.p1 - c).norm();
+            let la = (arc.p0 - c).length();
+            let lb = (arc.p1 - c).length();
             let udist = if la < lb { la } else { lb };
 
             if udist < min_dist {

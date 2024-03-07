@@ -10,9 +10,9 @@ use allsorts::{
 };
 // use freetype_sys::FT_Vector;
 
-use parry2d::bounding_volume::Aabb;
+use pi_shape::plane::aabb::Aabb;
+use pi_shape::plane::Point;
 use wasm_bindgen::prelude::wasm_bindgen;
-// use parry2d::math::Point;
 
 use crate::{
     glyphy::{
@@ -24,8 +24,7 @@ use crate::{
         outline::glyphy_outline_winding_from_even_odd,
         util::GLYPHY_INFINITY,
     },
-    utils::{encode_uint_arc_data, GlyphVisitor, EMBOLDEN_MAX, MIN_FONT_SIZE, TOLERANCE},
-    Point,
+    utils::{encode_uint_arc_data, GlyphVisitor, TOLERANCE},
 };
 
 #[wasm_bindgen]
@@ -135,11 +134,7 @@ impl FontFace {
         &self.max_box_normaliz
     }
 
-    pub fn verties(
-        &self,
-        font_size: f32,
-        shadow_offset: &mut [f32],
-    ) -> [f32; 16] {
+    pub fn verties(&self, font_size: f32, shadow_offset: &mut [f32]) -> [f32; 16] {
         let mut extents = self.max_box_normaliz.clone();
 
         let offset_x = shadow_offset[0] / font_size;

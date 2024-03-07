@@ -1,4 +1,6 @@
-use parry2d::{bounding_volume::Aabb, math::Point};
+
+use pi_shape::plane::aabb::Aabb;
+use pi_shape::plane::Point;
 use wasm_bindgen::prelude::wasm_bindgen;
 
 use super::geometry::aabb::AabbEXT;

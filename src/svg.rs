@@ -4,8 +4,10 @@ use allsorts::{
     outline::OutlineSink,
     pathfinder_geometry::{line_segment::LineSegment2F, vector::Vector2F},
 };
-use parry2d::bounding_volume::Aabb;
 
+
+use pi_shape::plane::aabb::Aabb;
+use pi_shape::plane::Point;
 use usvg::{
     tiny_skia_path::{self, PathVerb},
     NodeKind, TreeParsing,
@@ -18,7 +20,7 @@ use crate::{
         util::GLYPHY_INFINITY,
     },
     utils::{encode_uint_arc_data, Attribute, GlyphVisitor},
-    Point,
+
 };
 
 #[derive(Debug, Clone)]

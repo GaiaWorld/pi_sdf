@@ -7,17 +7,12 @@ use allsorts::{
 };
 use image::{ImageBuffer, Rgba};
 
+use pi_shape::plane::aabb::Aabb;
+use pi_shape::plane::Point;
 use usvg::{Color, Fill, NonZeroPositiveF32, Paint, Stroke};
 use wasm_bindgen::prelude::wasm_bindgen;
 
-use crate::{
-    glyphy::{
-        geometry::arcs::GlyphyArcAccumulator,
-        sdf::glyphy_sdf_from_arc_list2,
-    },
-    Point,
-};
-use parry2d::bounding_volume::Aabb;
+use crate::glyphy::{geometry::arcs::GlyphyArcAccumulator, sdf::glyphy_sdf_from_arc_list2};
 
 use crate::{
     font::FontFace,
@@ -298,7 +293,7 @@ pub fn encode_uint_arc_data(
                 snap(&end.p, &extents, glyph_width, glyph_height),
             );
             // Shader的最后 要加回去
-            line.c -= line.n.dot(&c.into_vector());
+            line.c -= line.n.dot(c.into_vector());
             // shader 的 decode 要 乘回去
             line.c /= unit;
 
@@ -360,7 +355,7 @@ pub fn encode_uint_arc_data(
 
                 let sdf = glyphy_sdf_from_arc_list2(&near_arcs, p).0;
                 let a = (160.0 - sdf).clamp(0.0, 255.0);
-                
+
                 unit_arc.s_dist = a as u8;
             }
         }
@@ -431,7 +426,7 @@ pub fn to_arc_cmds(endpoints: &Vec<ArcEndpoint>) -> (Vec<Vec<String>>, Vec<[f32;
                 let arc = Arc::new(_current_point.clone(), ep.p, ep.d);
                 let center = arc.center();
                 let radius = arc.radius();
-                let start_v = _current_point - center;
+                let start_v = *_current_point - center;
                 let start_angle = start_v.sdf_angle();
 
                 let end_v = ep.p - (center);

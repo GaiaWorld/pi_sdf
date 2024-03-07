@@ -1,16 +1,18 @@
-use parry2d::math::Vector;
+
+
+use pi_shape::glam::Vec2;
 
 use crate::glyphy::util::float_equals;
 
 #[derive(Debug, Clone)]
 pub struct SignedVector {
-    pub vec2: Vector<f32>,
+    pub vec2: Vec2,
     pub negative: bool,
 }
 impl SignedVector {
     pub fn new(x: f32, y: f32, negative: bool) -> Self {
         Self {
-            vec2: Vector::new(x, y),
+            vec2: Vec2::new(x, y),
             negative,
         }
     }
@@ -18,7 +20,7 @@ impl SignedVector {
     /**
      * 从向量 创建 SignedVector
      */
-    pub fn from_vector(v: Vector<f32>, negative: bool) -> Self {
+    pub fn from_vector(v: Vec2, negative: bool) -> Self {
         Self { vec2: v, negative }
     }
 
