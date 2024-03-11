@@ -5,8 +5,10 @@
 
 use std::ops::Range;
 
-use crate::{glyphy::geometry::line::Line, Point};
-use parry2d::{bounding_volume::Aabb, shape::Segment};
+use pi_shape::plane::{aabb::Aabb, segment::Segment};
+use pi_shape::plane::Point;
+
+use crate::glyphy::geometry::line::Line;
 
 use super::{point::PointExt, signed_vector::SignedVector};
 
@@ -21,7 +23,7 @@ pub trait SegmentEXT {
     fn projection_to_left_area(&self, aabb: &Aabb) -> Option<(Range<f32>, f32)>;
     fn projection_to_right_area(&self, aabb: &Aabb) -> Option<(Range<f32>, f32)>;
     fn nearest_points_on_line_segments(&self, other: &Segment) -> Segment;
-    fn norm_squared(&self) -> f32;
+    fn length_squared(&self) -> f32;
     fn norm_scale(&self, scale: f32)->f32;
 }
 
@@ -47,8 +49,8 @@ impl SegmentEXT for Segment {
 
         if self.contains_in_span(p) {
             let v = p.into_vector();
-            let d = temp.n.dot(&v);
-            return -(d - temp.c) / temp.n.norm();
+            let d = temp.n.dot(v);
+            return -(d - temp.c) / temp.n.length();
         }
 
         let dist_p_p0 = p.distance_to_point(&self.a);
@@ -60,7 +62,7 @@ impl SegmentEXT for Segment {
             dist_p_p1
         };
         let rv = p.into_vector();
-        let mag = temp.n.dot(&rv);
+        let mag = temp.n.dot(rv);
         let c = if -(mag - temp.c) < 0.0 { -1.0 } else { 1.0 };
 
         return d * c;
@@ -77,8 +79,8 @@ impl SegmentEXT for Segment {
         // Check if z is between p0 and p1.
         let temp = Line::from_points(self.a, self.b);
         if self.contains_in_span(*p) {
-            let a = p.into_vector().dot(&temp.n) - temp.c;
-            return a * a / temp.n.dot(&temp.n);
+            let a = p.into_vector().dot(temp.n) - temp.c;
+            return a * a / temp.n.dot(temp.n);
         }
 
         let dist_p_p0 = p.squared_distance_to_point(&self.a);
@@ -91,11 +93,11 @@ impl SegmentEXT for Segment {
     }
 
     fn squared_distance_to_point2(&self, p: &Point) -> Segment {
-        let l2 = (self.a - self.b).norm_squared(); // i.e. |w-v|^2 -  avoid a sqrt
+        let l2 = (self.a - self.b).length_squared(); // i.e. |w-v|^2 -  avoid a sqrt
         if l2 == 0.0 {
             return Segment::new(*p, self.a);
         };
-        let t = 0.0f32.max(1.0f32.min((p - self.a).dot(&(self.b - self.a)) / l2));
+        let t = 0.0f32.max(1.0f32.min((*p - self.a).dot(self.b - self.a) / l2));
         let projection = self.a + t * (self.b - self.a); // Projection falls on the segment
 
         return Segment::new(*p, projection);
@@ -117,10 +119,10 @@ impl SegmentEXT for Segment {
         // shortest vector from point to line
         let temp = Line::from_points(p0, p1);
         let v = p.into_vector();
-        let d = temp.n.dot(&v);
-        let mag = -(d - temp.c) / temp.n.norm();
+        let d = temp.n.dot(v);
+        let mag = -(d - temp.c) / temp.n.length();
 
-        let y = temp.n.normalize().scale(mag);
+        let y = temp.n.normalize() * (mag);
         let z = p + y;
 
         // Check if z is between p0 and p1.
@@ -150,7 +152,7 @@ impl SegmentEXT for Segment {
         // );
 
         println!("top_aabb: {:?}", top_aabb);
-        if let Some(s) = top_aabb.clip_segment(&self.a, &self.b) {
+        if let Some(s) = top_aabb.clip_segment(self.a, self.b) {
             if s.a.y != top_aabb.maxs.y && s.b.y != top_aabb.maxs.y {
                 println!("s: {:?}", s);
                 let rang = if s.b.x > s.a.x {
@@ -173,7 +175,7 @@ impl SegmentEXT for Segment {
     fn projection_to_bottom_area(&self, bottom_aabb: &Aabb) -> Option<(Range<f32>, f32)> {
         // 包含线段或者与aabb的边相交
         println!("bottom_aabb: {:?}", bottom_aabb);
-        if let Some(s) = bottom_aabb.clip_segment(&self.a, &self.b) {
+        if let Some(s) = bottom_aabb.clip_segment(self.a, self.b) {
             if s.a.y != bottom_aabb.mins.y && s.b.y != bottom_aabb.mins.y {
                 println!("s: {:?}", s);
                 // let d = s.b.x - s.a.x;
@@ -196,7 +198,7 @@ impl SegmentEXT for Segment {
 
     fn projection_to_left_area(&self, left_aabb: &Aabb) -> Option<(Range<f32>, f32)> {
         // 包含线段或者与aabb的边相交
-        if let Some(s) = left_aabb.clip_segment(&self.a, &self.b) {
+        if let Some(s) = left_aabb.clip_segment(self.a, self.b) {
             if s.a.x != left_aabb.maxs.x && s.b.x != left_aabb.maxs.x {
                 println!("s: {:?}", s);
                 let rang = if s.b.y > s.a.y {
@@ -218,7 +220,7 @@ impl SegmentEXT for Segment {
 
     fn projection_to_right_area(&self, right_aabb: &Aabb) -> Option<(Range<f32>, f32)> {
         // 包含线段或者与aabb的边相交
-        if let Some(s) = right_aabb.clip_segment(&self.a, &self.b) {
+        if let Some(s) = right_aabb.clip_segment(self.a, self.b) {
             if s.a.x != right_aabb.mins.x && s.b.x != right_aabb.mins.x {
                 println!("s: {:?}", s);
                 let rang = if s.b.y > s.a.y {
@@ -244,11 +246,11 @@ impl SegmentEXT for Segment {
         let u = self.b - self.a;
         let v = other.b - other.a;
 
-        let ru = r.dot(&u);
-        let rv = r.dot(&v);
-        let uu = u.dot(&u);
-        let uv = u.dot(&v);
-        let vv = v.dot(&v);
+        let ru = r.dot(u);
+        let rv = r.dot(v);
+        let uu = u.dot(u);
+        let uv = u.dot(v);
+        let vv = v.dot(v);
 
         let det = uu * vv - uv * uv;
         let s1;
@@ -270,12 +272,12 @@ impl SegmentEXT for Segment {
         return Segment::new(a, b);
     }
 
-    fn norm_squared(&self) -> f32 {
-        (self.a - self.b).norm_squared()
+    fn length_squared(&self) -> f32 {
+        (self.a - self.b).length_squared()
     }
 
     fn norm_scale(&self, _scale: f32) -> f32 {
-        (self.a  - self.b ).norm()
+        (self.a  - self.b ).length()
     }
 }
 

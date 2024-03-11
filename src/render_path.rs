@@ -5,7 +5,7 @@
 //     },
 //     glyphy_draw2::get_char_arc,
 //     utils::{FontFace, GlyphVisitor},
-//     Matrix4, Orthographic3, Point, Vector3,
+//     Matrix4, Orthographic3, Point2, Vector3,
 // };
 // use pi_wgpu as wgpu;
 // use wgpu::util::DeviceExt;
@@ -20,13 +20,13 @@
 
 // #[derive(Debug, Default, PartialEq)]
 // pub struct ColorGradient {
-//     start_gradient: Point,
-//     end_gradient: Point,
+//     start_gradient: Point2,
+//     end_gradient: Point2,
 //     color_step: Vec<(f32, Color)>,
 // }
 
 // impl ColorGradient {
-//     pub fn new(start: Point, end: Point) -> Self {
+//     pub fn new(start: Point2, end: Point2) -> Self {
 //         Self {
 //             start_gradient: start,
 //             end_gradient: end,
@@ -58,7 +58,7 @@
 //     font_size: u32,
 //     outline_type: OutlineType,
 //     outline: Option<GlyphVisitor>,
-//     pos: Point,
+//     pos: Point2,
 
 //     font_face: Option<FontFace>,
 
@@ -127,7 +127,7 @@
 //             font_size: 20,
 //             outline: None,
 //             outline_type: OutlineType::Font,
-//             pos: Point::default(),
+//             pos: Point2::default(),
 
 //             font_face: None,
 
@@ -190,7 +190,7 @@
 //         }
 //     }
 
-//     pub fn set_pos(&mut self, pos: Point) {
+//     pub fn set_pos(&mut self, pos: Point2) {
 //         if self.pos != pos {
 //             self.pos = pos;
 //             self.render_update = true;
@@ -407,7 +407,7 @@
 //         &self,
 //         verties: &[GlyphyVertex; 4],
 //         tex_data: &TexData,
-//         pos: Point,
+//         pos: Point2,
 //     ) -> wgpu::BindGroup {
 //         let device = &self.device;
 //         let world_matrix = Matrix4::identity()

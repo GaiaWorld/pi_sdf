@@ -1,10 +1,12 @@
-use parry2d::{bounding_volume::Aabb, math::Vector, shape::Segment};
+use pi_shape::glam::Vec2;
+use pi_shape::plane::aabb::Aabb;
+use pi_shape::plane::segment::Segment;
+use pi_shape::plane::Point;
 use std::sync::atomic::AtomicU64;
 use std::{ops::Range, sync::atomic::Ordering};
 use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::glyphy::util::{float_equals, xor};
-use crate::Point;
 
 use super::{
     aabb::AabbEXT, bezier::Bezier, line::Line, point::PointExt, segment::SegmentEXT,
@@ -156,8 +158,8 @@ impl Arc {
         a1: f32,
         complement: bool,
     ) -> Self {
-        let p0 = center + Vector::new(a0.cos(), a0.sin()).scale(radius);
-        let p1 = center + Vector::new(a1.cos(), a1.sin()).scale(radius);
+        let p0 = center + Vec2::new(a0.cos(), a0.sin()) * (radius);
+        let p1 = center + Vec2::new(a1.cos(), a1.sin()) * (radius);
         let v1 = (a1 - a0) / 4.0;
         let v2 = if complement {
             0.
@@ -209,11 +211,10 @@ impl Arc {
         }
 
         if self.wedge_contains_point(&p) {
-            let difference = (self.center() - p)
-                .normalize()
-                .scale((p.distance_to_point(&self.center()) - self.radius()).abs());
+            let difference = (self.center() - p).normalize()
+                * ((p.distance_to_point(&self.center()) - self.radius()).abs());
 
-            let d = xor(self.d < 0., (p - self.center()).norm() < self.radius());
+            let d = xor(self.d < 0., (p - self.center()).length() < self.radius());
             return SignedVector::from_vector(difference, d);
         }
 
@@ -223,12 +224,12 @@ impl Arc {
         let other_arc = Arc::new(self.p0, self.p1, (1.0 + self.d) / (1.0 - self.d));
         let normal = self.center() - (if d0 < d1 { self.p0 } else { self.p1 });
 
-        if normal.len() == 0 {
-            return SignedVector::from_vector(Vector::new(0., 0.), true);
+        if normal.length() == 0.0 {
+            return SignedVector::from_vector(Vec2::new(0., 0.), true);
         }
 
         let min_p = if d0 < d1 { self.p0 } else { self.p1 };
-        let l = Line::new(normal.x, normal.y, normal.dot(&min_p.into_vector()));
+        let l = Line::new(normal.x, normal.y, normal.dot(min_p.into_vector()));
         return SignedVector::from_vector(l.sub(&p).vec2, !other_arc.wedge_contains_point(&p));
     }
 
@@ -237,7 +238,7 @@ impl Arc {
      * @returns {f32} 圆弧半径
      */
     pub fn radius(&self) -> f32 {
-        return ((self.p1 - (self.p0)).norm() / (2.0 * sin2atan(self.d))).abs();
+        return ((self.p1 - (self.p0)).length() / (2.0 * sin2atan(self.d))).abs();
     }
 
     /**
@@ -245,11 +246,8 @@ impl Arc {
      * @returns {Point} 圆弧的圆心
      */
     pub fn center(&self) -> Point {
-        return (self.p0.midpoint(&self.p1)).add_vector(
-            &(self.p1 - (self.p0))
-                .ortho()
-                .scale(1. / (2. * tan2atan(self.d))),
-        );
+        return (self.p0.midpoint(&self.p1))
+            .add_vector(&((self.p1 - (self.p0)).ortho() * (1. / (2. * tan2atan(self.d)))));
     }
 
     /**
@@ -269,11 +267,11 @@ impl Arc {
      *
      * 将有向线段 AC 分解到 半弦 和 半弦 垂线上，分别得到下面的 result_dp 和 pp
      */
-    pub fn tangents(&self) -> (Vector<f32>, Vector<f32>) {
-        let dp = (self.p1 - self.p0).scale(0.5);
-        let pp = dp.ortho().scale(-sin2atan(self.d));
+    pub fn tangents(&self) -> (Vec2, Vec2) {
+        let dp = (self.p1 - self.p0) * (0.5);
+        let pp = dp.ortho() * (-sin2atan(self.d));
 
-        let result_dp = dp.scale(cos2atan(self.d));
+        let result_dp = dp * (cos2atan(self.d));
 
         return (
             result_dp + pp, // 起点 切线向量，注：没有单位化
@@ -288,10 +286,10 @@ impl Arc {
         let dp = self.p1 - (self.p0);
         let pp = dp.ortho();
 
-        error.value = dp.norm() * self.d.abs().powf(5.0) / (54. * (1. + self.d * self.d));
+        error.value = dp.length() * self.d.abs().powf(5.0) / (54. * (1. + self.d * self.d));
 
-        let result_dp = dp.scale((1. - self.d * self.d) / 3.);
-        let result_pp = pp.scale(2. * self.d / 3.);
+        let result_dp = dp * ((1. - self.d * self.d) / 3.);
+        let result_pp = pp * (2. * self.d / 3.);
 
         let p0s = self.p0 + (result_dp) - (result_pp);
         let p1s = self.p1 - (result_dp) - (result_pp);
@@ -313,14 +311,14 @@ impl Arc {
             // 在 夹角内，意味着 下面两者 同时成立：
             //     向量 <P0, P> 和 起点切线 成 锐角
             //     向量 <P1, P> 和 终点切线 是 钝角
-            return (p - self.p0).dot(&t.0) >= 0.0 && (p - (self.p1)).dot(&t.1) <= 0.0;
+            return (*p - self.p0).dot(t.0) >= 0.0 && (*p - (self.p1)).dot(t.1) <= 0.0;
         } else {
             // 大圆弧，夹角 大于 PI
             // 如果 点 在 小圆弧 内，那么：下面两者 同时成立
             //     向量 <P0, P> 和 起点切线 成 钝角
             //     向量 <P1, P> 和 终点切线 是 锐角
             // 所以这里要 取反
-            return (p - (self.p0)).dot(&t.0) >= 0. || (p - (self.p1)).dot(&t.1) <= 0.;
+            return (*p - (self.p0)).dot(t.0) >= 0. || (*p - (self.p1)).dot(t.1) <= 0.;
         }
     }
 
@@ -391,7 +389,7 @@ impl Arc {
      */
     pub fn extended_dist(&self, p: &Point) -> f32 {
         // m 是 P0 P1 的 中点
-        let m = self.p0.lerp(&self.p1, 0.5);
+        let m = self.p0.lerp(self.p1, 0.5);
 
         // dp 是 向量 <P0, P1>
         let dp = self.p1 - (self.p0);
@@ -402,17 +400,17 @@ impl Arc {
         // d2 是 圆弧的 圆心角一半 的正切
         let d2 = tan2atan(self.d);
 
-        if (p - m).dot(&(self.p1 - (m))) < 0.0 {
+        if (*p - m).dot(self.p1 - (m)) < 0.0 {
             // 如果 <M, P> 和 <P1, P> 夹角 为 钝角
             // 代表 P 在 直径为 <M, P1> 的 圆内
 
             // <P0, P> 与 N1 方向的 投影
             // N1 = pp + dp * tan(angle / 2)
-            return (p - (self.p0)).dot(&(pp + (dp.scale(d2))).normalize());
+            return (*p - (self.p0)).dot((pp + (dp * (d2))).normalize());
         } else {
             // <P1, P> 与 N2 的 点积
             // N2 = pp - dp * tan(angle / 2)
-            return (p - (self.p1)).dot(&(pp - (dp.scale(d2))).normalize());
+            return (*p - (self.p1)).dot((pp - (dp * (d2))).normalize());
         }
     }
 
@@ -428,10 +426,10 @@ impl Arc {
         let c = self.center();
         let r = self.radius();
         let p = [
-            c.add_vector(&Vector::new(-1., 0.).scale(r)),
-            c.add_vector(&Vector::new(1., 0.).scale(r)),
-            c.add_vector(&Vector::new(0., -1.).scale(r)),
-            c.add_vector(&Vector::new(0., 1.).scale(r)),
+            c.add_vector(&(Vec2::new(-1., 0.) * r)),
+            c.add_vector(&(Vec2::new(1., 0.) * r)),
+            c.add_vector(&(Vec2::new(0., -1.) * r)),
+            c.add_vector(&(Vec2::new(0., 1.) * r)),
         ];
 
         for i in 0..4 {
@@ -460,12 +458,12 @@ impl Arc {
     ) -> (Range<f32>, Segment, f32) {
         let s = segment.nearest_points_on_line_segments(&Segment::new(self.p0, self.p1));
         if let Some(ab) = aabb.intersection(&self.aabb) {
-            ((ab.mins.x..ab.maxs.x), s, (s.a - s.b).norm_squared())
+            ((ab.mins.x..ab.maxs.x), s, (s.a - s.b).length_squared())
         } else {
             if self.p0.x < aabb.mins.x {
-                ((aabb.mins.x..aabb.mins.x), s, (s.a - s.b).norm_squared())
+                ((aabb.mins.x..aabb.mins.x), s, (s.a - s.b).length_squared())
             } else {
-                ((aabb.maxs.x..aabb.maxs.x), s, (s.a - s.b).norm_squared())
+                ((aabb.maxs.x..aabb.maxs.x), s, (s.a - s.b).length_squared())
             }
         }
     }
@@ -477,12 +475,12 @@ impl Arc {
     ) -> (Range<f32>, Segment, f32) {
         let s = segment.nearest_points_on_line_segments(&Segment::new(self.p0, self.p1));
         if let Some(ab) = aabb.intersection(&self.aabb) {
-            ((ab.mins.y..ab.maxs.y), s, (s.a - s.b).norm_squared())
+            ((ab.mins.y..ab.maxs.y), s, (s.a - s.b).length_squared())
         } else {
             if self.p0.y < aabb.mins.y {
-                ((aabb.mins.y..aabb.mins.y), s, (s.a - s.b).norm_squared())
+                ((aabb.mins.y..aabb.mins.y), s, (s.a - s.b).length_squared())
             } else {
-                ((aabb.maxs.y..aabb.maxs.y), s, (s.a - s.b).norm_squared())
+                ((aabb.maxs.y..aabb.maxs.y), s, (s.a - s.b).length_squared())
             }
         }
     }

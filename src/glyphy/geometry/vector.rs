@@ -1,48 +1,48 @@
 // import { float_equals } from "../util";
 
-use parry2d::math::Vector;
+use pi_shape::glam::Vec2;
 
 pub trait VectorEXT {
     fn sdf_angle(&self) -> f32;
     /// 逆时针旋转90度
-    fn ortho(&self) -> Vector<f32>;
+    fn ortho(&self) -> Vec2;
     /**
      * 重建向量
      */
 
-    fn rebase(&self, bx: &Vector<f32>, by: &Vector<f32>) -> Vector<f32>;
-    fn rebase_other(&self, oth: &Vector<f32>) -> Vector<f32>;
+    fn rebase(&self, bx: &Vec2, by: &Vec2) -> Vec2;
+    fn rebase_other(&self, oth: &Vec2) -> Vec2;
     /**
      * 向量 叉积
      */
-    fn sdf_cross(&self, other: &Vector<f32>) -> f32;
+    fn sdf_cross(&self, other: &Vec2) -> f32;
 }
 
-impl VectorEXT for Vector<f32> {
-    fn ortho(&self) -> Vector<f32> {
-        Vector::new(-self.y, self.x)
+impl VectorEXT for Vec2 {
+    fn ortho(&self) -> Vec2 {
+        Vec2::new(-self.y, self.x)
     }
 
     fn sdf_angle(&self) -> f32 {
         self.y.atan2(self.x)
     }
 
-    fn rebase(&self, bx: &Vector<f32>, by: &Vector<f32>) -> Vector<f32> {
-        return Vector::new(self.dot(&bx), self.dot(&by));
+    fn rebase(&self, bx: &Vec2, by: &Vec2) -> Vec2 {
+        return Vec2::new(self.dot(*bx), self.dot(*by));
     }
 
-    fn rebase_other(&self, oth: &Vector<f32>) -> Vector<f32> {
+    fn rebase_other(&self, oth: &Vec2) -> Vec2 {
         return self.rebase(oth, &oth.ortho());
     }
 
     /**
      * 向量 叉积
      */
-    fn sdf_cross(&self, other: &Vector<f32>) -> f32 {
+    fn sdf_cross(&self, other: &Vec2) -> f32 {
         return self.x * other.y - self.y * other.x;
     }
 }
-// export class Vector {
+// export class Vec2 {
 
 //     x: number;
 //     y: number;
@@ -56,56 +56,56 @@ impl VectorEXT for Vector<f32> {
 //      * 克隆 向量
 //      */
 //     clone() {
-//         return new Vector(this.x, this.y);
+//         return new Vec2(this.x, this.y);
 //     }
 
 //     /**
 //      * 向量的 长度
 //      */
-//     equals(v: Vector) {
+//     equals(v: Vec2) {
 //         return float_equals(this.x, v.x) && float_equals(this.y, v.y);
 //     }
 
 //     /**
 //      * 向量 取反
-//      * @returns {Vector}
+//      * @returns {Vec2}
 //      */
 //     neg() {
-//         return new Vector(-this.x, -this.y);
+//         return new Vec2(-this.x, -this.y);
 //     }
 
 //     /**
 //      * 向量 加法
 //      */
-//     add(v: Vector) {
-//         return new Vector(this.x + v.x, this.y + v.y);
+//     add(v: Vec2) {
+//         return new Vec2(this.x + v.x, this.y + v.y);
 //     }
 
 //     /**
 //      * 向量 减法
 //      */
-//     sub(v: Vector) {
-//         return new Vector(this.x - v.x, this.y - v.y);
+//     sub(v: Vec2) {
+//         return new Vec2(this.x - v.x, this.y - v.y);
 //     }
 
 //     /**
 //      * 向量 数量积
 //      */
 //     scale(s: number) {
-//         return new Vector(this.x * s, this.y * s);
+//         return new Vec2(this.x * s, this.y * s);
 //     }
 
 //     /**
 //      * 向量 数量商
 //      */
 //     div(s: number) {
-//         return new Vector(this.x / s, this.y / s);
+//         return new Vec2(this.x / s, this.y / s);
 //     }
 
 //     /**
 //      * 加法 赋值
 //      */
-//     add_assign(v: Vector) {
+//     add_assign(v: Vec2) {
 //         this.x += v.x;
 //         this.y += v.y;
 //         return this;
@@ -114,7 +114,7 @@ impl VectorEXT for Vector<f32> {
 //     /**
 //      * 减法 赋值
 //      */
-//     sub_assign(v: Vector) {
+//     sub_assign(v: Vec2) {
 //         this.x -= v.x;
 //         this.y -= v.y;
 //         return this;
@@ -141,14 +141,14 @@ impl VectorEXT for Vector<f32> {
 //     /**
 //      * 向量 点积
 //      */
-//     dot(v: Vector) {
+//     dot(v: Vec2) {
 //         return this.x * v.x + this.y * v.y;
 //     }
 
 //     /**
 //      * 向量 叉积
 //      */
-//     cross(other: Vector) {
+//     cross(other: Vec2) {
 //         return this.x * other.y - this.y * other.x;
 //     }
 
@@ -185,7 +185,7 @@ impl VectorEXT for Vector<f32> {
 //      * 垂直 向量
 //      */
 //     ortho() {
-//         return new Vector(-this.y, this.x);
+//         return new Vec2(-this.y, this.x);
 //     }
 
 //     /**
@@ -205,14 +205,14 @@ impl VectorEXT for Vector<f32> {
 //     /**
 //      * 重建向量
 //      */
-//     rebase(bx: Vector, by: Vector) {
-//         return new Vector(this.dot(bx), this.dot(by));
+//     rebase(bx: Vec2, by: Vec2) {
+//         return new Vec2(this.dot(bx), this.dot(by));
 //     }
 
 //     /**
 //      * 重建向量
 //      */
-//     rebase_other(bx: Vector) {
+//     rebase_other(bx: Vec2) {
 //         return this.rebase(bx, bx.ortho());
 //     }
 // }

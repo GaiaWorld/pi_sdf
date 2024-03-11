@@ -1,4 +1,5 @@
-use parry2d::na::{self};
+use pi_shape::glam::Mat4;
+// use parry2d::na::{self};
 use tracing::Level;
 use tracing_subscriber::fmt::Subscriber;
 
@@ -103,16 +104,16 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     let vertexs = ft_face.verties(scale[0], &mut shadow_offset_and_blur_level[0..=1]); // 获取网格数据
     println!("vertexs: {:?}", vertexs);
 
-    let view_matrix = na::Matrix4::<f32>::identity(); // 视口矩阵
+    let view_matrix = Mat4::default(); // 视口矩阵
     let view_matrix_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Index Buffer"),
-        contents: bytemuck::cast_slice(view_matrix.as_slice()),
+        contents: bytemuck::cast_slice(view_matrix.as_ref()),
         usage: wgpu::BufferUsages::UNIFORM,
     });
-    println!("view_matrix.as_slice(): {:?}", view_matrix.as_slice());
+    println!("view_matrix.as_slice(): {:?}", view_matrix.as_ref());
 
     // 投影矩阵
-    let proj_matrix = na::Orthographic3::<f32>::new(
+    let proj_matrix = Mat4::orthographic_lh(
         0.0,
         window_size.width as f32,
         0.0,
@@ -122,12 +123,12 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     );
     let proj_matrix_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Index Buffer"),
-        contents: bytemuck::cast_slice(proj_matrix.as_matrix().as_slice()),
+        contents: bytemuck::cast_slice(proj_matrix.as_ref()),
         usage: wgpu::BufferUsages::UNIFORM,
     });
     println!(
         "proj_matrix.as_slice(): {:?}",
-        proj_matrix.as_matrix().as_slice()
+        proj_matrix
     );
 
     // 斜体, 第一个值为正切值，第二个写死为网格最小y坐标

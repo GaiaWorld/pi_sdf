@@ -1,10 +1,10 @@
 use std::{collections::HashMap, ops::Range};
 
-// use freetype_sys::FT_New_Face;
-// use parry2d::na::ComplexField;
-// use hashlink::LinkedHashMap;
-use parry2d::{bounding_volume::Aabb, math::Vector};
 
+
+// use kurbo::Vec2;
+use pi_shape::{plane::aabb::Aabb, glam::Vec2};
+use pi_shape::plane::Point;
 use wasm_bindgen::prelude::wasm_bindgen;
 
 use super::{
@@ -19,7 +19,6 @@ use super::{
     util::{is_inf, GLYPHY_INFINITY},
 };
 use crate::glyphy::geometry::aabb::AabbEXT;
-use crate::Point;
 
 pub const MAX_GRID_SIZE: f32 = 63.0;
 
@@ -987,7 +986,7 @@ pub fn line_decode(encoded: [f32; 4], nominal_size: [f32; 2]) -> Line {
     let d = id / 0x1FFF as f32;
     let scale = nominal_size[0].max(nominal_size[1]);
 
-    let n = Vector::new(angle.cos(), angle.sin());
+    let n = Vec2::new(angle.cos(), angle.sin());
 
     return Line::from_normal_d(n, d * scale);
 }
@@ -1147,11 +1146,11 @@ fn compute_near_arc(
 ) {
     let c = cell.center();
     // 最近的意思：某个半径的 圆内
-    let radius_squared = cell.half_extents().norm_squared();
+    let radius_squared = cell.half_extents().length_squared();
 
     let mut near_arcs: Vec<&'static Arc> = Vec::with_capacity(arcs.len());
     for arc in arcs {
-        if arc.squared_distance_to_point2(&c).norm_squared() <= radius_squared {
+        if arc.squared_distance_to_point2(&c).length_squared() <= radius_squared {
             near_arcs.push(*arc);
         }
     }

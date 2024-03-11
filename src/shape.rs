@@ -4,7 +4,11 @@ use allsorts::{
     pathfinder_geometry::{line_segment::LineSegment2F, vector::Vector2F},
 };
 use kurbo::Shape;
-use parry2d::{bounding_volume::Aabb, shape::Segment as MSegment};
+use pi_shape::{
+    glam::Vec3,
+    plane::{aabb::Aabb, segment::Segment as MSegment},
+};
+use pi_shape::plane::Point;
 // use usvg::tiny_skia_path::PathSegment;
 
 use crate::utils::Attribute;
@@ -16,7 +20,6 @@ use crate::{
     },
     svg::compute_near_arc_impl,
     utils::GlyphVisitor,
-    Point,
 };
 #[derive(PartialEq, Clone, Copy)]
 pub enum PathVerb {
@@ -332,7 +335,7 @@ impl Polyline {
         let r = self.points.first().map(|v1| {
             self.points
                 .last()
-                .map(|v2| (*v1 - *v2).norm_squared() < 0.01)
+                .map(|v2| (*v1 - *v2).length_squared() < 0.01)
         });
 
         if let Some(Some(r)) = r {
@@ -412,7 +415,7 @@ impl Path {
         let r = self.points.first().map(|v1| {
             self.points
                 .last()
-                .map(|v2| (*v1 - *v2).norm_squared() < 0.01)
+                .map(|v2| (*v1 - *v2).length_squared() < 0.01)
         });
 
         if let Some(Some(r)) = r {
@@ -566,8 +569,7 @@ fn compute_direction(path: &Vec<Point>) -> bool {
 
     let a = path[index] - path[previous];
     let b = path[next] - path[index];
-    let v =
-        parry2d::na::Vector3::new(a.x, a.y, 0.0).cross(&parry2d::na::Vector3::new(b.x, b.y, 0.0));
+    let v = Vec3::new(a.x, a.y, 0.0).cross(Vec3::new(b.x, b.y, 0.0));
 
     // 小于0时，为顺时针
     let clockwise = v.z < 0.0;
