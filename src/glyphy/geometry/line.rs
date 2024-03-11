@@ -1,22 +1,19 @@
+use parry2d::math::Vector;
 
-
-use pi_shape::glam::Vec2;
-use pi_shape::plane::Point;
-
-use crate::glyphy::util::{float_equals, GLYPHY_INFINITY};
+use crate::{glyphy::util::{float_equals, GLYPHY_INFINITY}, Point};
 
 use super::{point::PointExt, signed_vector::SignedVector, vector::VectorEXT};
 
 #[derive(Debug, Clone)]
 pub struct Line {
-    pub n: Vec2,
+    pub n: Vector<f32>,
     pub c: f32,
 }
 
 impl Line {
     pub fn new(a: f32, b: f32, c: f32) -> Self {
         Self {
-            n: Vec2::new(a, b), /* line normal */
+            n: Vector::new(a, b), /* line normal */
             c,                    /* n.x * x + n.y * y = c */
         }
     }
@@ -24,7 +21,7 @@ impl Line {
     /**
      * 从 法向量 和 距离 构造 直线
      */
-    pub fn from_normal_d(n: Vec2, c: f32) -> Self {
+    pub fn from_normal_d(n: Vector<f32>, c: f32) -> Self {
         Self { n, c }
     }
 
@@ -34,7 +31,7 @@ impl Line {
     pub fn from_points(p0: Point, p1: Point) -> Self {
         // let r  =Vector::new(0.0f32, 0.0f32);
         let n = (p1 - p0).ortho();
-        let c = p0.into_vector().dot(n);
+        let c = p0.into_vector().dot(&n);
         Self { n, c }
     }
 
@@ -43,7 +40,7 @@ impl Line {
      * @returns {Line}
      */
     pub fn normalized(&self) -> Self {
-        let d = self.n.length();
+        let d = self.n.norm();
         return if float_equals(d, 0.0, None) {
             self.clone()
         } else {
@@ -55,7 +52,7 @@ impl Line {
      * 返回 法向量
      * @returns {Vector}
      */
-    pub fn normal(&self) -> &Vec2 {
+    pub fn normal(&self) -> &Vector<f32> {
         return &self.n;
     }
 
@@ -78,7 +75,7 @@ impl Line {
      * 点到直线的最短向量
      */
     pub fn sub(&self, p: &Point) -> SignedVector {
-        let mag = -(self.n.dot(p.into_vector()) - self.c) / self.n.length();
-        return SignedVector::from_vector(self.n.normalize() * (mag), mag < 0.0);
+        let mag = -(self.n.dot(&p.into_vector()) - self.c) / self.n.norm();
+        return SignedVector::from_vector(self.n.normalize().scale(mag), mag < 0.0);
     }
 }

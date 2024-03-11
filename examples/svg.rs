@@ -1,4 +1,4 @@
-use pi_shape::glam::Mat4;
+use parry2d::na::{self};
 use tracing::Level;
 use tracing_subscriber::fmt::Subscriber;
 
@@ -97,15 +97,15 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     let vertexs = svg.verties();
     println!("vertexs: {:?}", vertexs);
 
-    let view_matrix = Mat4::default();
+    let view_matrix = na::Matrix4::<f32>::identity();
     let view_matrix_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Index Buffer"),
-        contents: bytemuck::cast_slice(view_matrix.as_ref()),
+        contents: bytemuck::cast_slice(view_matrix.as_slice()),
         usage: wgpu::BufferUsages::UNIFORM,
     });
-    println!("view_matrix.as_slice(): {:?}", view_matrix);
+    println!("view_matrix.as_slice(): {:?}", view_matrix.as_slice());
 
-    let proj_matrix = Mat4::orthographic_lh(
+    let proj_matrix = na::Orthographic3::<f32>::new(
         0.0,
         window_size.width as f32,
         0.0,
@@ -115,10 +115,13 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     );
     let proj_matrix_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Index Buffer"),
-        contents: bytemuck::cast_slice(proj_matrix.as_ref()),
+        contents: bytemuck::cast_slice(proj_matrix.as_matrix().as_slice()),
         usage: wgpu::BufferUsages::UNIFORM,
     });
-    println!("proj_matrix.as_slice(): {:?}", proj_matrix);
+    println!(
+        "proj_matrix.as_slice(): {:?}",
+        proj_matrix.as_matrix().as_slice()
+    );
 
     let slope = [0.0, vertexs[1]];
     let slope_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {

@@ -1,9 +1,11 @@
 use std::ops::Range;
 
+use parry2d::{bounding_volume::Aabb, shape::Segment};
 
-use pi_shape::plane::{aabb::Aabb, segment::Segment, Point};
-
-use crate::glyphy::{geometry::segment::SegmentEXT, util::GLYPHY_INFINITY};
+use crate::{
+    glyphy::{geometry::segment::SegmentEXT, util::GLYPHY_INFINITY},
+    Point,
+};
 
 use super::arc::Arc;
 
@@ -183,7 +185,7 @@ impl AabbEXT for Aabb {
                 
                 for j in 0..result_arcs.len() {
                     let result_arc = result_arcs[j];
-                    let dist = result_arc.squared_distance_to_point2(&p).length_squared();
+                    let dist = result_arc.squared_distance_to_point2(&p).norm_squared();
                     // println!("dist: {}", dist);
                     if min_dist >= dist {
                         let (p1, p2) = if segment.a.x == segment.b.x {
@@ -198,11 +200,11 @@ impl AabbEXT for Aabb {
                             )
                         };
 
-                        let d11 = result_arc.squared_distance_to_point2(&p1).length_squared();
-                        let d12 = result_arc.squared_distance_to_point2(&p2).length_squared();
+                        let d11 = result_arc.squared_distance_to_point2(&p1).norm_squared();
+                        let d12 = result_arc.squared_distance_to_point2(&p2).norm_squared();
 
-                        let d21 = arcs[i].squared_distance_to_point2(&p1).length_squared();
-                        let d22 = arcs[i].squared_distance_to_point2(&p2).length_squared();
+                        let d21 = arcs[i].squared_distance_to_point2(&p1).norm_squared();
+                        let d22 = arcs[i].squared_distance_to_point2(&p2).norm_squared();
 
                         if (d11 < d21 && d12 < d22) || (d11 < d22  && d12 < d21){
                             is_push = false;
@@ -215,7 +217,7 @@ impl AabbEXT for Aabb {
                     for j in 0..result_arcs.len() {
                         let p = temps[j].0;
                         let dist = temps[j].1;
-                        let d = arcs[i].squared_distance_to_point2(&p).length_squared();
+                        let d = arcs[i].squared_distance_to_point2(&p).norm_squared();
                         // println!("dist: {}, d: {}", dist, d);
                         if d < dist {
                             // let rangs = &mut temps[j].2;
@@ -291,14 +293,14 @@ impl AabbEXT for Aabb {
     //             for j in 0..result_arcs.len() {
     //                 let arc = result_arcs[j];
 
-    //                 let dist0 = arc.squared_distance_to_point2(&line0.b).length_squared();
+    //                 let dist0 = arc.squared_distance_to_point2(&line0.b).norm_squared();
     //                 let dist1 = if line0.b == line1.b {
     //                     dist0
     //                 } else {
-    //                     arc.squared_distance_to_point2(&line1.b).length_squared()
+    //                     arc.squared_distance_to_point2(&line1.b).norm_squared()
     //                 };
 
-    //                 if dist0 < line0.length_squared() && dist1 < line1.length_squared() {
+    //                 if dist0 < line0.norm_squared() && dist1 < line1.norm_squared() {
     //                     is_push = false
     //                 }
     //             }

@@ -2,7 +2,7 @@
  * Approximate outlines with multiple arcs
  */
 
-
+use parry2d::bounding_volume::Aabb;
 
 use super::aabb::AabbEXT;
 use super::arc::{Arc, ArcEndpoint, ErrorValue};
@@ -13,7 +13,7 @@ use crate::glyphy::arc_bezier::{
 };
 use crate::glyphy::geometry::point::PointExt;
 use crate::glyphy::util::{is_zero, GLYPHY_INFINITY, GLYPHY_MAX_D};
-
+use crate::Point;
 
 #[derive(Clone)]
 pub struct GlyphyArcAccumulator {
@@ -88,8 +88,8 @@ impl GlyphyArcAccumulator {
     pub fn conic_to(&mut self, p1: Point, p2: Point) {
         let b = Bezier::new(
             self.current_point,
-            self.current_point.lerp(p1, 2. / 3.),
-            p2.lerp(p1, 2. / 3.),
+            self.current_point.lerp(&p1, 2. / 3.),
+            p2.lerp(&p1, 2. / 3.),
             p2,
         );
         self.bezier(b);
@@ -185,8 +185,6 @@ pub fn glyphy_arc_list_extents(endpoints: &Vec<ArcEndpoint>, extents: &mut Aabb)
 }
 
 use ArcBezierApproximatorQuantized as ArcBezierApproximatorQuantizedDefault;
-use pi_shape::plane::Point;
-use pi_shape::plane::aabb::Aabb;
 pub struct ArcsBezierApproximatorSpringSystem;
 
 impl ArcsBezierApproximatorSpringSystem {

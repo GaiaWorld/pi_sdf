@@ -10,9 +10,9 @@ use allsorts::{
 };
 // use freetype_sys::FT_Vector;
 
-use pi_shape::plane::aabb::Aabb;
-use pi_shape::plane::Point;
+use parry2d::bounding_volume::Aabb;
 use wasm_bindgen::prelude::wasm_bindgen;
+// use parry2d::math::Point;
 
 use crate::{
     glyphy::{
@@ -25,6 +25,7 @@ use crate::{
         util::GLYPHY_INFINITY,
     },
     utils::{encode_uint_arc_data, GlyphVisitor, TOLERANCE},
+    Point,
 };
 
 #[wasm_bindgen]
@@ -223,11 +224,10 @@ impl FontFace {
         // let r1 = self.font.vertical_advance(glyph_index);
         // println!("horizontal_advance, char: {}: horizontal_advance:{:?}, vertical_advance: {:?}", ch, r, r1);
         let _ = self.glyf.visit(glyph_index, &mut sink);
-
         sink
     }
 
-    pub fn get_char_arc(extents: Aabb, mut sink: GlyphVisitor) -> (BlobArc, HashMap<String, u64>) {
+    pub fn get_char_arc(extents: Aabb, mut sink: GlyphVisitor) -> (BlobArc, HashMap<u64, u64>) {
         // log::error!("get_char_arc: {:?}", char);
 
         let endpoints = &mut sink.accumulate.result;
@@ -302,6 +302,7 @@ impl FontFace {
             min_sdf,
             max_sdf,
             cell_size: min_width,
+            #[cfg(feature = "debug")]
             show: format!("<br> 格子数：宽 = {}, 高 = {} <br>", min_width, min_height),
             extents,
             data: unit_arcs,
@@ -344,7 +345,7 @@ impl FontFace {
         let sdf_tex3 = &mut tex_data.sdf_tex3;
 
         for char in text {
-            println!("char: {}", char);
+            // println!("char: {}", char);
             let outline = self.to_outline(char);
             let (mut blod_arc, map) = Self::get_char_arc(self.max_box.clone(), outline);
             let size = blod_arc.encode_data_tex(&map, data_tex, width0, offset_x0, offset_y0)?;

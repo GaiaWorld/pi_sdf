@@ -4,10 +4,8 @@ use allsorts::{
     outline::OutlineSink,
     pathfinder_geometry::{line_segment::LineSegment2F, vector::Vector2F},
 };
+use parry2d::bounding_volume::Aabb;
 
-
-use pi_shape::plane::aabb::Aabb;
-use pi_shape::plane::Point;
 use usvg::{
     tiny_skia_path::{self, PathVerb},
     NodeKind, TreeParsing,
@@ -20,7 +18,7 @@ use crate::{
         util::GLYPHY_INFINITY,
     },
     utils::{encode_uint_arc_data, Attribute, GlyphVisitor},
-
+    Point,
 };
 
 #[derive(Debug, Clone)]
@@ -107,7 +105,7 @@ impl Svg {
         ]
     }
 
-    pub fn compute_near_arc(&self, endpoints: Vec<ArcEndpoint>) -> (BlobArc, HashMap<String, u64>) {
+    pub fn compute_near_arc(&self, endpoints: Vec<ArcEndpoint>) -> (BlobArc, HashMap<u64, u64>) {
         compute_near_arc_impl(self.view_box, endpoints)
     }
 
@@ -278,7 +276,7 @@ fn compute_outline<'a>(
 pub fn compute_near_arc_impl(
     view_box: Aabb,
     endpoints: Vec<ArcEndpoint>,
-) -> (BlobArc, HashMap<String, u64>) {
+) -> (BlobArc, HashMap<u64, u64>) {
     let extents = view_box;
     // println!("extents: {:?}", extents);
     let mut min_width = f32::INFINITY;
@@ -326,7 +324,9 @@ pub fn compute_near_arc_impl(
         min_sdf,
         max_sdf,
         cell_size: min_width,
+        #[cfg(feature = "debug")]
         show: format!("<br> 格子数：宽 = {}, 高 = {} <br>", min_width, min_height),
+  
         extents,
         data: unit_arcs,
         avg_fetch_achieved: 0.0,

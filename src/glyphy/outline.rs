@@ -1,6 +1,4 @@
-
-
-use pi_shape::plane::Point;
+use parry2d::math::Point;
 
 use crate::glyphy::geometry::{arc::Arc, vector::VectorEXT};
 
@@ -63,7 +61,7 @@ pub fn winding(endpoints: &mut [ArcEndpoint]) -> bool {
         assert!(d != GLYPHY_INFINITY);
 
         area += p0.into_vector().sdf_cross(&p1.into_vector());
-        area -= 0.5 * d * (p1 - p0).length_squared();
+        area -= 0.5 * d * (p1 - p0).norm_squared();
     }
     return area < 0.0;
 }

@@ -1,16 +1,14 @@
-use crate::glyphy::geometry::line::Line;
+use crate::{glyphy::geometry::line::Line, Point};
 use crate::glyphy::geometry::signed_vector::SignedVector;
 use crate::glyphy::util::float_equals;
 use allsorts::pathfinder_geometry::vector::Vector2F;
-use pi_shape::plane::Point;
-use pi_shape::glam::Vec2;
-
+use parry2d::math::Vector;
 
 pub trait PointExt {
     /**
      * Point 转 向量
      */
-    fn into_vector(self) -> Vec2;
+    fn into_vector(self) -> Vector<f32>;
     /**
      * 到 线l的最短距离
      */
@@ -31,7 +29,7 @@ pub trait PointExt {
     /**
      * 点 减 点
      */
-    fn add_vector(&self, p: &Vec2) -> Point;
+    fn add_vector(&self, p: &Vector<f32>) -> Point;
     /**
      * this 是否等于 p
      */
@@ -41,8 +39,8 @@ pub trait PointExt {
 }
 
 impl PointExt for Point {
-    fn into_vector(self) -> Vec2 {
-        Vec2::new(self.x, self.y)
+    fn into_vector(self) -> Vector<f32> {
+        Vector::new(self.x, self.y)
     }
 
     fn shortest_distance_to_line(&self, l: &Line) -> SignedVector {
@@ -50,20 +48,20 @@ impl PointExt for Point {
     }
 
     fn squared_distance_to_point(&self, p: &Point) -> f32 {
-        let v = *self - *p;
-        v.length_squared()
+        let v = self - p;
+        v.norm_squared()
     }
 
     fn distance_to_point(&self, p: &Point) -> f32 {
-        let v = *self - *p;
-        v.length()
+        let v = self - p;
+        v.norm()
     }
 
     fn midpoint(&self, p: &Point) -> Point {
         return Point::new((self.x + p.x) / 2.0, (self.y + p.y) / 2.0);
     }
 
-    fn add_vector(&self, v: &Vec2) -> Point {
+    fn add_vector(&self, v: &Vector<f32>) -> Point {
         return Point::new(self.x + v.x, self.y + v.y);
     }
 

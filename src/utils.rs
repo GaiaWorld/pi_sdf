@@ -5,14 +5,17 @@ use allsorts::{
     outline::OutlineSink,
     pathfinder_geometry::{line_segment::LineSegment2F, vector::Vector2F},
 };
-use image::{ImageBuffer, Rgba};
+use image::{EncodableLayout, ImageBuffer, Rgba};
 
-use pi_shape::plane::aabb::Aabb;
-use pi_shape::plane::Point;
 use usvg::{Color, Fill, NonZeroPositiveF32, Paint, Stroke};
 use wasm_bindgen::prelude::wasm_bindgen;
 
-use crate::glyphy::{geometry::arcs::GlyphyArcAccumulator, sdf::glyphy_sdf_from_arc_list2};
+use crate::{
+    glyphy::{geometry::arcs::GlyphyArcAccumulator, sdf::glyphy_sdf_from_arc_list2},
+    Point,
+};
+use parry2d::bounding_volume::Aabb;
+use std::hash::Hasher;
 
 use crate::{
     font::FontFace,
@@ -48,7 +51,9 @@ pub struct User {
 pub struct GlyphVisitor {
     rasterizer: Rasterizer,
     pub(crate) accumulate: GlyphyArcAccumulator,
+    #[cfg(feature = "debug")]
     pub(crate) path_str: String,
+    #[cfg(feature = "debug")]
     pub(crate) svg_paths: Vec<String>,
     pub(crate) svg_endpoints: Vec<[f32; 2]>,
 
@@ -66,7 +71,9 @@ impl GlyphVisitor {
         Self {
             rasterizer,
             accumulate,
+            #[cfg(feature = "debug")]
             path_str: "".to_string(),
+            #[cfg(feature = "debug")]
             svg_paths: vec![],
             svg_endpoints: vec![],
             scale,
@@ -98,6 +105,7 @@ impl OutlineSink for GlyphVisitor {
         if self.scale > 0.02 {
             self.accumulate
                 .move_to(Point::new(to.x as f32, to.y as f32));
+            #[cfg(feature = "debug")]
             self.path_str.push_str(&format!("M {} {}", to.x, to.y));
             self.svg_endpoints.push([to.x as f32, to.y as f32]);
         }
@@ -111,6 +119,7 @@ impl OutlineSink for GlyphVisitor {
         log::debug!("+ L {} {} ", to.x, to.y);
         if self.scale > 0.02 {
             self.accumulate.line_to(to);
+            #[cfg(feature = "debug")]
             self.path_str.push_str(&format!("L {} {}", to.x, to.y));
             self.svg_endpoints.push([to.x as f32, to.y as f32]);
         } else {
@@ -175,6 +184,7 @@ impl OutlineSink for GlyphVisitor {
             log::debug!("+ L {} {} ", self.start.x, self.start.y);
             if self.scale > 0.02 {
                 self.accumulate.line_to(self.start);
+                #[cfg(feature = "debug")]
                 self.path_str
                     .push_str(&format!("M {} {}", self.start.x, self.start.y));
                 self.svg_endpoints
@@ -190,9 +200,12 @@ impl OutlineSink for GlyphVisitor {
         log::debug!("+ Z");
         if self.scale > 0.02 {
             self.accumulate.close_path();
-            self.path_str.push_str("Z");
-            self.svg_paths.push(self.path_str.clone());
-            self.path_str.clear();
+            #[cfg(feature = "debug")]
+            {
+                self.path_str.push_str("Z");
+                self.svg_paths.push(self.path_str.clone());
+                self.path_str.clear();
+            }
         }
 
         // let r = self.compute_direction();
@@ -208,7 +221,7 @@ pub fn encode_uint_arc_data(
     extents: &Aabb,
     min_width: f32,
     min_height: f32,
-) -> (Vec<Vec<UnitArc>>, HashMap<String, u64>) {
+) -> (Vec<Vec<UnitArc>>, HashMap<u64, u64>) {
     let glyph_width = extents.width();
     let glyph_height = extents.height();
     // 格子列的数量
@@ -227,10 +240,11 @@ pub fn encode_uint_arc_data(
                 },
                 offset: 0,
                 sdf: 0.0,
+                #[cfg(feature = "debug")]
                 show: "".to_owned(),
                 data: Vec::with_capacity(8),
                 origin_data: vec![],
-                key: "".to_string(),
+                key: u64::MAX,
                 s_dist: 0,
                 s_dist_1: 0,
                 s_dist_2: 0,
@@ -293,7 +307,7 @@ pub fn encode_uint_arc_data(
                 snap(&end.p, &extents, glyph_width, glyph_height),
             );
             // Shader的最后 要加回去
-            line.c -= line.n.dot(c.into_vector());
+            line.c -= line.n.dot(&c.into_vector());
             // shader 的 decode 要 乘回去
             line.c /= unit;
 
@@ -322,14 +336,17 @@ pub fn encode_uint_arc_data(
             }
 
             // 编码到纹理：该格子 对应 的 圆弧数据
-            let mut key = "".to_string();
+            let mut hasher = pi_hash::DefaultHasher::default();
+            let mut key = Vec::with_capacity(20);
             for endpoint in &near_endpoints {
-                key.push_str(&format!(
-                    "{}_{}_{}_",
-                    endpoint.p.x, endpoint.p.y, endpoint.d
-                ));
+                key.push(endpoint.p.x);
+                key.push(endpoint.p.y);
+                key.push(endpoint.d);
             }
-            arc_result = Some(key);
+            hasher.write(key.as_bytes());
+            let result = hasher.finish();
+
+            arc_result = Some(result);
         }
 
         // If the arclist is two arcs that can be combined in encoding if reordered, do that.
@@ -426,7 +443,7 @@ pub fn to_arc_cmds(endpoints: &Vec<ArcEndpoint>) -> (Vec<Vec<String>>, Vec<[f32;
                 let arc = Arc::new(_current_point.clone(), ep.p, ep.d);
                 let center = arc.center();
                 let radius = arc.radius();
-                let start_v = *_current_point - center;
+                let start_v = _current_point - center;
                 let start_angle = start_v.sdf_angle();
 
                 let end_v = ep.p - (center);

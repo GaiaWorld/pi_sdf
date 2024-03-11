@@ -1,11 +1,15 @@
-use pi_shape::{glam::Mat4, plane::aabb::Aabb};
+use parry2d::{
+    bounding_volume::Aabb,
+    na::{self},
+};
 use tracing::Level;
 use tracing_subscriber::fmt::Subscriber;
-use pi_shape::plane::Point;
+
+// use nalgebra::Vector3;
 use pi_sdf::{
     glyphy::blob::TexData,
     shape::{Circle, Ellipse, Path, PathVerb, Polygon, Polyline, Rect, Segment, Shapes},
-    utils::create_indices,
+    Point, utils::create_indices,
 };
 use pi_wgpu as wgpu;
 use wgpu::{util::DeviceExt, BlendState, ColorTargetState};
@@ -98,15 +102,15 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     let vertexs = shapes.verties();
     println!("vertexs: {:?}", vertexs);
 
-    let view_matrix = Mat4::default();
+    let view_matrix = na::Matrix4::<f32>::identity();
     let view_matrix_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Index Buffer"),
-        contents: bytemuck::cast_slice(view_matrix.as_ref()),
+        contents: bytemuck::cast_slice(view_matrix.as_slice()),
         usage: wgpu::BufferUsages::UNIFORM,
     });
-    println!("view_matrix.as_slice(): {:?}", view_matrix);
+    println!("view_matrix.as_slice(): {:?}", view_matrix.as_slice());
 
-    let proj_matrix = Mat4::orthographic_lh(
+    let proj_matrix = na::Orthographic3::<f32>::new(
         0.0,
         window_size.width as f32,
         0.0,
@@ -116,12 +120,12 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     );
     let proj_matrix_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Index Buffer"),
-        contents: bytemuck::cast_slice(proj_matrix.as_ref()),
+        contents: bytemuck::cast_slice(proj_matrix.as_matrix().as_slice()),
         usage: wgpu::BufferUsages::UNIFORM,
     });
     println!(
         "proj_matrix.as_slice(): {:?}",
-        proj_matrix
+        proj_matrix.as_matrix().as_slice()
     );
 
     let slope = [0.0, vertexs[1]];
@@ -524,11 +528,12 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     let mut data_offset = vec![]; // 每个标签的数据纹偏移
     let mut u_info = vec![]; // 每个标签的sdf信息
     let mut fill_color = vec![0.0; attributes.len() * 4]; // 每个标签的填充颜色
-    let mut stroke_color_and_width = vec![0.0; attributes.len() * 4]; // 每个标签的描边颜色和描边宽度
+    let mut stroke_color_and_width = vec![0.0; attributes.len() * 4];// 每个标签的描边颜色和描边宽度
     let mut start_and_step = Vec::with_capacity(attributes.len() * 4); // 每个标签的虚线描边信息
     for info in &texs_info {
         translation.push(0.0);
         translation.push(0.0);
+
 
         index_info.push(info.index_offset.0 as f32);
         index_info.push(info.index_offset.1 as f32);
@@ -840,7 +845,7 @@ fn create_shape() -> Shapes {
     let mut rect = Rect::new(120.0, 70.0, -100.0, -50.0);
     // 填充颜色 默认0. 0. 0. 0.
     rect.attribute.set_fill_color(0, 0, 255);
-    // 描边颜色 默认 0. 0. 0.
+    // 描边颜色 默认 0. 0. 0. 
     rect.attribute.set_stroke_color(0, 0, 0);
     // 描边宽度，默认0.0
     rect.attribute.set_stroke_width(2.0);

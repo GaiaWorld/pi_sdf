@@ -67,16 +67,16 @@ pub fn approximate_bezier_arc_error(
 
     let d1 = approximate_deviation(v0.x, v1.x);
     let d2 = approximate_deviation(v0.y, v1.y);
-    let v = Vec2::new(d1, d2);
+    let v = Vector::new(d1, d2);
 
     /* Edge cases: If d*d is too close too large default to a weak bound. */
     if a.d * a.d > 1. - 1e-4 {
-        return ea.value + v.length();
+        return ea.value + v.norm();
     }
 
     /* If the wedge doesn't contain control points, default to weak bound. */
     if !a.wedge_contains_point(&b0.p1) || !a.wedge_contains_point(&b0.p2) {
-        return ea.value + v.length();
+        return ea.value + v.norm();
     }
 
     /* If straight line, return the max ortho deviation. */
@@ -91,13 +91,13 @@ pub fn approximate_bezier_arc_error(
 
     let mut _eb = 0.0;
     if tan_v.abs() <= tan_half_alpha {
-        return ea.value + v.length();
+        return ea.value + v.norm();
     }
 
-    let c2 = (a.p1 - a.p0).length() * 0.5;
+    let c2 = (a.p1 - a.p0).norm() * 0.5;
     let r = a.radius();
 
-    _eb = Vec2::new(c2 + v.x, c2 / tan_half_alpha + v.y).length() - r;
+    _eb = Vector::new(c2 + v.x, c2 / tan_half_alpha + v.y).norm() - r;
     // println!("_eb: {}", _eb);
     assert!(_eb >= -0.1);
 
@@ -191,7 +191,7 @@ impl ArcBezierApproximatorQuantized {
         }
 
         /* Error introduced by arc quantization */
-        let ed = (a.d - orig_a.d).abs() * (a.p1 - a.p0).length() * 0.5;
+        let ed = (a.d - orig_a.d).abs() * (a.p1 - a.p0).norm() * 0.5;
 
         arc_bezier_approximator_midpoint_two_part(
             &b,
@@ -234,9 +234,8 @@ pub fn arc_bezier_approximator_default(
     );
 }
 
-
+use parry2d::math::Vector;
 pub use ArcBezierApproximatorQuantized as ArcBezierApproximatorQuantizedDefault;
-use pi_shape::glam::Vec2;
 
 use crate::glyphy::geometry::{
     arc::{tan2atan, ErrorValue},
