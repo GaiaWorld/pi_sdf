@@ -98,7 +98,7 @@ impl GlyphVisitor {
 impl OutlineSink for GlyphVisitor {
     fn move_to(&mut self, to: Vector2F) {
         let to = Point::new(to.x(), to.y());
-        log::info!("M {} {} ", to.x, to.y);
+        log::debug!("M {} {} ", to.x, to.y);
 
         if self.scale > 0.02 {
             self.accumulate
@@ -113,7 +113,7 @@ impl OutlineSink for GlyphVisitor {
 
     fn line_to(&mut self, to: Vector2F) {
         let to = Point::new(to.x(), to.y());
-        log::info!("+ L {} {} ", to.x, to.y);
+        log::debug!("+ L {} {} ", to.x, to.y);
         if self.scale > 0.02 {
             self.accumulate.line_to(to);
             self.path_str.push_str(&format!("L {} {}", to.x, to.y));
@@ -132,7 +132,7 @@ impl OutlineSink for GlyphVisitor {
         let control = Point::new(control.x(), control.y());
         let to = Point::new(to.x(), to.y());
 
-        log::info!("+ Q {} {} {} {} ", control.x, control.y, to.x, to.y);
+        log::debug!("+ Q {} {} {} {} ", control.x, control.y, to.x, to.y);
         if self.scale > 0.02 {
             self.accumulate.conic_to(control, to);
             self.svg_endpoints.push([to.x, to.y]);
@@ -152,7 +152,7 @@ impl OutlineSink for GlyphVisitor {
         let control2 = Point::new(control.to_x(), control.to_y());
         let to = Point::new(to.x(), to.y());
 
-        log::info!(
+        log::debug!(
             "+ C {}, {}, {}, {}, {}, {}",
             control1.x,
             control1.y,
@@ -177,7 +177,7 @@ impl OutlineSink for GlyphVisitor {
 
     fn close(&mut self) {
         if self.previous != self.start {
-            log::info!("+ L {} {} ", self.start.x, self.start.y);
+            log::debug!("+ L {} {} ", self.start.x, self.start.y);
             if self.scale > 0.02 {
                 self.accumulate.line_to(self.start);
                 self.path_str
@@ -192,7 +192,7 @@ impl OutlineSink for GlyphVisitor {
                 )
             }
         }
-        log::info!("+ Z");
+        log::debug!("+ Z");
         if self.scale > 0.02 {
             self.accumulate.close_path();
             self.path_str.push_str("Z");
@@ -378,14 +378,14 @@ pub fn get_char_arc_debug(char: String) -> BlobArc {
 
     let _ = console_log::init_with_level(log::Level::Debug);
     let buffer = include_bytes!("../source/msyh.ttf").to_vec();
-    log::info!("1111111111");
+    log::debug!("1111111111");
     let mut ft_face = FontFace::new(buffer);
-    log::info!("22222222char: {}", char);
+    log::debug!("22222222char: {}", char);
     let char = char.chars().next().unwrap();
-    log::info!("13333333");
+    log::debug!("13333333");
     let outline = ft_face.to_outline(char);
     let (arcs, _map) = FontFace::get_char_arc(ft_face.max_box().clone(), outline);
-    log::info!("44444444444");
+    log::debug!("44444444444");
     arcs
 }
 

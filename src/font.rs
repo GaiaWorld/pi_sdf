@@ -228,6 +228,7 @@ impl FontFace {
         // let r1 = self.font.vertical_advance(glyph_index);
         // println!("horizontal_advance, char: {}: horizontal_advance:{:?}, vertical_advance: {:?}", ch, r, r1);
         let _ = self.glyf.visit(glyph_index, &mut sink);
+
         sink
     }
 

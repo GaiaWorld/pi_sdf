@@ -100,7 +100,7 @@ pub struct Extents {
 #[wasm_bindgen]
 impl BlobArc {
     pub fn get_unit_arc(&self, i: usize, j: usize) -> UnitArc {
-        // log::info!("i: {}, j: {}", i, j);
+        // log::debug!("i: {}, j: {}", i, j);
         self.data[j][i].clone()
     }
 
@@ -688,7 +688,7 @@ pub struct TexData {
 // }
 
 #[wasm_bindgen(getter_with_clone)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct TexInfo {
     pub grid_w: f32,
     pub grid_h: f32,
@@ -914,7 +914,7 @@ pub fn arc_endpoint_encode(ix: f32, iy: f32, d: f32) -> [f32; 4] {
         id = 0.0;
     } else {
         if d.abs() > GLYPHY_MAX_D {
-            panic!("d must be less than or equal to GLYPHY_MAX_D");
+            panic!("d must be less than or equal to GLYPHY_MAX_D, d: {}, GLYPHY_MAX_D: {}", d.abs(), GLYPHY_MAX_D) ;
         }
 
         id = 128. + (d * 127.0 / GLYPHY_MAX_D).round();
