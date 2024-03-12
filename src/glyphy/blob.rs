@@ -159,7 +159,7 @@ impl BlobArc {
         }
     }
 
-    pub fn encode_data_tex1(&self, map: &HashMap<String, u64>) -> Vec<u8> {
+    pub fn encode_data_tex1(&self, map: &HashMap<u64, u64>) -> Vec<u8> {
         // 返回索引数据和宽高
         let mut len = 0usize;
         let glyph_width = self.extents.width();
