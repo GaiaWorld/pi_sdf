@@ -1,6 +1,6 @@
 [package]
 name = "pi_sdf"
-version = "0.1.3"
+version = "0.1.4"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -35,7 +35,7 @@ winit = { registry = "yn", version = "0.27" }
 tracing = "0.1"
 tracing-subscriber = "0.3"
 bytemuck = { version = "1.4", features = [ "derive" ] }
-naga = "0.12"
+naga = "0.19"
 
 [profile.release]
 debug = true

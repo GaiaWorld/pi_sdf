@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use parry2d::{
     bounding_volume::Aabb,
     na::{self},
@@ -19,7 +21,7 @@ use winit::{
     window::{Window, WindowBuilder},
 };
 
-async fn run(event_loop: EventLoop<()>, window: Window) {
+async fn run(event_loop: EventLoop<()>, window: Arc<Window> ) {
     let subscriber = Subscriber::builder().with_max_level(Level::TRACE).finish();
 
     tracing::subscriber::set_global_default(subscriber).unwrap();
@@ -31,7 +33,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     //     dx12_shader_compiler: Dx12Compiler::default(),
     // });
 
-    let surface = unsafe { instance.create_surface(&window) }.unwrap();
+    let surface = unsafe { instance.create_surface(window.clone()) }.unwrap();
     let adapter = instance
         .request_adapter(&wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::default(),
@@ -47,9 +49,9 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         .request_device(
             &wgpu::DeviceDescriptor {
                 label: None,
-                features: wgpu::Features::empty(),
+                required_features: wgpu::Features::empty(),
                 // Make sure we use the texture resolution limits from the adapter, so we can support images the size of the swapchain.
-                limits: wgpu::Limits::downlevel_webgl2_defaults()
+                required_limits: wgpu::Limits::downlevel_webgl2_defaults()
                     .using_resolution(adapter.limits()),
             },
             None,
@@ -931,6 +933,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         present_mode: wgpu::PresentMode::Fifo,
         alpha_mode: swapchain_capabilities.alpha_modes[0],
         view_formats: vec![],
+        desired_maximum_frame_latency: 2,
     };
 
     surface.configure(&device, &config);
@@ -976,12 +979,12 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                             resolve_target: None,
                             ops: wgpu::Operations {
                                 load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
-                                store: true,
+                                store: wgpu::StoreOp::Store,
                             },
                         })],
                         depth_stencil_attachment: None,
-                        // timestamp_writes: None,
-                        // occlusion_query_set: None,
+                        timestamp_writes: None,
+                        occlusion_query_set: None,
                     });
                     // rpass.push_debug_group("Prepare data for draw.");
                     rpass.set_pipeline(&render_pipeline);
@@ -1112,7 +1115,7 @@ fn main() {
         .with_inner_size(winit::dpi::PhysicalSize::new(512, 512))
         .build(&event_loop)
         .unwrap();
-    // let window = winit::window::Window::new(&event_loop).unwrap();
+    let window = Arc::new(window);
     #[cfg(not(target_arch = "wasm32"))]
     {
         env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();

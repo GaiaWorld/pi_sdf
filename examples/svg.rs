@@ -40,9 +40,9 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         .request_device(
             &wgpu::DeviceDescriptor {
                 label: None,
-                features: wgpu::Features::empty(),
+                required_features: wgpu::Features::empty(),
                 // Make sure we use the texture resolution limits from the adapter, so we can support images the size of the swapchain.
-                limits: wgpu::Limits::downlevel_webgl2_defaults()
+                required_limits: wgpu::Limits::downlevel_webgl2_defaults()
                     .using_resolution(adapter.limits()),
             },
             None,
@@ -764,13 +764,21 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     // println!("render_pipeline: {:?}", render_pipeline);
 
     let mut config = wgpu::SurfaceConfiguration {
-        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-        format: swapchain_format,
-        width: window_size.width,
-        height: window_size.height,
-        present_mode: wgpu::PresentMode::Fifo,
-        alpha_mode: swapchain_capabilities.alpha_modes[0],
-        view_formats: vec![],
+        usage: todo!(),
+        format: todo!(),
+        width: todo!(),
+        height: todo!(),
+        present_mode: todo!(),
+        alpha_mode: todo!(),
+        view_formats: todo!(),
+        desired_maximum_frame_latency: todo!(),
+        // usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+        // format: swapchain_format,
+        // width: window_size.width,
+        // height: window_size.height,
+        // present_mode: wgpu::PresentMode::Fifo,
+        // alpha_mode: swapchain_capabilities.alpha_modes[0],
+        // view_formats: vec![],
     };
 
     surface.configure(&device, &config);
@@ -816,12 +824,12 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                             resolve_target: None,
                             ops: wgpu::Operations {
                                 load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
-                                store: true,
+                                store: wgpu::StoreOp::Store,
                             },
                         })],
                         depth_stencil_attachment: None,
-                        // timestamp_writes: None,
-                        // occlusion_query_set: None,
+                        timestamp_writes: None,
+                        occlusion_query_set: None,
                     });
                     // rpass.push_debug_group("Prepare data for draw.");
                     rpass.set_pipeline(&render_pipeline);
