@@ -7,6 +7,7 @@ use allsorts::{
 };
 use image::{EncodableLayout, ImageBuffer, Rgba};
 
+use serde::{Deserialize, Serialize, Serializer, ser::SerializeStruct};
 use usvg::{Color, Fill, NonZeroPositiveF32, Paint, Stroke};
 use wasm_bindgen::prelude::wasm_bindgen;
 
@@ -510,39 +511,41 @@ pub struct Attribute {
     pub start: Point,
 }
 
+unsafe impl Send for Attribute{}
+unsafe impl Sync for Attribute{}
 impl Attribute {
     pub fn set_fill_color(&mut self, r: u8, g: u8, b: u8) {
-        let fill = Fill::from_paint(Paint::Color(Color::new_rgb(r, g, b)));
-        self.fill = Some(fill);
+        // let fill = Fill::from_paint(Paint::Color(Color::new_rgb(r, g, b)));
+        // self.fill = Some(fill);
     }
 
     pub fn set_stroke_color(&mut self, r: u8, g: u8, b: u8) {
-        if let Some(stroke) = &mut self.stroke {
-            stroke.paint = Paint::Color(Color::new_rgb(r, g, b));
-        } else {
-            let mut stroke = Stroke::default();
-            stroke.paint = Paint::Color(Color::new_rgb(r, g, b));
-            self.stroke = Some(stroke);
-        }
+        // if let Some(stroke) = &mut self.stroke {
+        //     stroke.paint = Paint::Color(Color::new_rgb(r, g, b));
+        // } else {
+        //     let mut stroke = Stroke::default();
+        //     stroke.paint = Paint::Color(Color::new_rgb(r, g, b));
+        //     self.stroke = Some(stroke);
+        // }
     }
 
     pub fn set_stroke_width(&mut self, width: f32) {
-        if let Some(stroke) = &mut self.stroke {
-            stroke.width = NonZeroPositiveF32::new(width).unwrap();
-        } else {
-            let mut stroke = Stroke::default();
-            stroke.width = NonZeroPositiveF32::new(width).unwrap();
-            self.stroke = Some(stroke);
-        }
+        // if let Some(stroke) = &mut self.stroke {
+        //     stroke.width = NonZeroPositiveF32::new(width).unwrap();
+        // } else {
+        //     let mut stroke = Stroke::default();
+        //     stroke.width = NonZeroPositiveF32::new(width).unwrap();
+        //     self.stroke = Some(stroke);
+        // }
     }
 
     pub fn set_stroke_dasharray(&mut self, dasharray: Vec<f32>) {
-        if let Some(stroke) = &mut self.stroke {
-            stroke.dasharray = Some(dasharray)
-        } else {
-            let mut stroke = Stroke::default();
-            stroke.dasharray = Some(dasharray);
-            self.stroke = Some(stroke);
-        }
+        // if let Some(stroke) = &mut self.stroke {
+        //     stroke.dasharray = Some(dasharray)
+        // } else {
+        //     let mut stroke = Stroke::default();
+        //     stroke.dasharray = Some(dasharray);
+        //     self.stroke = Some(stroke);
+        // }
     }
 }

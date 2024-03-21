@@ -175,12 +175,12 @@ impl Svg {
                         sink.close();
                     }
                     let p = path.data.points().first().unwrap();
-                    attributes.push(Attribute {
-                        fill: path.fill,
-                        stroke: path.stroke,
-                        is_close,
-                        start: Point::new(p.x, p.y),
-                    });
+                    // attributes.push(Attribute {
+                    //     fill: path.fill,
+                    //     stroke: path.stroke,
+                    //     is_close,
+                    //     start: Point::new(p.x, p.y),
+                    // });
 
                     let (mut blob_arc, map) = self.compute_near_arc(sink.accumulate.result);
                     let size =

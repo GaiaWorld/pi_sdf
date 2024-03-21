@@ -3,8 +3,11 @@ use allsorts::{
     outline::OutlineSink,
     pathfinder_geometry::{line_segment::LineSegment2F, vector::Vector2F},
 };
+use erased_serde::serialize_trait_object;
+use image::EncodableLayout;
 use kurbo::Shape;
 use parry2d::{bounding_volume::Aabb, shape::Segment as MSegment};
+use serde::{Deserialize, Serialize};
 // use usvg::tiny_skia_path::PathSegment;
 
 use crate::utils::Attribute;
@@ -18,9 +21,13 @@ use crate::{
     utils::GlyphVisitor,
     Point,
 };
-#[derive(PartialEq, Clone, Copy)]
+use std::{collections::HashMap, fmt::Debug, hash::Hasher};
+
+#[derive(PartialEq, Clone, Copy, Debug, Serialize, Deserialize)]
 pub enum PathVerb {
+    // 绝对点
     MoveTo,
+    // 相对点
     MoveToRelative,
     LineTo,
     LineToRelative,
@@ -40,11 +47,75 @@ pub enum PathVerb {
     EllipticalArcToRelative,
     Close,
 }
-pub trait ArcOutline {
+
+impl Into<f32> for PathVerb {
+    fn into(self) -> f32 {
+        match self {
+            PathVerb::MoveTo => 1.0,
+            PathVerb::MoveToRelative => 2.0,
+            PathVerb::LineTo => 3.0,
+            PathVerb::LineToRelative => 4.0,
+            PathVerb::QuadTo => 5.0,
+            PathVerb::QuadToRelative => 6.0,
+            PathVerb::SmoothQuadTo => 7.0,
+            PathVerb::SmoothQuadToRelative => 8.0,
+            PathVerb::CubicTo => 9.0,
+            PathVerb::CubicToRelative => 10.0,
+            PathVerb::SmoothCubicTo => 11.0,
+            PathVerb::SmoothCubicToRelative => 12.0,
+            PathVerb::HorizontalLineTo => 13.0,
+            PathVerb::HorizontalLineToRelative => 14.0,
+            PathVerb::VerticalLineTo => 15.0,
+            PathVerb::VerticalLineToRelative => 16.0,
+            PathVerb::EllipticalArcTo => 17.0,
+            PathVerb::EllipticalArcToRelative => 18.0,
+            PathVerb::Close => 19.0,
+        }
+    }
+}
+pub trait ArcOutline: Send + Sync + Debug + ShapeClone {
     fn get_arc_endpoints(&self) -> Vec<ArcEndpoint>;
     fn get_attribute(&self) -> Attribute;
+    fn get_hash(&self) -> u64;
 }
 
+pub trait ShapeClone {
+    fn clone_box(&self) -> Box<dyn ArcOutline>;
+}
+
+impl<T> ShapeClone for T
+where
+    T: 'static + ArcOutline + Clone,
+{
+    fn clone_box(&self) -> Box<dyn ArcOutline> {
+        Box::new(self.clone())
+    }
+}
+
+impl Clone for Box<dyn ArcOutline> {
+    fn clone(&self) -> Box<dyn ArcOutline> {
+        self.clone_box()
+    }
+}
+
+// serialize_trait_object!(ArcOutline);
+// impl Serialize for Box<dyn ArcOutline> {
+//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+//     where
+//         S: serde::Serializer {
+//         todo!()
+//     }
+// }
+
+// impl Deserialize for Box<dyn ArcOutline> {
+//     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+//     where
+//         D: serde::Deserializer<'de> {
+//         todo!()
+//     }
+// }
+
+#[derive(Clone, Debug)]
 pub struct Circle {
     radius: f32,
     cx: f32,
@@ -100,8 +171,15 @@ impl ArcOutline for Circle {
     fn get_attribute(&self) -> Attribute {
         self.attribute.clone()
     }
+
+    fn get_hash(&self) -> u64 {
+        let mut hasher = pi_hash::DefaultHasher::default();
+        hasher.write([self.cx, self.cy, self.radius, 1.0].as_bytes());
+        hasher.finish()
+    }
 }
 
+#[derive(Clone, Debug)]
 pub struct Rect {
     x: f32,
     y: f32,
@@ -150,8 +228,15 @@ impl ArcOutline for Rect {
     fn get_attribute(&self) -> Attribute {
         self.attribute.clone()
     }
+
+    fn get_hash(&self) -> u64 {
+        let mut hasher = pi_hash::DefaultHasher::default();
+        hasher.write([self.x, self.y, self.width, self.height, 2.0].as_bytes());
+        hasher.finish()
+    }
 }
 
+#[derive(Clone, Debug)]
 pub struct Segment {
     segment: MSegment,
     pub attribute: Attribute,
@@ -181,8 +266,24 @@ impl ArcOutline for Segment {
     fn get_attribute(&self) -> Attribute {
         self.attribute.clone()
     }
+
+    fn get_hash(&self) -> u64 {
+        let mut hasher = pi_hash::DefaultHasher::default();
+        hasher.write(
+            [
+                self.segment.a.x,
+                self.segment.a.y,
+                self.segment.b.x,
+                self.segment.b.y,
+                3.0,
+            ]
+            .as_bytes(),
+        );
+        hasher.finish()
+    }
 }
 
+#[derive(Clone, Debug)]
 pub struct Ellipse {
     cx: f32,
     cy: f32,
@@ -261,8 +362,15 @@ impl ArcOutline for Ellipse {
     fn get_attribute(&self) -> Attribute {
         self.attribute.clone()
     }
+
+    fn get_hash(&self) -> u64 {
+        let mut hasher = pi_hash::DefaultHasher::default();
+        hasher.write([self.rx, self.ry, self.cx, self.cy, 4.0].as_bytes());
+        hasher.finish()
+    }
 }
 
+#[derive(Clone, Debug)]
 pub struct Polygon {
     points: Vec<Point>,
     pub attribute: Attribute,
@@ -306,8 +414,21 @@ impl ArcOutline for Polygon {
     fn get_attribute(&self) -> Attribute {
         self.attribute.clone()
     }
+
+    fn get_hash(&self) -> u64 {
+        let mut key = Vec::with_capacity(self.points.len() * 2);
+        for p in &self.points {
+            key.push(p.x);
+            key.push(p.y);
+        }
+        key.push(5.0);
+        let mut hasher = pi_hash::DefaultHasher::default();
+        hasher.write(key.as_bytes());
+        hasher.finish()
+    }
 }
 
+#[derive(Clone, Debug)]
 pub struct Polyline {
     points: Vec<Point>,
     pub attribute: Attribute,
@@ -371,8 +492,21 @@ impl ArcOutline for Polyline {
     fn get_attribute(&self) -> Attribute {
         self.attribute.clone()
     }
+
+    fn get_hash(&self) -> u64 {
+        let mut key = Vec::with_capacity(self.points.len() * 2);
+        for p in &self.points {
+            key.push(p.x);
+            key.push(p.y);
+        }
+        key.push(6.0);
+        let mut hasher = pi_hash::DefaultHasher::default();
+        hasher.write(key.as_bytes());
+        hasher.finish()
+    }
 }
 
+#[derive(Clone, Debug)]
 pub struct Path {
     verbs: Vec<PathVerb>,
     points: Vec<Point>,
@@ -444,19 +578,32 @@ impl ArcOutline for Path {
     fn get_attribute(&self) -> Attribute {
         self.attribute.clone()
     }
+
+    fn get_hash(&self) -> u64 {
+        let mut key = Vec::with_capacity(self.points.len() * 4);
+        for (p, v) in self.points.iter().zip(self.verbs.iter()) {
+            key.push(p.x);
+            key.push(p.y);
+            key.push((*v).into());
+        }
+        key.push(7.0);
+        let mut hasher = pi_hash::DefaultHasher::default();
+        hasher.write(key.as_bytes());
+        hasher.finish()
+    }
 }
 
-pub struct Shapes {
-    shapes: Vec<Box<dyn ArcOutline>>,
-    view_box: Aabb,
+pub struct SvgScenes {
+    pub shapes: HashMap<u64, Box<dyn ArcOutline>>,
+    pub view_box: Aabb,
 }
 
-impl Shapes {
+impl SvgScenes {
     pub fn new(view_box: Aabb) -> Self {
         // 添加空隙
         let view_box = Aabb {
-            mins: Point::new(view_box.mins.x - 10.0, view_box.mins.y - 10.0),
-            maxs: Point::new(view_box.maxs.x + 10.0, view_box.maxs.y + 10.0),
+            mins: Point::new(view_box.mins.x, view_box.mins.y ),
+            maxs: Point::new(view_box.maxs.x, view_box.maxs.y ),
         };
         Self {
             shapes: Default::default(),
@@ -464,8 +611,10 @@ impl Shapes {
         }
     }
 
-    pub fn add_shape(&mut self, shape: Box<dyn ArcOutline>) {
-        self.shapes.push(shape);
+    pub fn add_shape(&mut self, shape: Box<dyn ArcOutline>) -> u64 {
+        let key = shape.get_hash();
+        self.shapes.insert(key, shape);
+        key
     }
 
     pub fn verties(&self) -> [f32; 16] {
@@ -512,7 +661,7 @@ impl Shapes {
         let sdf_tex2 = &mut tex_data.sdf_tex2;
         let sdf_tex3 = &mut tex_data.sdf_tex3;
 
-        for node in &self.shapes {
+        for node in self.shapes.values() {
             let (mut blob_arc, map) =
                 compute_near_arc_impl(self.view_box, node.get_arc_endpoints());
             let size = blob_arc.encode_data_tex(&map, data_tex, width0, offset_x0, offset_y0)?;

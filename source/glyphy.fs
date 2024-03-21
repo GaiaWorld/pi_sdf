@@ -633,6 +633,6 @@ void main() {
 	}
 	
 	// 虚线，svg用
-	// fragColor = stroke_dasharray(fragColor, u_startAndStep);
+	fragColor = stroke_dasharray(fragColor, u_startAndStep);
 	fragColor.rgb *= fragColor.a;
 }
