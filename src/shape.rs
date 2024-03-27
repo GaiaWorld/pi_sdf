@@ -26,7 +26,7 @@ use std::{collections::HashMap, fmt::Debug, hash::Hasher};
 #[derive(PartialEq, Clone, Copy, Debug, Serialize, Deserialize)]
 pub enum PathVerb {
     // 绝对点
-    MoveTo,
+    MoveTo = 1,
     // 相对点
     MoveToRelative,
     LineTo,
@@ -77,6 +77,7 @@ pub trait ArcOutline: Send + Sync + Debug + ShapeClone {
     fn get_arc_endpoints(&self) -> Vec<ArcEndpoint>;
     fn get_attribute(&self) -> Attribute;
     fn get_hash(&self) -> u64;
+    fn binding_box(&self) -> Aabb;
 }
 
 pub trait ShapeClone {
@@ -177,6 +178,13 @@ impl ArcOutline for Circle {
         hasher.write([self.cx, self.cy, self.radius, 1.0].as_bytes());
         hasher.finish()
     }
+
+    fn binding_box(&self) -> Aabb {
+        Aabb {
+            mins: Point::new(self.cx - self.radius, self.cy - self.radius),
+            maxs: Point::new(self.cx + self.radius, self.cy + self.radius),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -234,6 +242,14 @@ impl ArcOutline for Rect {
         hasher.write([self.x, self.y, self.width, self.height, 2.0].as_bytes());
         hasher.finish()
     }
+
+    fn binding_box(&self) -> Aabb {
+        let min_x = self.x.min(self.x - self.width);
+        let min_y = self.y.min(self.y - self.height);
+        let max_x = self.x.max(self.x - self.width);
+        let max_x = self.y.max(self.y - self.height);
+        Aabb { mins: Point::new(min_x, min_y), maxs:Point::new( max_x, max_x) }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -280,6 +296,14 @@ impl ArcOutline for Segment {
             .as_bytes(),
         );
         hasher.finish()
+    }
+
+    fn binding_box(&self) -> Aabb {
+        let min_x = self.segment.a.x.min(self.segment.b.x);
+        let min_y = self.segment.a.y.min(self.segment.b.y);
+        let max_x = self.segment.a.x.max(self.segment.b.x);
+        let max_x = self.segment.a.y.max(self.segment.b.y);
+        Aabb { mins: Point::new(min_x, min_y), maxs:Point::new( max_x, max_x) }
     }
 }
 
@@ -368,6 +392,13 @@ impl ArcOutline for Ellipse {
         hasher.write([self.rx, self.ry, self.cx, self.cy, 4.0].as_bytes());
         hasher.finish()
     }
+
+    fn binding_box(&self) -> Aabb {
+        Aabb {
+            mins: Point::new(self.cx - self.rx, self.cy - self.rx),
+            maxs: Point::new(self.cx + self.rx, self.cy + self.rx),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -425,6 +456,22 @@ impl ArcOutline for Polygon {
         let mut hasher = pi_hash::DefaultHasher::default();
         hasher.write(key.as_bytes());
         hasher.finish()
+    }
+
+    fn binding_box(&self) -> Aabb {
+        let mut min_x = f32::INFINITY;
+        let mut max_x = f32::NEG_INFINITY;
+        let mut min_y = f32::INFINITY;
+        let mut max_y = f32::NEG_INFINITY;
+
+        self.points.iter().for_each(|v|{
+            min_x = min_x.min(v.x);
+            min_y = min_y.min(v.y);
+            max_x = max_x.max(v.x);
+            max_y = max_y.max(v.y);
+        });
+        
+        Aabb { mins: Point::new(min_x, min_y), maxs:Point::new( max_x, max_x) }
     }
 }
 
@@ -503,6 +550,22 @@ impl ArcOutline for Polyline {
         let mut hasher = pi_hash::DefaultHasher::default();
         hasher.write(key.as_bytes());
         hasher.finish()
+    }
+
+    fn binding_box(&self) -> Aabb {
+        let mut min_x = f32::INFINITY;
+        let mut max_x = f32::NEG_INFINITY;
+        let mut min_y = f32::INFINITY;
+        let mut max_y = f32::NEG_INFINITY;
+
+        self.points.iter().for_each(|v|{
+            min_x = min_x.min(v.x);
+            min_y = min_y.min(v.y);
+            max_x = max_x.max(v.x);
+            max_y = max_y.max(v.y);
+        });
+        
+        Aabb { mins: Point::new(min_x, min_y), maxs:Point::new( max_x, max_x) }
     }
 }
 
@@ -591,6 +654,17 @@ impl ArcOutline for Path {
         hasher.write(key.as_bytes());
         hasher.finish()
     }
+
+    fn binding_box(&self) -> Aabb {
+        let mut min_x = f32::INFINITY;
+        let mut max_x = f32::NEG_INFINITY;
+        let mut min_y = f32::INFINITY;
+        let mut max_y = f32::NEG_INFINITY;
+
+
+        
+        Aabb { mins: Point::new(min_x, min_y), maxs:Point::new( max_x, max_x) }
+    }
 }
 
 pub struct SvgScenes {
@@ -602,8 +676,8 @@ impl SvgScenes {
     pub fn new(view_box: Aabb) -> Self {
         // 添加空隙
         let view_box = Aabb {
-            mins: Point::new(view_box.mins.x, view_box.mins.y ),
-            maxs: Point::new(view_box.maxs.x, view_box.maxs.y ),
+            mins: Point::new(view_box.mins.x, view_box.mins.y),
+            maxs: Point::new(view_box.maxs.x, view_box.maxs.y),
         };
         Self {
             shapes: Default::default(),
@@ -611,10 +685,9 @@ impl SvgScenes {
         }
     }
 
-    pub fn add_shape(&mut self, shape: Box<dyn ArcOutline>) -> u64 {
-        let key = shape.get_hash();
-        self.shapes.insert(key, shape);
-        key
+    pub fn add_shape(&mut self, hash: u64, shape: Box<dyn ArcOutline>) {
+        // let key = shape.get_hash();
+        self.shapes.insert(hash, shape);
     }
 
     pub fn verties(&self) -> [f32; 16] {

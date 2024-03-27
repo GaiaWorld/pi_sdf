@@ -95,9 +95,13 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     let (texs_info, attributes) = svg.out_tex_data(&mut tex_data).unwrap();
     println!("out_tex_data: {:?}", time.elapsed());
     let vertexs = svg.verties();
+    // 字体缩放
+    let scale = [1.0f32, 1.0];
+    // 阴影偏移和模糊等级
+    let mut shadow_offset_and_blur_level = vec![20.0f32, 0., 6.0, 0.0];
     println!("vertexs: {:?}", vertexs);
 
-    let view_matrix = na::Matrix4::<f32>::identity();
+    let view_matrix = na::Matrix4::<f32>::identity(); // 视口矩阵
     let view_matrix_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Index Buffer"),
         contents: bytemuck::cast_slice(view_matrix.as_slice()),
@@ -123,19 +127,68 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         proj_matrix.as_matrix().as_slice()
     );
 
+    // 斜体, 第一个值为正切值，第二个写死为网格最小y坐标
     let slope = [0.0, vertexs[1]];
     let slope_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("Index Buffer"),
+        label: Some("slope"),
         contents: bytemuck::cast_slice(&slope),
         usage: wgpu::BufferUsages::UNIFORM,
     });
 
-    let scale = [1.0f32, 1.0];
     let scale_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("Index Buffer"),
+        label: Some("scale"),
         contents: bytemuck::cast_slice(scale.as_slice()),
         usage: wgpu::BufferUsages::UNIFORM,
     });
+
+    let u_gradient_start_end: [f32; 4] = [-0.5, -0.5, 0.5, 0.5];
+    let u_gradient_start_end_buffer =
+        device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("u_gradient_start_end_buffer"),
+            contents: bytemuck::cast_slice(&u_gradient_start_end),
+            usage: wgpu::BufferUsages::UNIFORM,
+        });
+
+    let u_weight: [f32; 1] = [0.0];
+    let u_weight_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("u_weight_buffer"),
+        contents: bytemuck::cast_slice(&u_weight),
+        usage: wgpu::BufferUsages::UNIFORM,
+    });
+
+    let gradient = [
+        1.0f32, 0.0, 0.0, 0.0, // 第一个
+        1.0f32, 0.0, 0.0, 0.4, // 第二个
+        0.0f32, 0.0, 1.0, 0.6, // 第三个
+        1.0f32, 1.0, 0.0, 1.0, // 第四个
+    ];
+    let u_gradient_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("gradient"),
+        contents: bytemuck::cast_slice(&gradient),
+        usage: wgpu::BufferUsages::UNIFORM,
+    });
+
+    let outer_glow_color_and_dist = vec![0.0f32, 0.0, 0.0, 0.0];
+    let outer_glow_color_and_dist_buffer =
+        device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("outer_glow_color_and_dist"),
+            contents: bytemuck::cast_slice(&outer_glow_color_and_dist),
+            usage: wgpu::BufferUsages::UNIFORM,
+        });
+
+    let shadow_color = vec![0.0f32, 0.0, 0.0, 0.0];
+    let shadow_color_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("shadow_color"),
+        contents: bytemuck::cast_slice(&shadow_color),
+        usage: wgpu::BufferUsages::UNIFORM,
+    });
+
+    let shadow_offset_and_blur_level_buffer =
+        device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("shadow_offset_and_blur_level"),
+            contents: bytemuck::cast_slice(&shadow_offset_and_blur_level),
+            usage: wgpu::BufferUsages::UNIFORM,
+        });
 
     let bind_group_layout0 = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: None,
@@ -180,6 +233,66 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 },
                 count: None,
             },
+            wgpu::BindGroupLayoutEntry {
+                binding: 4,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: wgpu::BufferSize::new(4),
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 5,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: wgpu::BufferSize::new(16),
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 6,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: wgpu::BufferSize::new(64),
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 7,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: wgpu::BufferSize::new(16),
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 8,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: wgpu::BufferSize::new(16),
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 9,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: wgpu::BufferSize::new(16),
+                },
+                count: None,
+            },
         ],
     });
 
@@ -218,104 +331,16 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                     size: wgpu::BufferSize::new(8),
                 }),
             },
-        ],
-        label: None,
-    });
-
-    let u_gradient_start_end: [f32; 4] = [-0.5, -0.5, 0.5, 0.5];
-    let u_gradient_start_end_buffer =
-        device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("u_gradient_start_end_buffer"),
-            contents: bytemuck::cast_slice(&u_gradient_start_end),
-            usage: wgpu::BufferUsages::UNIFORM,
-        });
-
-    let u_weight_and_offset: [f32; 4] = [0.0, 0.0, 1.0, 0.0];
-    let u_weight_and_offset_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("u_weight_and_offset_buffer"),
-        contents: bytemuck::cast_slice(&u_weight_and_offset),
-        usage: wgpu::BufferUsages::UNIFORM,
-    });
-
-    let gradient = [
-        1.0f32, 0.0, 0.0, 0.0, // 第一个
-        1.0f32, 0.0, 0.0, 0.4, // 第二个
-        0.0f32, 0.0, 1.0, 0.6, // 第三个
-        1.0f32, 1.0, 0.0, 1.0, // 第四个
-    ];
-    let u_gradient_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("u_weight_and_offset_buffer"),
-        contents: bytemuck::cast_slice(&gradient),
-        usage: wgpu::BufferUsages::UNIFORM,
-    });
-
-    let outer_glow_color_and_dist = vec![0.0f32, 0.0, 0.0, 0.0];
-    let outer_glow_color_and_dist_buffer =
-        device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("outer_glow_color_and_dist"),
-            contents: bytemuck::cast_slice(&outer_glow_color_and_dist),
-            usage: wgpu::BufferUsages::UNIFORM,
-        });
-
-    let bind_group_layout1 = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-        label: None,
-        entries: &[
-            wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: wgpu::BufferSize::new(16),
-                },
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 1,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: wgpu::BufferSize::new(16),
-                },
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 2,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: wgpu::BufferSize::new(64),
-                },
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 3,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: wgpu::BufferSize::new(16),
-                },
-                count: None,
-            },
-        ],
-    });
-
-    let bind_group1 = device.create_bind_group(&wgpu::BindGroupDescriptor {
-        layout: &bind_group_layout1,
-        entries: &[
             wgpu::BindGroupEntry {
-                binding: 0,
+                binding: 4,
                 resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                    buffer: &u_weight_and_offset_buffer,
+                    buffer: &u_weight_buffer,
                     offset: 0,
-                    size: wgpu::BufferSize::new(16),
+                    size: wgpu::BufferSize::new(4),
                 }),
             },
             wgpu::BindGroupEntry {
-                binding: 1,
+                binding: 5,
                 resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
                     buffer: &u_gradient_start_end_buffer,
                     offset: 0,
@@ -323,7 +348,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 }),
             },
             wgpu::BindGroupEntry {
-                binding: 2,
+                binding: 6,
                 resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
                     buffer: &u_gradient_buffer,
                     offset: 0,
@@ -331,9 +356,25 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 }),
             },
             wgpu::BindGroupEntry {
-                binding: 3,
+                binding: 7,
                 resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
                     buffer: &outer_glow_color_and_dist_buffer,
+                    offset: 0,
+                    size: wgpu::BufferSize::new(16),
+                }),
+            },
+            wgpu::BindGroupEntry {
+                binding: 8,
+                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                    buffer: &shadow_color_buffer,
+                    offset: 0,
+                    size: wgpu::BufferSize::new(16),
+                }),
+            },
+            wgpu::BindGroupEntry {
+                binding: 9,
+                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                    buffer: &shadow_offset_and_blur_level_buffer,
                     offset: 0,
                     size: wgpu::BufferSize::new(16),
                 }),
@@ -342,6 +383,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         label: None,
     });
 
+    // 创建索引纹理
     let index_tex = &tex_data.index_tex;
     let index_texture_extent = wgpu::Extent3d {
         width: tex_size.0 as u32,
@@ -376,7 +418,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         index_texture_extent,
     );
 
-    let bind_group_layout2 = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+    let bind_group_layout1 = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: None,
         entries: &[
             wgpu::BindGroupLayoutEntry {
@@ -390,7 +432,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 visibility: wgpu::ShaderStages::FRAGMENT,
                 ty: wgpu::BindingType::Texture {
                     multisampled: false,
-                    sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
                     view_dimension: wgpu::TextureViewDimension::D2,
                 },
                 count: None,
@@ -408,8 +450,8 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         ],
     });
 
-    let bind_group2 = device.create_bind_group(&wgpu::BindGroupDescriptor {
-        layout: &bind_group_layout2,
+    let bind_group1 = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        layout: &bind_group_layout1,
         entries: &[
             wgpu::BindGroupEntry {
                 binding: 0,
@@ -466,7 +508,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         data_texture_extent,
     );
 
-    let bind_group_layout3 = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+    let bind_group_layout2 = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: None,
         entries: &[
             wgpu::BindGroupLayoutEntry {
@@ -497,9 +539,8 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
             },
         ],
     });
-
-    let bind_group3 = device.create_bind_group(&wgpu::BindGroupDescriptor {
-        layout: &bind_group_layout3,
+    let bind_group2 = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        layout: &bind_group_layout2,
         entries: &[
             wgpu::BindGroupEntry {
                 binding: 0,
@@ -521,6 +562,121 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
         label: None,
     });
 
+    let sdf_tex_size_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("u_weight_and_offset_buffer"),
+        contents: bytemuck::cast_slice(&[tex_size.0 as f32, tex_size.1 as f32]),
+        usage: wgpu::BufferUsages::UNIFORM,
+    });
+    let sdf_tex = [
+        &tex_data.sdf_tex,
+        &tex_data.sdf_tex1,
+        &tex_data.sdf_tex2,
+        &tex_data.sdf_tex3,
+    ];
+    let mut sdf_texture_extent = wgpu::Extent3d {
+        width: tex_size.0 as u32,
+        height: tex_size.1 as u32,
+        depth_or_array_layers: 1,
+    };
+    let sdf_tex_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+        label: None,
+        min_filter: wgpu::FilterMode::Linear,
+        mag_filter: wgpu::FilterMode::Linear,
+        // mipmap_filter: wgpu::FilterMode::Linear,
+        ..Default::default()
+    });
+    let mip_level_count = 4;
+    let sdf_texture = device.create_texture(&wgpu::TextureDescriptor {
+        label: None,
+        size: sdf_texture_extent,
+        mip_level_count: mip_level_count,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: wgpu::TextureFormat::R8Unorm,
+        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+        view_formats: &[],
+    });
+
+    let sdf_texture_view = sdf_texture.create_view(&wgpu::TextureViewDescriptor::default());
+    for i in 0..=(mip_level_count - 1) {
+        sdf_texture_extent = wgpu::Extent3d {
+            width: tex_size.0 as u32 >> i,
+            height: tex_size.1 as u32 >> i,
+            depth_or_array_layers: 1,
+        };
+        println!("sdf{}: {}", i, sdf_tex[i as usize][0]);
+        queue.write_texture(
+            wgpu::ImageCopyTexture {
+                texture: &sdf_texture,
+                mip_level: i,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            sdf_tex[i as usize],
+            wgpu::ImageDataLayout {
+                offset: 0,
+                bytes_per_row: Some(tex_size.0 as u32 >> i),
+                rows_per_image: None,
+            },
+            sdf_texture_extent,
+        );
+    }
+
+    let bind_group_layout3 = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: None,
+        entries: &[
+            wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 1,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Texture {
+                    multisampled: false,
+                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    view_dimension: wgpu::TextureViewDimension::D2,
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 2,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: wgpu::BufferSize::new(8),
+                },
+                count: None,
+            },
+        ],
+    });
+
+    let bind_group3 = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        layout: &bind_group_layout3,
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::Sampler(&sdf_tex_sampler),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: wgpu::BindingResource::TextureView(&sdf_texture_view),
+            },
+            wgpu::BindGroupEntry {
+                binding: 2,
+                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                    buffer: &sdf_tex_size_buffer,
+                    offset: 0,
+                    size: wgpu::BufferSize::new(8),
+                }),
+            },
+        ],
+        label: None,
+    });
+
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: None,
         bind_group_layouts: &[
@@ -533,31 +689,28 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     });
 
     let swapchain_capabilities = surface.get_capabilities(&adapter);
-    let swapchain_format = swapchain_capabilities.formats[0];
-
+    let swapchain_format = swapchain_capabilities.formats[1];
+    println!("swapchain_format: {:?}", swapchain_capabilities.formats);
+    // 创建网格数据
     let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Index Buffer"),
         contents: bytemuck::cast_slice(&vertexs),
         usage: wgpu::BufferUsages::VERTEX,
     });
 
-    let translation = [
-        0.0f32, 0.0, // 第一个字位置
-        0.0, 0.0, // 第二个字位置
-        0.0, 0.0, // 第一个字位置
-        0.0, 0.0, // 第二个字位置
-        0.0, 0.0, // 第一个字位置
-        0.0, 0.0, // 第二个字位置
-        0.0, 0.0, // 第一个字位置
-        0.0, 0.0, // 第二个字位置
-    ];
-    let mut index_info = vec![];
-    let mut data_offset = vec![];
-    let mut u_info = vec![];
-    let mut fill_color = vec![0.0; attributes.len() * 4];
-    let mut stroke_color_and_width = vec![0.0; attributes.len() * 4];
-    let mut start_and_step = Vec::with_capacity(attributes.len() * 4);
+    // svg中有多少个标签就有多少个以下数据
+    let mut translation = vec![]; // 每个标签的位置
+    let mut index_info = vec![]; // 每个标签的索引纹理的偏移和宽高
+    let mut data_offset = vec![]; // 每个标签的数据纹偏移
+    let mut u_info = vec![]; // 每个标签的sdf信息
+    let mut fill_color = vec![0.0; attributes.len() * 4]; // 每个标签的填充颜色
+    let mut stroke_color_and_width = vec![0.0; attributes.len() * 4];// 每个标签的描边颜色和描边宽度
+    let mut start_and_step = Vec::with_capacity(attributes.len() * 4); // 每个标签的虚线描边信息
     for info in &texs_info {
+        translation.push(0.0);
+        translation.push(0.0);
+
+
         index_info.push(info.index_offset.0 as f32);
         index_info.push(info.index_offset.1 as f32);
         index_info.push(info.grid_w);
@@ -565,7 +718,6 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
 
         data_offset.push(info.data_offset.0 as f32);
         data_offset.push(info.data_offset.1 as f32);
-        // println!("info.cell_size: {}", info.cell_size);
         let check = info.cell_size * 0.5 * 2.0f32.sqrt();
         u_info.push(info.max_offset as f32);
         u_info.push(info.min_sdf as f32);
@@ -584,16 +736,19 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
                 fill_color[index * 4] = color.red as f32 / 255.0;
                 fill_color[index * 4 + 1] = color.green as f32 / 255.0;
                 fill_color[index * 4 + 2] = color.blue as f32 / 255.0;
+                // 如果不是封闭路径，将填充颜色设置为0
                 fill_color[index * 4 + 3] = if attr.is_close { 1.0 } else { 0.0 };
             }
         }
 
+        // 当不需要虚线时，见这两个值填无穷大
         let mut step = [100000.0, 100000.0];
         if let Some(stroke) = &attr.stroke {
             if let usvg::Paint::Color(color) = stroke.paint {
                 stroke_color_and_width[index * 4] = color.red as f32 / 255.0;
                 stroke_color_and_width[index * 4 + 1] = color.green as f32 / 255.0;
                 stroke_color_and_width[index * 4 + 2] = color.blue as f32 / 255.0;
+                // 如果不需要描边时，将描边宽度设置为0.0
                 stroke_color_and_width[index * 4 + 3] = stroke.width.get();
             }
 
@@ -764,21 +919,14 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     // println!("render_pipeline: {:?}", render_pipeline);
 
     let mut config = wgpu::SurfaceConfiguration {
-        usage: todo!(),
-        format: todo!(),
-        width: todo!(),
-        height: todo!(),
-        present_mode: todo!(),
-        alpha_mode: todo!(),
-        view_formats: todo!(),
-        desired_maximum_frame_latency: todo!(),
-        // usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-        // format: swapchain_format,
-        // width: window_size.width,
-        // height: window_size.height,
-        // present_mode: wgpu::PresentMode::Fifo,
-        // alpha_mode: swapchain_capabilities.alpha_modes[0],
-        // view_formats: vec![],
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+        format: swapchain_format,
+        width: window_size.width,
+        height: window_size.height,
+        present_mode: wgpu::PresentMode::Fifo,
+        alpha_mode: swapchain_capabilities.alpha_modes[0],
+        view_formats: vec![],
+        desired_maximum_frame_latency: 2,
     };
 
     surface.configure(&device, &config);
