@@ -10,7 +10,7 @@ use tracing_subscriber::fmt::Subscriber;
 // use nalgebra::Vector3;
 use pi_sdf::{
     glyphy::blob::TexData,
-    shape::{Circle, Ellipse, Path, PathVerb, Polygon, Polyline, Rect, Segment, SvgScenes},
+    shape::{Circle, Ellipse, Path, PathVerb, Polygon, Polyline, Rect, Segment, SvgScenes, ArcOutline},
     Point, utils::create_indices,
 };
 use pi_wgpu as wgpu;
@@ -33,7 +33,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window> ) {
     //     dx12_shader_compiler: Dx12Compiler::default(),
     // });
 
-    let surface = unsafe { instance.create_surface(window.clone()) }.unwrap();
+    let surface =  { instance.create_surface(window.clone()) }.unwrap();
     let adapter = instance
         .request_adapter(&wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::default(),
@@ -99,13 +99,13 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window> ) {
     };
     let time = std::time::Instant::now();
     let shapes = create_shape();
-    let (texs_info, attributes) = shapes.out_tex_data(&mut tex_data).unwrap();
+    let (texs_info, attributes, ts) = shapes.out_tex_data(&mut tex_data).unwrap();
     println!("out_tex_data: {:?}", time.elapsed());
     let vertexs = shapes.verties();
     // 字体缩放
-    let scale = [1.0f32, 1.0];
+  
     // 阴影偏移和模糊等级
-    let mut shadow_offset_and_blur_level = vec![20.0f32, 0., 6.0, 0.0];
+    let  shadow_offset_and_blur_level = vec![50.0f32 / 140.0, 50. / 140.0, 6.0, 0.0];
     println!("vertexs: {:?}", vertexs);
 
     let view_matrix = na::Matrix4::<f32>::identity(); // 视口矩阵
@@ -142,11 +142,6 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window> ) {
         usage: wgpu::BufferUsages::UNIFORM,
     });
 
-    let scale_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("scale"),
-        contents: bytemuck::cast_slice(scale.as_slice()),
-        usage: wgpu::BufferUsages::UNIFORM,
-    });
 
     let u_gradient_start_end: [f32; 4] = [-0.5, -0.5, 0.5, 0.5];
     let u_gradient_start_end_buffer =
@@ -183,7 +178,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window> ) {
             usage: wgpu::BufferUsages::UNIFORM,
         });
 
-    let shadow_color = vec![0.0f32, 0.0, 0.0, 0.0];
+    let shadow_color = vec![0.0f32, 0.0, 0.0, 1.0];
     let shadow_color_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("shadow_color"),
         contents: bytemuck::cast_slice(&shadow_color),
@@ -222,16 +217,6 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window> ) {
             },
             wgpu::BindGroupLayoutEntry {
                 binding: 2,
-                visibility: wgpu::ShaderStages::VERTEX,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: wgpu::BufferSize::new(8),
-                },
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 3,
                 visibility: wgpu::ShaderStages::VERTEX,
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Uniform,
@@ -326,14 +311,6 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window> ) {
                 binding: 2,
                 resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
                     buffer: &slope_buffer,
-                    offset: 0,
-                    size: wgpu::BufferSize::new(8),
-                }),
-            },
-            wgpu::BindGroupEntry {
-                binding: 3,
-                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                    buffer: &scale_buffer,
                     offset: 0,
                     size: wgpu::BufferSize::new(8),
                 }),
@@ -706,18 +683,15 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window> ) {
     });
 
     // svg中有多少个标签就有多少个以下数据
-    let mut translation = vec![]; // 每个标签的位置
+    let transform = ts.into_iter().flatten().collect::<Vec<f32>>(); // 每个图形的缩放和平移
     let mut index_info = vec![]; // 每个标签的索引纹理的偏移和宽高
     let mut data_offset = vec![]; // 每个标签的数据纹偏移
     let mut u_info = vec![]; // 每个标签的sdf信息
     let mut fill_color = vec![0.0; attributes.len() * 4]; // 每个标签的填充颜色
     let mut stroke_color_and_width = vec![0.0; attributes.len() * 4];// 每个标签的描边颜色和描边宽度
     let mut start_and_step = Vec::with_capacity(attributes.len() * 4); // 每个标签的虚线描边信息
+
     for info in &texs_info {
-        translation.push(0.0);
-        translation.push(0.0);
-
-
         index_info.push(info.index_offset.0 as f32);
         index_info.push(info.index_offset.1 as f32);
         index_info.push(info.grid_w);
@@ -732,7 +706,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window> ) {
         u_info.push(check);
     }
     println!("index_info: {:?}", index_info);
-    println!("translation: {:?}", translation);
+    println!("transform: {:?}", transform);
     println!("data_offset: {:?}", data_offset);
     println!("u_info: {:?}", u_info);
 
@@ -782,9 +756,9 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window> ) {
         usage: wgpu::BufferUsages::VERTEX,
     });
 
-    let translation_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+    let transform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("translation_buffer"),
-        contents: bytemuck::cast_slice(translation.as_slice()),
+        contents: bytemuck::cast_slice(transform.as_slice()),
         usage: wgpu::BufferUsages::VERTEX,
     });
 
@@ -860,7 +834,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window> ) {
                     array_stride: std::mem::size_of::<[f32; 2]>() as wgpu::BufferAddress,
                     step_mode: wgpu::VertexStepMode::Instance,
                     attributes: &[wgpu::VertexAttribute {
-                        format: wgpu::VertexFormat::Float32x2,
+                        format: wgpu::VertexFormat::Float32x4,
                         offset: 0,
                         shader_location: 2,
                     }],
@@ -999,7 +973,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window> ) {
                     rpass.set_vertex_buffer(0, vertex_buffer.slice(..));
 
                     rpass.set_vertex_buffer(1, index_info_buffer.slice(..));
-                    rpass.set_vertex_buffer(2, translation_buffer.slice(..));
+                    rpass.set_vertex_buffer(2, transform_buffer.slice(..));
                     rpass.set_vertex_buffer(3, data_offset_buffer.slice(..));
                     rpass.set_vertex_buffer(4, u_info_buffer.slice(..));
                     rpass.set_vertex_buffer(5, fill_color_buffer.slice(..));
@@ -1025,63 +999,63 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window> ) {
 fn create_shape() -> SvgScenes {
     let mut shapes = SvgScenes::new(Aabb::new(Point::new(0.0, 0.0), Point::new(400.0, 400.0)));
     // 矩形
-    let mut rect = Rect::new(120.0, 70.0, -100.0, -50.0);
+    let mut rect = Rect::new(120.0, 70.0, 100.0, 50.0);
     // 填充颜色 默认0. 0. 0. 0.
     rect.attribute.set_fill_color(0, 0, 255);
     // 描边颜色 默认 0. 0. 0. 
     rect.attribute.set_stroke_color(0, 0, 0);
     // 描边宽度，默认0.0
     rect.attribute.set_stroke_width(2.0);
-    shapes.add_shape(Box::new(rect));
+    shapes.add_shape(rect.get_hash(), Box::new(rect));
 
-    // 圆
-    let mut circle = Circle::new(200.0, 60.0, 40.0).unwrap();
-    circle.attribute.set_fill_color(0, 0, 255);
-    circle.attribute.set_stroke_color(0, 0, 0);
-    circle.attribute.set_stroke_width(2.0);
-    shapes.add_shape(Box::new(circle));
+    // // 圆
+    // let mut circle = Circle::new(200.0, 60.0, 40.0).unwrap();
+    // circle.attribute.set_fill_color(0, 0, 255);
+    // circle.attribute.set_stroke_color(0, 0, 0);
+    // circle.attribute.set_stroke_width(2.0);
+    // shapes.add_shape(circle.get_hash(), Box::new(circle));
 
-    // 椭圆
-    let mut ellipse = Ellipse::new(320.0, 60.0, 50.0, 25.0);
-    ellipse.attribute.set_fill_color(0, 0, 255);
-    ellipse.attribute.set_stroke_color(0, 0, 0);
-    ellipse.attribute.set_stroke_width(2.0);
-    shapes.add_shape(Box::new(ellipse));
+    // // 椭圆
+    // let mut ellipse = Ellipse::new(320.0, 60.0, 50.0, 25.0);
+    // ellipse.attribute.set_fill_color(0, 0, 255);
+    // ellipse.attribute.set_stroke_color(0, 0, 0);
+    // ellipse.attribute.set_stroke_width(2.0);
+    // shapes.add_shape(ellipse.get_hash(), Box::new(ellipse));
 
     // 线段
-    let mut segment = Segment::new(Point::new(20.0, 100.0), Point::new(120.0, 180.0));
-    segment.attribute.set_stroke_color(255, 0, 0);
-    segment.attribute.set_stroke_width(2.0);
-    shapes.add_shape(Box::new(segment));
+    // let mut segment = Segment::new(Point::new(20.0, 100.0), Point::new(120.0, 180.0));
+    // segment.attribute.set_stroke_color(255, 0, 0);
+    // segment.attribute.set_stroke_width(2.0);
+    // shapes.add_shape(Box::new(segment));
 
-    // 多边形
-    let mut polygon = Polygon::new(vec![
-        Point::new(270.0, 110.0),
-        Point::new(350.0, 170.0),
-        Point::new(320.0, 220.0),
-        Point::new(220.0, 210.0),
-        Point::new(200.0, 160.0),
-    ]);
-    polygon.attribute.set_fill_color(0, 255, 0);
-    polygon.attribute.set_stroke_color(0, 0, 0);
-    polygon.attribute.set_stroke_width(2.0);
-    shapes.add_shape(Box::new(polygon));
+    // // 多边形
+    // let mut polygon = Polygon::new(vec![
+    //     Point::new(270.0, 110.0),
+    //     Point::new(350.0, 170.0),
+    //     Point::new(320.0, 220.0),
+    //     Point::new(220.0, 210.0),
+    //     Point::new(200.0, 160.0),
+    // ]);
+    // polygon.attribute.set_fill_color(0, 255, 0);
+    // polygon.attribute.set_stroke_color(0, 0, 0);
+    // polygon.attribute.set_stroke_width(2.0);
+    // shapes.add_shape(Box::new(polygon));
 
-    // 多段线
-    let mut polyline: Polyline = Polyline::new(vec![
-        Point::new(20., 220.),
-        Point::new(40., 225.),
-        Point::new(60., 240.),
-        Point::new(80., 320.),
-        Point::new(120., 340.),
-        Point::new(180., 320.),
-    ]);
-    polyline.attribute.set_fill_color(0, 255, 0);
-    polyline.attribute.set_stroke_color(0, 0, 0);
-    polyline.attribute.set_stroke_width(2.0);
-    shapes.add_shape(Box::new(polyline));
+    // // 多段线
+    // let mut polyline: Polyline = Polyline::new(vec![
+    //     Point::new(20., 220.),
+    //     Point::new(40., 225.),
+    //     Point::new(60., 240.),
+    //     Point::new(80., 320.),
+    //     Point::new(120., 340.),
+    //     Point::new(180., 320.),
+    // ]);
+    // polyline.attribute.set_fill_color(0, 255, 0);
+    // polyline.attribute.set_stroke_color(0, 0, 0);
+    // polyline.attribute.set_stroke_width(2.0);
+    // shapes.add_shape(Box::new(polyline));
 
-    // 路径
+    // // 路径
     let mut path = Path::new(
         vec![PathVerb::MoveTo, PathVerb::CubicTo],
         vec![
@@ -1094,17 +1068,17 @@ fn create_shape() -> SvgScenes {
     // polygon.attribute.set_fill_color(0, 255, 0);
     path.attribute.set_stroke_color(0, 255, 255);
     path.attribute.set_stroke_width(2.0);
-    shapes.add_shape(Box::new(path));
+    shapes.add_shape(path.get_hash(), Box::new(path));
 
-    // 虚线
-    let mut path = Path::new(
-        vec![PathVerb::MoveTo, PathVerb::LineToRelative],
-        vec![Point::new(10., 400.), Point::new(215., 0.)],
-    );
-    path.attribute.set_stroke_dasharray(vec![20., 10.]);
-    path.attribute.set_stroke_color(0, 0, 0);
-    path.attribute.set_stroke_width(3.0);
-    shapes.add_shape(Box::new(path));
+    // // 虚线
+    // let mut path = Path::new(
+    //     vec![PathVerb::MoveTo, PathVerb::LineToRelative],
+    //     vec![Point::new(10., 400.), Point::new(215., 0.)],
+    // );
+    // path.attribute.set_stroke_dasharray(vec![20., 10.]);
+    // path.attribute.set_stroke_color(0, 0, 0);
+    // path.attribute.set_stroke_width(3.0);
+    // shapes.add_shape(path.get_hash() ,Box::new(path));
 
     shapes
 }

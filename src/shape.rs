@@ -3,14 +3,14 @@ use allsorts::{
     outline::OutlineSink,
     pathfinder_geometry::{line_segment::LineSegment2F, vector::Vector2F},
 };
-use erased_serde::serialize_trait_object;
+// use erased_serde::serialize_trait_object;
 use image::EncodableLayout;
 use kurbo::Shape;
 use parry2d::{bounding_volume::Aabb, shape::Segment as MSegment};
 use serde::{Deserialize, Serialize};
 // use usvg::tiny_skia_path::PathSegment;
 
-use crate::utils::Attribute;
+use crate::{glyphy::geometry::aabb::AabbEXT, utils::Attribute};
 use crate::{
     glyphy::{
         blob::{EncodeError, TexData, TexInfo},
@@ -22,6 +22,7 @@ use crate::{
     Point,
 };
 use std::{collections::HashMap, fmt::Debug, hash::Hasher};
+pub const FARWAY: f32 = 20.0;
 
 #[derive(PartialEq, Clone, Copy, Debug, Serialize, Deserialize)]
 pub enum PathVerb {
@@ -77,7 +78,24 @@ pub trait ArcOutline: Send + Sync + Debug + ShapeClone {
     fn get_arc_endpoints(&self) -> Vec<ArcEndpoint>;
     fn get_attribute(&self) -> Attribute;
     fn get_hash(&self) -> u64;
+    fn extents(&self) -> Aabb {
+        let mut binding_box = self.binding_box();
+        binding_box.mins.x = binding_box.mins.x - FARWAY;
+        binding_box.mins.y = binding_box.mins.y - FARWAY;
+        binding_box.maxs.x = binding_box.maxs.x + FARWAY;
+        binding_box.maxs.y = binding_box.maxs.y + FARWAY;
+
+        let width = binding_box.width();
+        let height = binding_box.height();
+        if width > height {
+            binding_box.maxs.y = binding_box.mins.y + width;
+        } else {
+            binding_box.maxs.x = binding_box.mins.x + height;
+        };
+        binding_box
+    }
     fn binding_box(&self) -> Aabb;
+    fn is_area(&self) ->bool;
 }
 
 pub trait ShapeClone {
@@ -185,6 +203,10 @@ impl ArcOutline for Circle {
             maxs: Point::new(self.cx + self.radius, self.cy + self.radius),
         }
     }
+
+    fn is_area(&self) -> bool {
+       true
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -244,11 +266,19 @@ impl ArcOutline for Rect {
     }
 
     fn binding_box(&self) -> Aabb {
-        let min_x = self.x.min(self.x - self.width);
-        let min_y = self.y.min(self.y - self.height);
-        let max_x = self.x.max(self.x - self.width);
-        let max_x = self.y.max(self.y - self.height);
-        Aabb { mins: Point::new(min_x, min_y), maxs:Point::new( max_x, max_x) }
+        let min_x = self.x.min(self.x + self.width);
+        let min_y = self.y.min(self.y + self.height);
+        let max_x = self.x.max(self.x + self.width);
+        let max_y = self.y.max(self.y + self.height);
+
+        Aabb {
+            mins: Point::new(min_x, min_y),
+            maxs: Point::new(max_x, max_y),
+        }
+    }
+
+    fn is_area(&self) ->bool {
+        true
     }
 }
 
@@ -302,8 +332,16 @@ impl ArcOutline for Segment {
         let min_x = self.segment.a.x.min(self.segment.b.x);
         let min_y = self.segment.a.y.min(self.segment.b.y);
         let max_x = self.segment.a.x.max(self.segment.b.x);
-        let max_x = self.segment.a.y.max(self.segment.b.y);
-        Aabb { mins: Point::new(min_x, min_y), maxs:Point::new( max_x, max_x) }
+        let max_y = self.segment.a.y.max(self.segment.b.y);
+
+        Aabb {
+            mins: Point::new(min_x, min_y),
+            maxs: Point::new(max_x, max_y),
+        }
+    }
+
+    fn is_area(&self) ->bool {
+        false
     }
 }
 
@@ -399,6 +437,10 @@ impl ArcOutline for Ellipse {
             maxs: Point::new(self.cx + self.rx, self.cy + self.rx),
         }
     }
+
+    fn is_area(&self) ->bool {
+        true
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -464,14 +506,21 @@ impl ArcOutline for Polygon {
         let mut min_y = f32::INFINITY;
         let mut max_y = f32::NEG_INFINITY;
 
-        self.points.iter().for_each(|v|{
+        self.points.iter().for_each(|v| {
             min_x = min_x.min(v.x);
             min_y = min_y.min(v.y);
             max_x = max_x.max(v.x);
             max_y = max_y.max(v.y);
         });
-        
-        Aabb { mins: Point::new(min_x, min_y), maxs:Point::new( max_x, max_x) }
+
+        Aabb {
+            mins: Point::new(min_x, min_y),
+            maxs: Point::new(max_x, max_y),
+        }
+    }
+
+    fn is_area(&self) ->bool {
+        true
     }
 }
 
@@ -558,14 +607,21 @@ impl ArcOutline for Polyline {
         let mut min_y = f32::INFINITY;
         let mut max_y = f32::NEG_INFINITY;
 
-        self.points.iter().for_each(|v|{
+        self.points.iter().for_each(|v| {
             min_x = min_x.min(v.x);
             min_y = min_y.min(v.y);
             max_x = max_x.max(v.x);
             max_y = max_y.max(v.y);
         });
-        
-        Aabb { mins: Point::new(min_x, min_y), maxs:Point::new( max_x, max_x) }
+
+        Aabb {
+            mins: Point::new(min_x, min_y),
+            maxs: Point::new(max_x, max_y),
+        }
+    }
+
+    fn is_area(&self) ->bool {
+        false
     }
 }
 
@@ -661,9 +717,20 @@ impl ArcOutline for Path {
         let mut min_y = f32::INFINITY;
         let mut max_y = f32::NEG_INFINITY;
 
+        for p in &self.points {
+            min_x = min_x.min(p.x);
+            min_y = min_y.min(p.y);
+            max_x = max_x.max(p.x);
+            max_y = max_y.max(p.y);
+        }
 
-        
-        Aabb { mins: Point::new(min_x, min_y), maxs:Point::new( max_x, max_x) }
+        Aabb {
+            mins: Point::new(min_x, min_y),
+            maxs: Point::new(max_x, max_y),
+        }
+    }
+    fn is_area(&self) ->bool {
+        self.is_close()
     }
 }
 
@@ -692,31 +759,17 @@ impl SvgScenes {
 
     pub fn verties(&self) -> [f32; 16] {
         [
-            self.view_box.mins.x,
-            self.view_box.mins.y,
-            0.0,
-            0.0,
-            self.view_box.mins.x,
-            self.view_box.maxs.y,
-            0.0,
-            1.0,
-            self.view_box.maxs.x,
-            self.view_box.mins.y,
-            1.0,
-            0.0,
-            self.view_box.maxs.x,
-            self.view_box.maxs.y,
-            1.0,
-            1.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0,
         ]
     }
 
     pub fn out_tex_data(
         &self,
         tex_data: &mut TexData,
-    ) -> Result<(Vec<TexInfo>, Vec<Attribute>), EncodeError> {
+    ) -> Result<(Vec<TexInfo>, Vec<Attribute>, Vec<[f32; 4]>), EncodeError> {
         let mut infos = vec![];
         let mut attributes = vec![];
+        let mut transform = vec![];
 
         let data_tex = &mut tex_data.data_tex;
         let width0 = tex_data.data_tex_width;
@@ -735,8 +788,9 @@ impl SvgScenes {
         let sdf_tex3 = &mut tex_data.sdf_tex3;
 
         for node in self.shapes.values() {
-            let (mut blob_arc, map) =
-                compute_near_arc_impl(self.view_box, node.get_arc_endpoints());
+            let binding_box = node.binding_box();
+            println!("binding_box: {:?}", binding_box);
+            let (mut blob_arc, map) = compute_near_arc_impl(binding_box, node.get_arc_endpoints(), node.is_area());
             let size = blob_arc.encode_data_tex(&map, data_tex, width0, offset_x0, offset_y0)?;
             println!("data_map: {}", map.len());
             let mut info = blob_arc.encode_index_tex(
@@ -758,10 +812,16 @@ impl SvgScenes {
             last_offset1 = (*offset_x1, *offset_y1);
 
             infos.push(info);
-            attributes.push(node.get_attribute())
+            attributes.push(node.get_attribute());
+            transform.push([
+                binding_box.width(),
+                binding_box.height(),
+                binding_box.mins.x + FARWAY,
+                binding_box.mins.y + FARWAY,
+            ]);
         }
 
-        Ok((infos, attributes))
+        Ok((infos, attributes, transform))
     }
 }
 

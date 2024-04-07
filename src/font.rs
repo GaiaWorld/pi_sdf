@@ -294,7 +294,7 @@ impl FontFace {
         // let width_cells = (extents.width() / min_width).floor();
         // let height_cells = (extents.height() / min_height).floor();
         // 根据最小格子大小计算每个格子的圆弧数据
-        let (unit_arcs, map) = encode_uint_arc_data(result_arcs, &extents, min_width, min_height);
+        let (unit_arcs, map) = encode_uint_arc_data(result_arcs, &extents, min_width, min_height, None);
         // println!("unit_arcs[14][5]: {:?}", unit_arcs[14][5]);
 
         let [min_sdf, max_sdf] = travel_data(&unit_arcs);

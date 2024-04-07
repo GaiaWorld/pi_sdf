@@ -77,7 +77,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
 
     let tex_size = (1024, 1024);
     // 需要渲染的字符串
-    let text = "魔魔".to_string();
+    let text = "一".to_string();
     // 纹理数据
     let mut tex_data = TexData {
         index_tex: vec![0; tex_size.0 * tex_size.1 * 2], // 索引纹理数据
@@ -100,7 +100,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     // 字体缩放
     let scale = [64.0f32, 64.0];
     // 阴影偏移和模糊等级
-    let mut shadow_offset_and_blur_level = vec![20.0f32, 0., 6.0, 0.0];
+    let mut shadow_offset_and_blur_level = vec![20.0f32, 20., 6.0, 0.0];
     let vertexs = ft_face.verties(scale[0], &mut shadow_offset_and_blur_level[0..=1]); // 获取网格数据
     println!("vertexs: {:?}", vertexs);
 

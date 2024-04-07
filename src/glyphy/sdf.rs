@@ -209,3 +209,15 @@ pub fn glyphy_sdf_from_arc_list2(arcs: &Vec<&Arc>, p: Point) -> (f32, usize) {
 
     return (side as f32 * min_dist, last_index);
 }
+
+
+#[test]
+fn test(){
+    let arcs = vec![
+        Arc::new(Point::new(120.0, 180.0), Point::new(20.0, 100.0), 0.0),
+        Arc::new(Point::new(20.0, 100.0), Point::new(120.0, 180.0), 0.0),
+        
+    ];
+    let sdf = glyphy_sdf_from_arc_list2(&vec![&arcs[0], &arcs[1]], Point::new(115.9375,178.4375));
+    println!("sdf: {}", sdf.0);
+}
