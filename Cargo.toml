@@ -20,7 +20,7 @@ svg = "0.14"
 pi_wgpu = { registry = "yn", version = "0.1",features = ["use_wgpu"] }
 usvg = "0.37"
 kurbo = "0.9"
-ahash = "=0.8.6"
+ahash = "0.8"
 pi_hash = {version = "0.1.1", features = ["xxhash"]}
 serde = { version = "1.0", features = ["derive"] }
 erased-serde = "0.3"
