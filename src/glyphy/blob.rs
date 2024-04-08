@@ -773,7 +773,15 @@ impl Default for TexInfo {
         Self {
             extents: Aabb::new_invalid(),
             binding_box: Aabb::new_invalid(),
-            ..Default::default()
+            grid_w: Default::default(),
+            grid_h: Default::default(),
+            cell_size: Default::default(),
+            max_offset: Default::default(),
+            min_sdf: Default::default(),
+            sdf_step: Default::default(),
+            index_offset: Default::default(),
+            data_offset: Default::default(),
+            // ..
         }
     }
 }
