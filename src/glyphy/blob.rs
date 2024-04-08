@@ -387,6 +387,8 @@ impl BlobArc {
             sdf_step,
             index_offset: (0, 0),
             data_offset: (0, 0),
+            extents: Aabb::new_invalid(),
+            binding_box:  Aabb::new_invalid(),
         });
     }
 
@@ -394,7 +396,7 @@ impl BlobArc {
         &mut self,
         data_tex_map: HashMap<u64, u64>,
         data_tex_len: usize,
-    ) -> (TexInfo, Vec<u8>) {
+    ) -> (TexInfo, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>) {
         let max_offset = data_tex_len;
         // 计算sdf的 梯度等级
         let mut level = (2usize.pow(14) / max_offset) - 1;
@@ -409,12 +411,17 @@ impl BlobArc {
 
         let mut index_tex: Vec<u8> = Vec::with_capacity(grid_w * grid_h * 2);
 
+        let mut sdf_tex: Vec<u8> = Vec::with_capacity(grid_w * grid_h); //阴影用的minimip
+        let mut sdf_tex1: Vec<u8> = Vec::with_capacity((grid_w >> 1) * (grid_h >> 1));
+        let mut sdf_tex2: Vec<u8> = Vec::with_capacity((grid_w >> 2) * (grid_h >> 2));
+        let mut sdf_tex3: Vec<u8> = Vec::with_capacity((grid_w >> 3) * (grid_h >> 3));
+
         // 2 * grid_w * grid_h 个 Uint8
         for i in 0..self.data.len() {
-            let row = &mut self.data[i];
-            for j in 0..row.len() {
-                let unit_arc = &mut row[j];
-                let key = unit_arc.get_key();
+            let len = self.data[i].len();
+            for j in 0..len {
+                // let unit_arc = &mut row[j];
+                let key = self.data[i][j].get_key();
                 if key != u64::MAX {
                     let map_arc_data = data_tex_map.get(&key);
                     if map_arc_data.is_none() {
@@ -430,7 +437,7 @@ impl BlobArc {
                     }
 
                     let offset = map_arc_data.offset;
-                    let sdf = unit_arc.sdf;
+                    let sdf = self.data[i][j].sdf;
 
                     let cell_size = self.cell_size;
                     let is_interval = sdf.abs() <= cell_size * 0.5f32.sqrt();
@@ -450,6 +457,38 @@ impl BlobArc {
                     }
                     index_tex.push((encode as i32 & 0xff) as u8);
                     index_tex.push((encode as i32 >> 8) as u8);
+                    // println!("index_tex[{}][{}]: {} {}", j, i, encode as i32 & 0xff, encode as i32 >> 8);
+                    sdf_tex.push(self.data[i][j].s_dist);
+
+                    if i % 2 == 1 && j % 2 == 1 {
+                        self.data[i][j].s_dist_1 = (self.data[i][j].s_dist as u64
+                            + self.data[i - 1][j].s_dist as u64
+                            + self.data[i][j - 1].s_dist as u64
+                            + self.data[i - 1][j - 1].s_dist as u64)
+                            / 4;
+
+                        sdf_tex1.push(self.data[i][j].s_dist_1 as u8);
+
+                        if i % 4 == 3 && j % 4 == 3 {
+                            self.data[i][j].s_dist_2 = (self.data[i][j].s_dist_1 as u64
+                                + self.data[i - 2][j].s_dist_1 as u64
+                                + self.data[i][j - 2].s_dist_1 as u64
+                                + self.data[i - 2][j - 2].s_dist_1 as u64)
+                                / 4;
+
+                            sdf_tex2.push(self.data[i][j].s_dist_2 as u8);
+
+                            if i % 8 == 7 && j % 8 == 7 {
+                                self.data[i][j].s_dist_3 = (self.data[i][j].s_dist_2 as u64
+                                    + self.data[i - 4][j].s_dist_2 as u64
+                                    + self.data[i][j - 4].s_dist_2 as u64
+                                    + self.data[i - 4][j - 4].s_dist_2 as u64)
+                                    / 4;
+
+                                sdf_tex3.push(self.data[i][j].s_dist_3 as u8);
+                            }
+                        }
+                    }
 
                     #[cfg(feature = "debug")]
                     {
@@ -477,8 +516,15 @@ impl BlobArc {
                 sdf_step,
                 index_offset: (0, 0),
                 data_offset: (0, 0),
+                extents: Aabb::new_invalid(),
+                binding_box:  Aabb::new_invalid(),
             },
             index_tex,
+            sdf_tex,
+            sdf_tex1,
+            sdf_tex2,
+            sdf_tex3,
+            
         );
     }
 
@@ -702,7 +748,7 @@ pub struct TexData {
 // }
 
 #[wasm_bindgen(getter_with_clone)]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct TexInfo {
     pub grid_w: f32,
     pub grid_h: f32,
@@ -716,6 +762,20 @@ pub struct TexInfo {
     pub index_offset: (usize, usize),
     #[wasm_bindgen(skip)]
     pub data_offset: (usize, usize),
+    #[wasm_bindgen(skip)]
+    pub extents: Aabb,
+    #[wasm_bindgen(skip)]
+    pub binding_box: Aabb,
+}
+
+impl Default for TexInfo {
+    fn default() -> Self {
+        Self {
+            extents: Aabb::new_invalid(),
+            binding_box: Aabb::new_invalid(),
+            ..Default::default()
+        }
+    }
 }
 
 // 两张纹理，索引纹理 和 数据纹理
@@ -927,7 +987,11 @@ pub fn arc_endpoint_encode(ix: f32, iy: f32, d: f32) -> [f32; 4] {
         id = 0.0;
     } else {
         if d.abs() > GLYPHY_MAX_D {
-            panic!("d must be less than or equal to GLYPHY_MAX_D, d: {}, GLYPHY_MAX_D: {}", d.abs(), GLYPHY_MAX_D) ;
+            panic!(
+                "d must be less than or equal to GLYPHY_MAX_D, d: {}, GLYPHY_MAX_D: {}",
+                d.abs(),
+                GLYPHY_MAX_D
+            );
         }
 
         id = 128. + (d * 127.0 / GLYPHY_MAX_D).round();

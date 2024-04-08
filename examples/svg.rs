@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use parry2d::na::{self};
 use tracing::Level;
 use tracing_subscriber::fmt::Subscriber;
@@ -12,7 +14,7 @@ use winit::{
     window::{Window, WindowBuilder},
 };
 
-async fn run(event_loop: EventLoop<()>, window: Window) {
+async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     let subscriber = Subscriber::builder().with_max_level(Level::TRACE).finish();
 
     tracing::subscriber::set_global_default(subscriber).unwrap();
@@ -24,7 +26,7 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     //     dx12_shader_compiler: Dx12Compiler::default(),
     // });
 
-    let surface = unsafe { instance.create_surface(&window) }.unwrap();
+    let surface = { instance.create_surface(window.clone()) }.unwrap();
     let adapter = instance
         .request_adapter(&wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::default(),
@@ -704,12 +706,11 @@ async fn run(event_loop: EventLoop<()>, window: Window) {
     let mut data_offset = vec![]; // 每个标签的数据纹偏移
     let mut u_info = vec![]; // 每个标签的sdf信息
     let mut fill_color = vec![0.0; attributes.len() * 4]; // 每个标签的填充颜色
-    let mut stroke_color_and_width = vec![0.0; attributes.len() * 4];// 每个标签的描边颜色和描边宽度
+    let mut stroke_color_and_width = vec![0.0; attributes.len() * 4]; // 每个标签的描边颜色和描边宽度
     let mut start_and_step = Vec::with_capacity(attributes.len() * 4); // 每个标签的虚线描边信息
     for info in &texs_info {
         translation.push(0.0);
         translation.push(0.0);
-
 
         index_info.push(info.index_offset.0 as f32);
         index_info.push(info.index_offset.1 as f32);
@@ -1021,7 +1022,7 @@ fn main() {
         .with_inner_size(winit::dpi::PhysicalSize::new(512, 512))
         .build(&event_loop)
         .unwrap();
-    // let window = winit::window::Window::new(&event_loop).unwrap();
+    let window = Arc::new(window);
     #[cfg(not(target_arch = "wasm32"))]
     {
         env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();

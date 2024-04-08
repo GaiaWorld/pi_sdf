@@ -14,7 +14,7 @@ use usvg::{
 use crate::{
     glyphy::{
         blob::{recursion_near_arcs_of_cell, travel_data, BlobArc, EncodeError, TexData, TexInfo},
-        geometry::arc::{Arc, ArcEndpoint},
+        geometry::{arc::{Arc, ArcEndpoint}, aabb::AabbEXT},
         util::GLYPHY_INFINITY,
     },
     utils::{encode_uint_arc_data, Attribute, GlyphVisitor},
@@ -105,8 +105,8 @@ impl Svg {
         ]
     }
 
-    pub fn compute_near_arc(&self, endpoints: Vec<ArcEndpoint>) -> (BlobArc, HashMap<u64, u64>) {
-        compute_near_arc_impl(self.view_box, endpoints)
+    pub fn compute_near_arc(&self, endpoints: Vec<ArcEndpoint>, is_area: bool) -> (BlobArc, HashMap<u64, u64>) {
+        compute_near_arc_impl(self.view_box, endpoints, is_area)
     }
 
     pub fn out_tex_data(
@@ -182,7 +182,7 @@ impl Svg {
                     //     start: Point::new(p.x, p.y),
                     // });
 
-                    let (mut blob_arc, map) = self.compute_near_arc(sink.accumulate.result);
+                    let (mut blob_arc, map) = self.compute_near_arc(sink.accumulate.result,false);
                     let size =
                         blob_arc.encode_data_tex(&map, data_tex, width0, offset_x0, offset_y0)?;
                     println!("data_map: {}", map.len());
@@ -276,6 +276,7 @@ fn compute_outline<'a>(
 pub fn compute_near_arc_impl(
     view_box: Aabb,
     endpoints: Vec<ArcEndpoint>,
+    is_area: bool,
 ) -> (BlobArc, HashMap<u64, u64>) {
     let extents = view_box;
     // println!("extents: {:?}", extents);
@@ -317,13 +318,13 @@ pub fn compute_near_arc_impl(
         &mut temp,
     );
 
-    let (unit_arcs, map) = encode_uint_arc_data(result_arcs, &extents, min_width, min_height);
+    let (unit_arcs, map) = encode_uint_arc_data(result_arcs, &extents, min_width, min_height, Some(is_area));
 
     let [min_sdf, max_sdf] = travel_data(&unit_arcs);
     let blob_arc = BlobArc {
         min_sdf,
         max_sdf,
-        cell_size: min_width,
+        cell_size: extents.width() / unit_arcs.len() as f32,
         #[cfg(feature = "debug")]
         show: format!("<br> 格子数：宽 = {}, 高 = {} <br>", min_width, min_height),
   

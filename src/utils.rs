@@ -7,7 +7,7 @@ use allsorts::{
 };
 use image::{EncodableLayout, ImageBuffer, Rgba};
 
-use serde::{Deserialize, Serialize, Serializer, ser::SerializeStruct};
+// use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
 use usvg::{Color, Fill, NonZeroPositiveF32, Paint, Stroke};
 use wasm_bindgen::prelude::wasm_bindgen;
 
@@ -222,13 +222,27 @@ pub fn encode_uint_arc_data(
     extents: &Aabb,
     min_width: f32,
     min_height: f32,
+    is_area: Option<bool>,
 ) -> (Vec<Vec<UnitArc>>, HashMap<u64, u64>) {
     let glyph_width = extents.width();
     let glyph_height = extents.height();
-    // 格子列的数量
-    let width_cells = (glyph_width / min_width).round() as usize;
+    // 格子列的数量;
+    // todo 为了兼容阴影minimip先强制索引纹理为32 * 32
+    let mut width_cells = 32 as usize;
     // 格子行的数量
-    let height_cells = (glyph_height / min_height).round() as usize;
+    let mut height_cells = 32 as usize;
+
+    if is_area.is_some() {
+        if glyph_width > 128.0 {
+            width_cells = 64;
+            height_cells = 64;
+        }
+    }
+
+    // 格子列的数量
+    let min_width = glyph_width / width_cells as f32;
+    // 格子行的数量
+    let min_height = glyph_height / height_cells as f32;
 
     let mut data = vec![
         vec![
@@ -256,8 +270,8 @@ pub fn encode_uint_arc_data(
         height_cells
     ];
 
-    let glyph_width = extents.width();
-    let glyph_height = extents.height();
+    // let glyph_width = extents.width();
+    // let glyph_height = extents.height();
     let c = extents.center();
     let unit = glyph_width.max(glyph_height);
 
@@ -370,10 +384,22 @@ pub fn encode_uint_arc_data(
                     (i as f32 + 0.5) * min_width + extents.mins.x,
                     (j as f32 + 0.5) * min_height + extents.mins.y,
                 );
-
                 let sdf = glyphy_sdf_from_arc_list2(&near_arcs, p).0;
-                let a = (160.0 - sdf).clamp(0.0, 255.0);
-
+                let a = if let Some(is_area) = is_area {
+                    let sdf1 = if !is_area {
+                        (256.0 - (sdf.abs()) * 32.0).clamp(0.0, 255.0)
+                    } else {
+                        (256.0 - sdf * 32.0).clamp(0.0, 255.0)
+                    };
+                    sdf1
+                } else {
+                    let sdf = glyphy_sdf_from_arc_list2(&near_arcs, p).0;
+                    (160.0 - sdf).clamp(0.0, 255.0)
+                };
+                // println!(
+                //     "========== i: {}, j: {}, sdf: {}, near_arcs: {:?}, p: {:?}",
+                //     i, j, sdf, near_arcs, p
+                // );
                 unit_arc.s_dist = a as u8;
             }
         }
@@ -511,41 +537,41 @@ pub struct Attribute {
     pub start: Point,
 }
 
-unsafe impl Send for Attribute{}
-unsafe impl Sync for Attribute{}
+unsafe impl Send for Attribute {}
+unsafe impl Sync for Attribute {}
 impl Attribute {
     pub fn set_fill_color(&mut self, r: u8, g: u8, b: u8) {
-        // let fill = Fill::from_paint(Paint::Color(Color::new_rgb(r, g, b)));
-        // self.fill = Some(fill);
+        let fill = Fill::from_paint(Paint::Color(Color::new_rgb(r, g, b)));
+        self.fill = Some(fill);
     }
 
     pub fn set_stroke_color(&mut self, r: u8, g: u8, b: u8) {
-        // if let Some(stroke) = &mut self.stroke {
-        //     stroke.paint = Paint::Color(Color::new_rgb(r, g, b));
-        // } else {
-        //     let mut stroke = Stroke::default();
-        //     stroke.paint = Paint::Color(Color::new_rgb(r, g, b));
-        //     self.stroke = Some(stroke);
-        // }
+        if let Some(stroke) = &mut self.stroke {
+            stroke.paint = Paint::Color(Color::new_rgb(r, g, b));
+        } else {
+            let mut stroke = Stroke::default();
+            stroke.paint = Paint::Color(Color::new_rgb(r, g, b));
+            self.stroke = Some(stroke);
+        }
     }
 
     pub fn set_stroke_width(&mut self, width: f32) {
-        // if let Some(stroke) = &mut self.stroke {
-        //     stroke.width = NonZeroPositiveF32::new(width).unwrap();
-        // } else {
-        //     let mut stroke = Stroke::default();
-        //     stroke.width = NonZeroPositiveF32::new(width).unwrap();
-        //     self.stroke = Some(stroke);
-        // }
+        if let Some(stroke) = &mut self.stroke {
+            stroke.width = NonZeroPositiveF32::new(width).unwrap();
+        } else {
+            let mut stroke = Stroke::default();
+            stroke.width = NonZeroPositiveF32::new(width).unwrap();
+            self.stroke = Some(stroke);
+        }
     }
 
     pub fn set_stroke_dasharray(&mut self, dasharray: Vec<f32>) {
-        // if let Some(stroke) = &mut self.stroke {
-        //     stroke.dasharray = Some(dasharray)
-        // } else {
-        //     let mut stroke = Stroke::default();
-        //     stroke.dasharray = Some(dasharray);
-        //     self.stroke = Some(stroke);
-        // }
+        if let Some(stroke) = &mut self.stroke {
+            stroke.dasharray = Some(dasharray)
+        } else {
+            let mut stroke = Stroke::default();
+            stroke.dasharray = Some(dasharray);
+            self.stroke = Some(stroke);
+        }
     }
 }
