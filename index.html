@@ -28,18 +28,24 @@
         ctx.fillRect(0, 0, 512, 512);//绘制填充白色背景
 
         // 设置阴影属性
-        ctx.shadowColor = 'rgba(0, 0, 0, 1.0)'; // 半透明黑色阴影
-        ctx.shadowBlur = 5.0; // 模糊程度
-        ctx.shadowOffsetX = 10; // 水平偏移量
-        ctx.shadowOffsetY = 10.; // 垂直偏移量
+        // ctx.shadowColor = 'rgba(0, 0, 0, 1.0)'; // 半透明黑色阴影
+        // ctx.shadowBlur = 5.0; // 模糊程度
+        // ctx.shadowOffsetX = 10; // 水平偏移量
+        // ctx.shadowOffsetY = 10.; // 垂直偏移量
 
-        ctx.fillStyle = '#ff0000';
-        ctx.font = "64px MyFont";
-        ctx.fillText("间", 50, 90);
+        ctx.fillStyle = '#00ff00';
+        ctx.font = " 64px MyFont";
+        // ctx.fillText("回", 50, 90);
+        ctx.lineWidth = 5.0;
+        ctx.strokeStyle = '#ff0000';
+        ctx.strokeText("放", 50, 90)
+        ctx.fillText("放", 50, 90);
 
-        ctx.lineWidth = 1.0;
-        ctx.strokeStyle = '#00ff00';
-        ctx.strokeText("间", 50, 90)
+        // ctx.font = "bold 64px MyFont";
+        // ctx.fillText("回", 90, 90);
+        // ctx.lineWidth = 1.0;
+        // ctx.strokeStyle = '#00ff00';
+        // ctx.strokeText("间", 50, 90)
 
 
         // ctx.moveTo(240, 60);

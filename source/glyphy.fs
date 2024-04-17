@@ -13,12 +13,12 @@ precision highp float;
 // (max_offset, min_sdf, sdf_step, check)
 // 如果 晶格的 sdf 在 [-check, check]，该晶格 和 字体轮廓 可能 相交 
 
-layout(set = 0, binding = 4) uniform float u_weight; // 粗体
-layout(set = 0, binding = 5) uniform vec4 u_gradientStarteEnd; // 渐变
-layout(set = 0, binding = 6) uniform mat4 u_gradient; // 渐变控制点
-layout(set = 0, binding = 7) uniform vec4 outer_glow_color_and_dist; // 外发光颜色和发散范围
-layout(set = 0, binding = 8) uniform vec4 shadow_color; // 阴影颜色
-layout(set = 0, binding = 9) uniform vec3 shadow_offset_and_blur_level; // 阴影偏移和模糊等级
+layout(set = 0, binding = 3) uniform float u_weight; // 粗体
+layout(set = 0, binding = 4) uniform vec4 u_gradientStarteEnd; // 渐变
+layout(set = 0, binding = 5) uniform mat4 u_gradient; // 渐变控制点
+layout(set = 0, binding = 6) uniform vec4 outer_glow_color_and_dist; // 外发光颜色和发散范围
+layout(set = 0, binding = 7) uniform vec4 shadow_color; // 阴影颜色
+layout(set = 0, binding = 8) uniform vec3 shadow_offset_and_blur_level; // 阴影偏移和模糊等级
 
 layout(set = 1, binding = 0) uniform sampler index_tex_samp;
 layout(set = 1, binding = 1) uniform texture2D u_index_tex;
@@ -573,7 +573,7 @@ void main() {
 	float distancePerPixel = 1.;
 
 	float weight = u_weight;
-	sdist = sdist - weight * distancePerPixel;
+	sdist = sdist - weight * distancePerPixel * scale * 0.5;
 
 	// sdist = abs(sdist);
 	float alpha = antialias(sdist);
@@ -629,10 +629,11 @@ void main() {
 	fragColor = shadow_blur(fragColor, shadow_color, shadow_offset_and_blur_level.xy, shadow_offset_and_blur_level.z, p);
 	if (abs(shadow_color.w - 0.0) < 0.1){
 		// 外发光 只有没有阴影的时候才会有外发光
-		fragColor = outer_glow(sdist, fragColor, vec4(outer_glow_color_and_dist.xyz, 1.0) , outer_glow_color_and_dist.w);
+		// fragColor = outer_glow(sdist, fragColor, vec4(outer_glow_color_and_dist.xyz, 1.0) , outer_glow_color_and_dist.w);
 	}
 	
 	// 虚线，svg用
 	fragColor = stroke_dasharray(fragColor, u_startAndStep);
+	// fragColor = vec4(fwidth(p), 0., 1.0);
 	fragColor.rgb *= fragColor.a;
 }

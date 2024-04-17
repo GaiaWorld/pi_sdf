@@ -1,6 +1,6 @@
 [package]
 name = "pi_sdf"
-version = "0.1.6"
+version = "0.1.8"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -10,23 +10,23 @@ crate-type = ["cdylib", "lib"]
 [dependencies]
 parry2d = "0.13"
 log = {version = "0.4"}#, features = ["release_max_level_error"]}
-lazy_static = "1.4"
+# lazy_static = "1.4"
 allsorts = { version = "0.14", default-features = false,  features = ["flate2_rust", "outline"]}
 ab_glyph_rasterizer = "0.1"
-image = "0.24"
 wasm-bindgen = "0.2"
 console_log = "1.0"
-svg = "0.14"
-pi_wgpu = { registry = "yn", version = "0.1",features = ["use_wgpu"] }
 usvg = "0.37"
 kurbo = "0.9"
-ahash = "=0.8.6"
+bytemuck = { version = "1.4", features = [ "derive" ] }
 pi_hash = {version = "0.1.1", features = ["xxhash"]}
 serde = { version = "1.0", features = ["derive"] }
-erased-serde = "0.3"
+# erased-serde = "0.3"
 
-[target."cfg(target_arch = \"wasm32\")".dependencies.web-sys]
-web-sys = {version = "0.3", features = ["Window", "Performance"]}
+
+[target."cfg(target_arch = \"wasm32\")".dependencies]
+getrandom = {version = "0.2", features = ["js"]}
+# web-sys = {version = "0.3", features = ["Window", "Performance"]}
+
 
 [dev-dependencies]
 pollster = "0.3"
@@ -34,11 +34,17 @@ env_logger = "0.10"
 winit = { registry = "yn", version = "0.27" }
 tracing = "0.1"
 tracing-subscriber = "0.3"
-bytemuck = { version = "1.4", features = [ "derive" ] }
 naga = "0.19"
+pi_wgpu = { registry = "yn", version = "0.1",features = ["use_wgpu"] }
 
 [profile.release]
-debug = true
+incremental = true
+strip = true
+lto = true
+panic = "abort"
+codegen-units = 1
+opt-level = "s"
+# debug = true
 
 [features]
 debug = []

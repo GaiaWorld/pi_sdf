@@ -4,7 +4,7 @@ use allsorts::{
     pathfinder_geometry::{line_segment::LineSegment2F, vector::Vector2F},
 };
 // use erased_serde::serialize_trait_object;
-use image::EncodableLayout;
+// use image::EncodableLayout;
 use kurbo::Shape;
 use parry2d::{bounding_volume::Aabb, shape::Segment as MSegment};
 use serde::{Deserialize, Serialize};
@@ -95,7 +95,7 @@ pub trait ArcOutline: Send + Sync + Debug + ShapeClone {
         binding_box
     }
     fn binding_box(&self) -> Aabb;
-    fn is_area(&self) ->bool;
+    fn is_area(&self) -> bool;
 }
 
 pub trait ShapeClone {
@@ -193,7 +193,7 @@ impl ArcOutline for Circle {
 
     fn get_hash(&self) -> u64 {
         let mut hasher = pi_hash::DefaultHasher::default();
-        hasher.write([self.cx, self.cy, self.radius, 1.0].as_bytes());
+        hasher.write(bytemuck::cast_slice(&[self.cx, self.cy, self.radius, 1.0]));
         hasher.finish()
     }
 
@@ -205,7 +205,7 @@ impl ArcOutline for Circle {
     }
 
     fn is_area(&self) -> bool {
-       true
+        true
     }
 }
 
@@ -261,7 +261,13 @@ impl ArcOutline for Rect {
 
     fn get_hash(&self) -> u64 {
         let mut hasher = pi_hash::DefaultHasher::default();
-        hasher.write([self.x, self.y, self.width, self.height, 2.0].as_bytes());
+        hasher.write(bytemuck::cast_slice(&[
+            self.x,
+            self.y,
+            self.width,
+            self.height,
+            2.0,
+        ]));
         hasher.finish()
     }
 
@@ -277,7 +283,7 @@ impl ArcOutline for Rect {
         }
     }
 
-    fn is_area(&self) ->bool {
+    fn is_area(&self) -> bool {
         true
     }
 }
@@ -315,16 +321,14 @@ impl ArcOutline for Segment {
 
     fn get_hash(&self) -> u64 {
         let mut hasher = pi_hash::DefaultHasher::default();
-        hasher.write(
-            [
-                self.segment.a.x,
-                self.segment.a.y,
-                self.segment.b.x,
-                self.segment.b.y,
-                3.0,
-            ]
-            .as_bytes(),
-        );
+
+        hasher.write(bytemuck::cast_slice(&[
+            self.segment.a.x,
+            self.segment.a.y,
+            self.segment.b.x,
+            self.segment.b.y,
+            3.0,
+        ]));
         hasher.finish()
     }
 
@@ -340,7 +344,7 @@ impl ArcOutline for Segment {
         }
     }
 
-    fn is_area(&self) ->bool {
+    fn is_area(&self) -> bool {
         false
     }
 }
@@ -427,7 +431,9 @@ impl ArcOutline for Ellipse {
 
     fn get_hash(&self) -> u64 {
         let mut hasher = pi_hash::DefaultHasher::default();
-        hasher.write([self.rx, self.ry, self.cx, self.cy, 4.0].as_bytes());
+        hasher.write(bytemuck::cast_slice(&[
+            self.rx, self.ry, self.cx, self.cy, 4.0,
+        ]));
         hasher.finish()
     }
 
@@ -438,7 +444,7 @@ impl ArcOutline for Ellipse {
         }
     }
 
-    fn is_area(&self) ->bool {
+    fn is_area(&self) -> bool {
         true
     }
 }
@@ -496,7 +502,7 @@ impl ArcOutline for Polygon {
         }
         key.push(5.0);
         let mut hasher = pi_hash::DefaultHasher::default();
-        hasher.write(key.as_bytes());
+        hasher.write(bytemuck::cast_slice(&key));
         hasher.finish()
     }
 
@@ -519,7 +525,7 @@ impl ArcOutline for Polygon {
         }
     }
 
-    fn is_area(&self) ->bool {
+    fn is_area(&self) -> bool {
         true
     }
 }
@@ -597,7 +603,7 @@ impl ArcOutline for Polyline {
         }
         key.push(6.0);
         let mut hasher = pi_hash::DefaultHasher::default();
-        hasher.write(key.as_bytes());
+        hasher.write(bytemuck::cast_slice(&key));
         hasher.finish()
     }
 
@@ -620,7 +626,7 @@ impl ArcOutline for Polyline {
         }
     }
 
-    fn is_area(&self) ->bool {
+    fn is_area(&self) -> bool {
         false
     }
 }
@@ -707,7 +713,7 @@ impl ArcOutline for Path {
         }
         key.push(7.0);
         let mut hasher = pi_hash::DefaultHasher::default();
-        hasher.write(key.as_bytes());
+        hasher.write(bytemuck::cast_slice(&key));
         hasher.finish()
     }
 
@@ -729,7 +735,7 @@ impl ArcOutline for Path {
             maxs: Point::new(max_x, max_y),
         }
     }
-    fn is_area(&self) ->bool {
+    fn is_area(&self) -> bool {
         self.is_close()
     }
 }
@@ -790,7 +796,8 @@ impl SvgScenes {
         for node in self.shapes.values() {
             let binding_box = node.binding_box();
             println!("binding_box: {:?}", binding_box);
-            let (mut blob_arc, map) = compute_near_arc_impl(binding_box, node.get_arc_endpoints(), node.is_area());
+            let (mut blob_arc, map) =
+                compute_near_arc_impl(binding_box, node.get_arc_endpoints(), node.is_area());
             let size = blob_arc.encode_data_tex(&map, data_tex, width0, offset_x0, offset_y0)?;
             println!("data_map: {}", map.len());
             let mut info = blob_arc.encode_index_tex(

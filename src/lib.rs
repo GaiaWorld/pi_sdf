@@ -1,7 +1,7 @@
 #![feature(trait_alias)]
 
-#[macro_use]
-extern crate lazy_static;
+// #[macro_use]
+// extern crate lazy_static;
 
 pub mod glyphy;
 pub mod utils;

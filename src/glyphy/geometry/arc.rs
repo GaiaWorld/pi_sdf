@@ -1,4 +1,4 @@
-use image::EncodableLayout;
+// use image::EncodableLayout;
 use parry2d::{bounding_volume::Aabb, math::Vector, shape::Segment};
 use std::hash::Hasher;
 use std::sync::atomic::AtomicU64;
@@ -13,9 +13,7 @@ use super::{
     signed_vector::SignedVector, vector::VectorEXT,
 };
 
-lazy_static! {
-    static ref ID: AtomicU64 = AtomicU64::new(0);
-}
+static ID: AtomicU64 = AtomicU64::new(0);
 
 // sin( 2 * atan(d) )
 pub fn sin2atan(d: f32) -> f32 {
@@ -73,7 +71,7 @@ impl ArcEndpoint {
         let mut hasher = pi_hash::DefaultHasher::default();
         let data = [self.p.x, self.p.y, self.d, ep1.p.x, ep1.p.y, ep1.d];
         // println!("data: {:?}", data);
-        hasher.write(data.as_bytes());
+        hasher.write(bytemuck::cast_slice(&data));
         let r = hasher.finish();
         // println!("r: {}", r);
         r

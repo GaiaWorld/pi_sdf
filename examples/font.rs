@@ -72,12 +72,13 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     });
 
     // 加载字体文件
-    let buffer = std::fs::read("./source/msyh.ttf").unwrap();
+    let buffer = std::fs::read("./source/WenQuanYiMicroHei.woff2").unwrap();
+    // let buffer = std::fs::read("./source/msyh.ttf").unwrap();
     let mut ft_face = FontFace::new(buffer);
 
     let tex_size = (1024, 1024);
     // 需要渲染的字符串
-    let text = "一".to_string();
+    let text = "放".to_string();
     // 纹理数据
     let mut tex_data = TexData {
         index_tex: vec![0; tex_size.0 * tex_size.1 * 2], // 索引纹理数据
@@ -98,9 +99,16 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     println!("out_tex_data: {:?}", time.elapsed());
 
     // 字体缩放
-    let scale = [64.0f32, 64.0];
+    let scale = [128.0f32, 128.0];
+
+    let translation = vec![
+        32.0f32, 32.0, 10.0, 10.0,
+        64.,     64.,  80.,  10.,
+        128.,     128.,  200.,  10.
+    ];
+
     // 阴影偏移和模糊等级
-    let mut shadow_offset_and_blur_level = vec![20.0f32, 20., 6.0, 0.0];
+    let mut shadow_offset_and_blur_level = vec![20.0f32, 20., 0.2, 0.2];
     let vertexs = ft_face.verties(scale[0], &mut shadow_offset_and_blur_level[0..=1]); // 获取网格数据
     println!("vertexs: {:?}", vertexs);
 
@@ -139,11 +147,11 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         usage: wgpu::BufferUsages::UNIFORM,
     });
 
-    let scale_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("scale"),
-        contents: bytemuck::cast_slice(scale.as_slice()),
-        usage: wgpu::BufferUsages::UNIFORM,
-    });
+    // let scale_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+    //     label: Some("scale"),
+    //     contents: bytemuck::cast_slice(scale.as_slice()),
+    //     usage: wgpu::BufferUsages::UNIFORM,
+    // });
 
     let u_gradient_start_end: [f32; 4] = [-0.5, -0.5, 0.5, 0.5];
     let u_gradient_start_end_buffer =
@@ -153,7 +161,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
             usage: wgpu::BufferUsages::UNIFORM,
         });
 
-    let u_weight: [f32; 1] = [0.0];
+    let u_weight: [f32; 1] = [1.0];
     let u_weight_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("u_weight_buffer"),
         contents: bytemuck::cast_slice(&u_weight),
@@ -229,16 +237,6 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
             },
             wgpu::BindGroupLayoutEntry {
                 binding: 3,
-                visibility: wgpu::ShaderStages::VERTEX,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: wgpu::BufferSize::new(8),
-                },
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 4,
                 visibility: wgpu::ShaderStages::FRAGMENT,
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Uniform,
@@ -248,7 +246,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
                 count: None,
             },
             wgpu::BindGroupLayoutEntry {
-                binding: 5,
+                binding: 4,
                 visibility: wgpu::ShaderStages::FRAGMENT,
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Uniform,
@@ -258,12 +256,22 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
                 count: None,
             },
             wgpu::BindGroupLayoutEntry {
-                binding: 6,
+                binding: 5,
                 visibility: wgpu::ShaderStages::FRAGMENT,
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Uniform,
                     has_dynamic_offset: false,
                     min_binding_size: wgpu::BufferSize::new(64),
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 6,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: wgpu::BufferSize::new(16),
                 },
                 count: None,
             },
@@ -279,16 +287,6 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
             },
             wgpu::BindGroupLayoutEntry {
                 binding: 8,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: wgpu::BufferSize::new(16),
-                },
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 9,
                 visibility: wgpu::ShaderStages::FRAGMENT,
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Uniform,
@@ -330,21 +328,13 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
             wgpu::BindGroupEntry {
                 binding: 3,
                 resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                    buffer: &scale_buffer,
-                    offset: 0,
-                    size: wgpu::BufferSize::new(8),
-                }),
-            },
-            wgpu::BindGroupEntry {
-                binding: 4,
-                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
                     buffer: &u_weight_buffer,
                     offset: 0,
                     size: wgpu::BufferSize::new(4),
                 }),
             },
             wgpu::BindGroupEntry {
-                binding: 5,
+                binding: 4,
                 resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
                     buffer: &u_gradient_start_end_buffer,
                     offset: 0,
@@ -352,7 +342,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
                 }),
             },
             wgpu::BindGroupEntry {
-                binding: 6,
+                binding: 5,
                 resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
                     buffer: &u_gradient_buffer,
                     offset: 0,
@@ -360,7 +350,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
                 }),
             },
             wgpu::BindGroupEntry {
-                binding: 7,
+                binding: 6,
                 resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
                     buffer: &outer_glow_color_and_dist_buffer,
                     offset: 0,
@@ -368,7 +358,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
                 }),
             },
             wgpu::BindGroupEntry {
-                binding: 8,
+                binding: 7,
                 resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
                     buffer: &shadow_color_buffer,
                     offset: 0,
@@ -376,7 +366,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
                 }),
             },
             wgpu::BindGroupEntry {
-                binding: 9,
+                binding: 8,
                 resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
                     buffer: &shadow_offset_and_blur_level_buffer,
                     offset: 0,
@@ -703,7 +693,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     });
 
     // 以下为实例化数据
-    let mut translation = vec![];
+   
     let mut index_info = vec![];
     let mut data_offset = vec![];
     let mut u_info = vec![];
@@ -732,8 +722,8 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         // 每个字符的位置
         let x = index % 15;
         let y = index / 15;
-        translation.push(x as f32 * 32.0 + 20.0);
-        translation.push(y as f32 * 32.0 + 20.0);
+       
+
 
         fill_color[index * 4] = 1.0;
         fill_color[index * 4 + 1] = 0.0;
@@ -743,7 +733,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         stroke_color_and_width[index * 4] = 0.0;
         stroke_color_and_width[index * 4 + 1] = 1.0;
         stroke_color_and_width[index * 4 + 2] = 0.0;
-        stroke_color_and_width[index * 4 + 3] = 1.0;
+        stroke_color_and_width[index * 4 + 3] = 0.0;
 
         start_and_step.push(0.0f32);
         start_and_step.push(0.0);
@@ -842,10 +832,10 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
                     }],
                 },
                 wgpu::VertexBufferLayout {
-                    array_stride: std::mem::size_of::<[f32; 2]>() as wgpu::BufferAddress,
+                    array_stride: std::mem::size_of::<[f32; 4]>() as wgpu::BufferAddress,
                     step_mode: wgpu::VertexStepMode::Instance,
                     attributes: &[wgpu::VertexAttribute {
-                        format: wgpu::VertexFormat::Float32x2,
+                        format: wgpu::VertexFormat::Float32x4,
                         offset: 0,
                         shader_location: 2,
                     }],

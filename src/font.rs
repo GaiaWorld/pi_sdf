@@ -24,7 +24,7 @@ use crate::{
         outline::glyphy_outline_winding_from_even_odd,
         util::GLYPHY_INFINITY,
     },
-    utils::{encode_uint_arc_data, GlyphVisitor, TOLERANCE},
+    utils::{encode_uint_arc_data, GlyphVisitor, EMBOLDEN_MAX, MIN_FONT_SIZE, TOLERANCE},
     Point,
 };
 
@@ -138,30 +138,30 @@ impl FontFace {
     pub fn verties(&self, font_size: f32, shadow_offset: &mut [f32]) -> [f32; 16] {
         let mut extents = self.max_box_normaliz.clone();
 
-        let offset_x = shadow_offset[0] / font_size;
-        let offset_y = shadow_offset[1] / font_size;
-        shadow_offset[0] = offset_x;
-        shadow_offset[1] = offset_y;
+        // let offset_x = shadow_offset[0] / font_size;
+        // let offset_y = shadow_offset[1] / font_size;
+        // shadow_offset[0] = offset_x;
+        // shadow_offset[1] = offset_y;
 
         let width = extents.width();
         let height = extents.height();
 
         let mut min_uv = [0.0f32, 0.0];
         let mut max_uv = [1.0f32, 1.0];
-        if offset_x < 0.0 {
-            extents.mins.x += offset_x;
-            min_uv[0] += offset_x / width;
-        } else {
-            extents.maxs.x += offset_x;
-            max_uv[0] += offset_x / width;
-        }
-        if offset_y < 0.0 {
-            extents.mins.y += offset_y;
-            min_uv[1] += offset_y / height;
-        } else {
-            extents.maxs.y += offset_y;
-            max_uv[1] += offset_y / height;
-        }
+        // if offset_x < 0.0 {
+        //     extents.mins.x += offset_x;
+        //     min_uv[0] += offset_x / width;
+        // } else {
+        //     extents.maxs.x += offset_x;
+        //     max_uv[0] += offset_x / width;
+        // }
+        // if offset_y < 0.0 {
+        //     extents.mins.y += offset_y;
+        //     min_uv[1] += offset_y / height;
+        // } else {
+        //     extents.maxs.y += offset_y;
+        //     max_uv[1] += offset_y / height;
+        // }
 
         [
             extents.mins.x,
@@ -188,18 +188,18 @@ impl FontFace {
             Point::new(head_table.x_min as f32, head_table.y_min as f32),
             Point::new(head_table.x_max as f32, head_table.y_max as f32),
         );
-
+        // println!("extents: {:?}", extents);
         // let per_em = TOLERANCE;
 
-        // let upem = head_table.units_per_em as f32;
+        let upem = head_table.units_per_em as f32;
         // let tolerance = upem * per_em; /* in font design units */
-        // let faraway = upem / (MIN_FONT_SIZE * 2.0f32.sqrt());
-        // let embolden_max = upem * EMBOLDEN_MAX;
+        let faraway = upem / 32.0; //upem / (MIN_FONT_SIZE * 2.0f32.sqrt());
+                                   // let embolden_max = upem / 32.0;
 
-        // extents.mins.x -= faraway + embolden_max;
-        // extents.mins.y -= faraway + embolden_max;
-        // extents.maxs.x += faraway + embolden_max;
-        // extents.maxs.y += faraway + embolden_max;
+        extents.mins.x -= faraway;
+        extents.mins.y -= faraway;
+        extents.maxs.x += faraway;
+        extents.maxs.y += faraway;
 
         let glyph_width = extents.maxs.x - extents.mins.x;
         let glyph_height = extents.maxs.y - extents.mins.y;
@@ -229,7 +229,7 @@ impl FontFace {
 
     pub fn get_char_arc(extents: Aabb, mut sink: GlyphVisitor) -> (BlobArc, HashMap<u64, u64>) {
         // log::error!("get_char_arc: {:?}", char);
-
+        // let extents = self.max_box.clone();
         let endpoints = &mut sink.accumulate.result;
         if endpoints.len() > 0 {
             // 用奇偶规则，计算 每个圆弧的 环绕数
@@ -294,7 +294,8 @@ impl FontFace {
         // let width_cells = (extents.width() / min_width).floor();
         // let height_cells = (extents.height() / min_height).floor();
         // 根据最小格子大小计算每个格子的圆弧数据
-        let (unit_arcs, map) = encode_uint_arc_data(result_arcs, &extents, min_width, min_height, None);
+        let (unit_arcs, map) =
+            encode_uint_arc_data(result_arcs, &extents, min_width, min_height, None);
         // println!("unit_arcs[14][5]: {:?}", unit_arcs[14][5]);
 
         let [min_sdf, max_sdf] = travel_data(&unit_arcs);
@@ -349,7 +350,7 @@ impl FontFace {
             let outline = self.to_outline(char);
             let (mut blod_arc, map) = Self::get_char_arc(self.max_box.clone(), outline);
             let size = blod_arc.encode_data_tex(&map, data_tex, width0, offset_x0, offset_y0)?;
-            // println!("data_map: {}", map.len());
+            println!("data_map: {}", map.len());
             let mut info = blod_arc.encode_index_tex(
                 index_tex, width1, offset_x1, offset_y1, map, size, sdf_tex, sdf_tex1, sdf_tex2,
                 sdf_tex3,

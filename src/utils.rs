@@ -5,7 +5,7 @@ use allsorts::{
     outline::OutlineSink,
     pathfinder_geometry::{line_segment::LineSegment2F, vector::Vector2F},
 };
-use image::{EncodableLayout, ImageBuffer, Rgba};
+// use image::{EncodableLayout, ImageBuffer, Rgba};
 
 // use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
 use usvg::{Color, Fill, NonZeroPositiveF32, Paint, Stroke};
@@ -13,7 +13,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::{
     glyphy::{geometry::arcs::GlyphyArcAccumulator, sdf::glyphy_sdf_from_arc_list2},
-    Point,
+    Point, shape::{SvgScenes, Rect, ArcOutline},
 };
 use parry2d::bounding_volume::Aabb;
 use std::hash::Hasher;
@@ -85,23 +85,23 @@ impl GlyphVisitor {
     }
 }
 
-impl GlyphVisitor {
-    pub fn get_pixmap(&mut self) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
-        let mut img = ImageBuffer::from_fn(512, 512, |_, _| Rgba([255u8, 0, 0, 0]));
+// impl GlyphVisitor {
+//     pub fn get_pixmap(&mut self) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
+//         let mut img = ImageBuffer::from_fn(512, 512, |_, _| Rgba([255u8, 0, 0, 0]));
 
-        self.rasterizer.for_each_pixel_2d(|x, y, a| {
-            let rgba = img.get_pixel_mut(x, 512 - y - 1);
-            rgba[3] = (a * 255.0) as u8;
-        });
+//         self.rasterizer.for_each_pixel_2d(|x, y, a| {
+//             let rgba = img.get_pixel_mut(x, 512 - y - 1);
+//             rgba[3] = (a * 255.0) as u8;
+//         });
 
-        return img;
-    }
-}
+//         return img;
+//     }
+// }
 
 impl OutlineSink for GlyphVisitor {
     fn move_to(&mut self, to: Vector2F) {
         let to = Point::new(to.x(), to.y());
-        log::debug!("M {} {} ", to.x, to.y);
+        log::info!("M {} {} ", to.x, to.y);
 
         if self.scale > 0.02 {
             self.accumulate
@@ -117,7 +117,7 @@ impl OutlineSink for GlyphVisitor {
 
     fn line_to(&mut self, to: Vector2F) {
         let to = Point::new(to.x(), to.y());
-        log::debug!("+ L {} {} ", to.x, to.y);
+        log::info!("+ L {} {} ", to.x, to.y);
         if self.scale > 0.02 {
             self.accumulate.line_to(to);
             #[cfg(feature = "debug")]
@@ -137,7 +137,7 @@ impl OutlineSink for GlyphVisitor {
         let control = Point::new(control.x(), control.y());
         let to = Point::new(to.x(), to.y());
 
-        log::debug!("+ Q {} {} {} {} ", control.x, control.y, to.x, to.y);
+        log::info!("+ Q {} {} {} {} ", control.x, control.y, to.x, to.y);
         if self.scale > 0.02 {
             self.accumulate.conic_to(control, to);
             self.svg_endpoints.push([to.x, to.y]);
@@ -157,7 +157,7 @@ impl OutlineSink for GlyphVisitor {
         let control2 = Point::new(control.to_x(), control.to_y());
         let to = Point::new(to.x(), to.y());
 
-        log::debug!(
+        log::info!(
             "+ C {}, {}, {}, {}, {}, {}",
             control1.x,
             control1.y,
@@ -182,7 +182,7 @@ impl OutlineSink for GlyphVisitor {
 
     fn close(&mut self) {
         if self.previous != self.start {
-            log::debug!("+ L {} {} ", self.start.x, self.start.y);
+            log::info!("+ L {} {} ", self.start.x, self.start.y);
             if self.scale > 0.02 {
                 self.accumulate.line_to(self.start);
                 #[cfg(feature = "debug")]
@@ -198,7 +198,7 @@ impl OutlineSink for GlyphVisitor {
                 )
             }
         }
-        log::debug!("+ Z");
+        log::info!("+ Z");
         if self.scale > 0.02 {
             self.accumulate.close_path();
             #[cfg(feature = "debug")]
@@ -223,6 +223,7 @@ pub fn encode_uint_arc_data(
     min_width: f32,
     min_height: f32,
     is_area: Option<bool>,
+    // units_per_em: u16,
 ) -> (Vec<Vec<UnitArc>>, HashMap<u64, u64>) {
     let glyph_width = extents.width();
     let glyph_height = extents.height();
@@ -358,7 +359,7 @@ pub fn encode_uint_arc_data(
                 key.push(endpoint.p.y);
                 key.push(endpoint.d);
             }
-            hasher.write(key.as_bytes());
+            hasher.write(bytemuck::cast_slice(&key));
             let result = hasher.finish();
 
             arc_result = Some(result);
@@ -393,8 +394,9 @@ pub fn encode_uint_arc_data(
                     };
                     sdf1
                 } else {
-                    let sdf = glyphy_sdf_from_arc_list2(&near_arcs, p).0;
-                    (160.0 - sdf).clamp(0.0, 255.0)
+                    // let sdf = glyphy_sdf_from_arc_list2(&near_arcs, p).0;
+                    // let temp = units_per_em as f32 / 2048.0;
+                    (0.5 - (sdf / (glyph_width / 32.0))).clamp(0.0, 1.0) * 255.0
                 };
                 // println!(
                 //     "========== i: {}, j: {}, sdf: {}, near_arcs: {:?}, p: {:?}",
@@ -416,15 +418,27 @@ pub fn get_char_arc_debug(char: String) -> BlobArc {
     // console_error_panic_hook::set_once();
 
     let _ = console_log::init_with_level(log::Level::Debug);
-    let buffer = include_bytes!("../source/msyh.ttf").to_vec();
+    // let buffer = include_bytes!("../source/msyh.ttf").to_vec();
+    let buffer = vec![];
     log::debug!("1111111111");
     let mut ft_face = FontFace::new(buffer);
     log::debug!("22222222char: {}", char);
     let char = char.chars().next().unwrap();
     log::debug!("13333333");
     let outline = ft_face.to_outline(char);
-    let (arcs, _map) = FontFace::get_char_arc(ft_face.max_box().clone(), outline);
+    let (arcs, _map) = FontFace::get_char_arc( ft_face.max_box.clone(), outline);
     log::debug!("44444444444");
+
+    let mut shapes = SvgScenes::new(Aabb::new(Point::new(0.0, 0.0), Point::new(400.0, 400.0)));
+    // 矩形
+    let mut rect = Rect::new(120.0, 70.0, 100.0, 50.0);
+    // 填充颜色 默认0. 0. 0. 0.
+    rect.attribute.set_fill_color(0, 0, 255);
+    // 描边颜色 默认 0. 0. 0. 
+    rect.attribute.set_stroke_color(0, 0, 0);
+    // 描边宽度，默认0.0
+    rect.attribute.set_stroke_width(2.0);
+    shapes.add_shape(rect.get_hash(), Box::new(rect));
     arcs
 }
 
