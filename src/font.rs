@@ -195,11 +195,11 @@ impl FontFace {
         // let tolerance = upem * per_em; /* in font design units */
         let faraway = upem / 32.0; //upem / (MIN_FONT_SIZE * 2.0f32.sqrt());
                                    // let embolden_max = upem / 32.0;
-
-        extents.mins.x -= faraway;
-        extents.mins.y -= faraway;
-        extents.maxs.x += faraway;
-        extents.maxs.y += faraway;
+        // 阴影抗锯齿需要
+        extents.mins.x -= 128.0;
+        extents.mins.y -= 128.0;
+        extents.maxs.x += 128.0;
+        extents.maxs.y += 128.0;
 
         let glyph_width = extents.maxs.x - extents.mins.x;
         let glyph_height = extents.maxs.y - extents.mins.y;

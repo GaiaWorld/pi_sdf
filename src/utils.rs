@@ -396,7 +396,8 @@ pub fn encode_uint_arc_data(
                 } else {
                     // let sdf = glyphy_sdf_from_arc_list2(&near_arcs, p).0;
                     // let temp = units_per_em as f32 / 2048.0;
-                    (0.5 - (sdf / (glyph_width / 32.0))).clamp(0.0, 1.0) * 255.0
+                    // (0.5 - (sdf / (glyph_width / 64.0))).clamp(0.0, 1.0) * 255.0
+                    (128.0 - sdf).clamp(0.0, 255.0)
                 };
                 // println!(
                 //     "========== i: {}, j: {}, sdf: {}, near_arcs: {:?}, p: {:?}",

@@ -1,6 +1,6 @@
 [package]
 name = "pi_sdf"
-version = "0.1.8"
+version = "0.1.9"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -18,7 +18,7 @@ console_log = "1.0"
 usvg = "0.37"
 kurbo = "0.9"
 bytemuck = { version = "1.4", features = [ "derive" ] }
-pi_hash = {version = "0.1.1", features = ["xxhash"]}
+pi_hash = {version = "0.1", features = ["xxhash"]}
 serde = { version = "1.0", features = ["derive"] }
 # erased-serde = "0.3"
 
