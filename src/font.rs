@@ -42,68 +42,6 @@ pub struct FontFace {
 }
 
 impl FontFace {
-    pub fn new(_data: Vec<u8>) -> Self {
-        let d: &'static Vec<u8> = unsafe { std::mem::transmute(&_data) };
-        let scope = ReadScope::new(d);
-        let font_file = scope.read::<FontData<'static>>().unwrap();
-        // font_file.table_provider(index)
-
-        let provider = font_file.table_provider(0).unwrap();
-        let font: Font<DynamicFontTableProvider<'static>> = Font::new(provider).unwrap().unwrap();
-
-        let head_table = font
-            .head_table()
-            .unwrap()
-            .ok_or("missing head table")
-            .unwrap();
-
-        let extents = Self::get_max_box(&head_table);
-        let _loca_data = font
-            .font_table_provider
-            .read_table_data(tag::LOCA)
-            .unwrap()
-            .to_vec();
-        let l: &'static Vec<u8> = unsafe { std::mem::transmute(&_loca_data) };
-
-        let loca = ReadScope::new(&l)
-            .read_dep::<LocaTable<'_>>((
-                usize::from(font.maxp_table.num_glyphs),
-                head_table.index_to_loc_format,
-            ))
-            .unwrap();
-        let _loca: LocaTable<'static> = unsafe { std::mem::transmute(loca) };
-        let loca_ref = unsafe { std::mem::transmute(&_loca) };
-
-        let _glyf_data = font
-            .font_table_provider
-            .read_table_data(tag::GLYF)
-            .unwrap()
-            .to_vec();
-        let g: &'static Vec<u8> = unsafe { std::mem::transmute(&_glyf_data) };
-
-        let glyf = ReadScope::new(g)
-            .read_dep::<GlyfTable<'_>>(loca_ref)
-            .unwrap();
-
-        let mut max_box_normaliz = extents.clone();
-        max_box_normaliz.scale(
-            1.0 / head_table.units_per_em as f32,
-            1.0 / head_table.units_per_em as f32,
-        );
-        // todo!()
-        Self {
-            _data,
-            font,
-            glyf,
-            _glyf_data,
-            _loca,
-            _loca_data,
-            max_box_normaliz,
-            max_box: extents,
-            units_per_em: head_table.units_per_em,
-        }
-    }
-
     pub fn font(&self) -> &Font<DynamicFontTableProvider> {
         &self.font
     }
@@ -126,7 +64,6 @@ impl FontFace {
     pub fn descender(&self) -> f32 {
         self.font.hhea_table.descender as f32 / self.units_per_em as f32
     }
-
     pub fn max_box(&self) -> &Aabb {
         &self.max_box
     }
@@ -372,3 +309,107 @@ impl FontFace {
         Ok(infos)
     }
 }
+
+#[wasm_bindgen(getter_with_clone)]
+pub struct SdfInfo{
+    pub tex_info: TexInfo,
+    pub data_tex: Vec<u8>,
+    pub index_tex: Vec<u8>,
+    pub sdf_tex1: Vec<u8>,
+    pub sdf_tex2: Vec<u8>,
+    pub sdf_tex3: Vec<u8>,
+    pub sdf_tex4: Vec<u8>,
+}
+
+// pub struct SdfInfos
+
+#[wasm_bindgen]
+impl FontFace {
+    pub fn new(_data: Vec<u8>) -> Self {
+        let _ = console_log::init_with_level(log::Level::Info);
+        // log::info!("=========== 1, : {}", _data.len());
+        let d: &'static Vec<u8> = unsafe { std::mem::transmute(&_data) };
+        let scope = ReadScope::new(d);
+        let font_file = scope.read::<FontData<'static>>().unwrap();
+        // font_file.table_provider(index)
+        // log::info!("=========== 2");
+        let provider = font_file.table_provider(0).unwrap();
+        let font: Font<DynamicFontTableProvider<'static>> = Font::new(provider).unwrap().unwrap();
+        // log::info!("=========== 3");
+        let head_table = font
+            .head_table()
+            .unwrap()
+            .ok_or("missing head table")
+            .unwrap();
+        // log::info!("=========== 4");
+        let extents = Self::get_max_box(&head_table);
+        let _loca_data = font
+            .font_table_provider
+            .read_table_data(tag::LOCA)
+            .unwrap()
+            .to_vec();
+        // log::info!("=========== 5");
+        let l: &'static Vec<u8> = unsafe { std::mem::transmute(&_loca_data) };
+        // log::info!("=========== 6");
+        let loca = ReadScope::new(&l)
+            .read_dep::<LocaTable<'_>>((
+                usize::from(font.maxp_table.num_glyphs),
+                head_table.index_to_loc_format,
+            ))
+            .unwrap();
+        let _loca: LocaTable<'static> = unsafe { std::mem::transmute(loca) };
+        let loca_ref = unsafe { std::mem::transmute(&_loca) };
+        // log::info!("=========== 7");
+        let _glyf_data = font
+            .font_table_provider
+            .read_table_data(tag::GLYF)
+            .unwrap()
+            .to_vec();
+        let g: &'static Vec<u8> = unsafe { std::mem::transmute(&_glyf_data) };
+        // log::info!("=========== 8");
+        let glyf = ReadScope::new(g)
+            .read_dep::<GlyfTable<'_>>(loca_ref)
+            .unwrap();
+        // log::info!("=========== 9");
+        let mut max_box_normaliz = extents.clone();
+        max_box_normaliz.scale(
+            1.0 / head_table.units_per_em as f32,
+            1.0 / head_table.units_per_em as f32,
+        );
+        // log::info!("=========== 10");
+        // todo!()
+        Self {
+            _data,
+            font,
+            glyf,
+            _glyf_data,
+            _loca,
+            _loca_data,
+            max_box_normaliz,
+            max_box: extents,
+            units_per_em: head_table.units_per_em,
+        }
+    }
+
+    pub fn compute_sdf(&mut self, text: &str,)-> Vec<SdfInfo> {
+        let mut info = Vec::with_capacity(text.len()); 
+        for char in text.chars() {
+            let outline = self.to_outline(char);
+            let (mut blod_arc, map) = Self::get_char_arc(self.max_box.clone(), outline);
+            let data_tex = blod_arc.encode_data_tex1(&map);
+            let (tex_info, index_tex, sdf_tex1, sdf_tex2, sdf_tex3, sdf_tex4) = blod_arc.encode_index_tex1(map, data_tex.len() / 4);
+            info.push(SdfInfo {
+                tex_info,
+                data_tex,
+                index_tex,
+                sdf_tex1,
+                sdf_tex2,
+                sdf_tex3,
+                sdf_tex4,
+            });
+        }
+        info
+    }
+}
+
+

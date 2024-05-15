@@ -101,7 +101,7 @@ impl GlyphVisitor {
 impl OutlineSink for GlyphVisitor {
     fn move_to(&mut self, to: Vector2F) {
         let to = Point::new(to.x(), to.y());
-        log::info!("M {} {} ", to.x, to.y);
+        log::debug!("M {} {} ", to.x, to.y);
 
         if self.scale > 0.02 {
             self.accumulate
@@ -117,7 +117,7 @@ impl OutlineSink for GlyphVisitor {
 
     fn line_to(&mut self, to: Vector2F) {
         let to = Point::new(to.x(), to.y());
-        log::info!("+ L {} {} ", to.x, to.y);
+        log::debug!("+ L {} {} ", to.x, to.y);
         if self.scale > 0.02 {
             self.accumulate.line_to(to);
             #[cfg(feature = "debug")]
@@ -137,7 +137,7 @@ impl OutlineSink for GlyphVisitor {
         let control = Point::new(control.x(), control.y());
         let to = Point::new(to.x(), to.y());
 
-        log::info!("+ Q {} {} {} {} ", control.x, control.y, to.x, to.y);
+        log::debug!("+ Q {} {} {} {} ", control.x, control.y, to.x, to.y);
         if self.scale > 0.02 {
             self.accumulate.conic_to(control, to);
             self.svg_endpoints.push([to.x, to.y]);
@@ -157,7 +157,7 @@ impl OutlineSink for GlyphVisitor {
         let control2 = Point::new(control.to_x(), control.to_y());
         let to = Point::new(to.x(), to.y());
 
-        log::info!(
+        log::debug!(
             "+ C {}, {}, {}, {}, {}, {}",
             control1.x,
             control1.y,
@@ -182,7 +182,7 @@ impl OutlineSink for GlyphVisitor {
 
     fn close(&mut self) {
         if self.previous != self.start {
-            log::info!("+ L {} {} ", self.start.x, self.start.y);
+            log::debug!("+ L {} {} ", self.start.x, self.start.y);
             if self.scale > 0.02 {
                 self.accumulate.line_to(self.start);
                 #[cfg(feature = "debug")]
@@ -198,7 +198,7 @@ impl OutlineSink for GlyphVisitor {
                 )
             }
         }
-        log::info!("+ Z");
+        log::debug!("+ Z");
         if self.scale > 0.02 {
             self.accumulate.close_path();
             #[cfg(feature = "debug")]
