@@ -747,7 +747,7 @@ pub struct TexData {
 //     pub fn new(index_tex: )
 // }
 
-#[wasm_bindgen(getter_with_clone)]
+#[wasm_bindgen]
 #[derive(Debug, Clone)]
 pub struct TexInfo {
     pub grid_w: f32,

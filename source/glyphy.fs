@@ -505,7 +505,7 @@ vec4 outer_glow(float dist_f_, vec4 color_v4_, vec4 input_color_v4_, float radiu
     // pow：平滑 a_f
     // max and min：防止在物体内部渲染
     float b_f = min(max(0.0, dist_f_), pow(a_f, 5.0));
-    return color_v4_ + input_color_v4_ * b_f;
+    return mix(color_v4_, input_color_v4_, b_f) ;//color_v4_ * (1-b_f) + input_color_v4_  * b_f;
 }
 
 // 虚线处理
