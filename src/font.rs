@@ -10,7 +10,7 @@ use allsorts::{
 };
 // use freetype_sys::FT_Vector;
 
-use parry2d::bounding_volume::Aabb;
+use parry2d::{bounding_volume::Aabb, na::Vector2};
 use wasm_bindgen::prelude::wasm_bindgen;
 // use parry2d::math::Point;
 
@@ -24,7 +24,7 @@ use crate::{
         outline::glyphy_outline_winding_from_even_odd,
         util::GLYPHY_INFINITY,
     },
-    utils::{encode_uint_arc_data, GlyphVisitor, EMBOLDEN_MAX, MIN_FONT_SIZE, TOLERANCE},
+    utils::{encode_uint_arc_data, GlyphVisitor, EMBOLDEN_MAX, MIN_FONT_SIZE, SCALE, TOLERANCE},
     Point,
 };
 
@@ -72,6 +72,10 @@ impl FontFace {
         &self.max_box_normaliz
     }
 
+    pub fn debug_size(&self)-> usize{
+        self._data.len()
+    }
+
     pub fn verties(&self, font_size: f32, shadow_offset: &mut [f32]) -> [f32; 16] {
         let mut extents = self.max_box_normaliz.clone();
 
@@ -80,11 +84,11 @@ impl FontFace {
         // shadow_offset[0] = offset_x;
         // shadow_offset[1] = offset_y;
 
-        let width = extents.width();
-        let height = extents.height();
+        // let width = extents.width();
+        // let height = extents.height();
 
-        let mut min_uv = [0.0f32, 0.0];
-        let mut max_uv = [1.0f32, 1.0];
+        let min_uv = [0.0f32, 0.0];
+        let max_uv = [1.0f32, 1.0];
         // if offset_x < 0.0 {
         //     extents.mins.x += offset_x;
         //     min_uv[0] += offset_x / width;
@@ -120,7 +124,7 @@ impl FontFace {
         ]
     }
 
-    fn get_max_box(head_table: &HeadTable) -> Aabb {
+    fn get_max_box_normaliz(head_table: &HeadTable) -> Aabb {
         let mut extents = Aabb::new(
             Point::new(head_table.x_min as f32, head_table.y_min as f32),
             Point::new(head_table.x_max as f32, head_table.y_max as f32),
@@ -128,15 +132,15 @@ impl FontFace {
         // println!("extents: {:?}", extents);
         // let per_em = TOLERANCE;
 
-        let upem = head_table.units_per_em as f32;
+        // let upem = head_table.units_per_em as f32;
         // let tolerance = upem * per_em; /* in font design units */
-        let faraway = upem / 32.0; //upem / (MIN_FONT_SIZE * 2.0f32.sqrt());
+        // let faraway = upem / 32.0; //upem / (MIN_FONT_SIZE * 2.0f32.sqrt());
                                    // let embolden_max = upem / 32.0;
-        // 阴影抗锯齿需要
-        extents.mins.x -= 128.0;
-        extents.mins.y -= 128.0;
-        extents.maxs.x += 128.0;
-        extents.maxs.y += 128.0;
+        // 抗锯齿需要
+        // extents.mins.x -= 128.0;
+        // extents.mins.y -= 128.0;
+        // extents.maxs.x += 128.0;
+        // extents.maxs.y += 128.0;
 
         let glyph_width = extents.maxs.x - extents.mins.x;
         let glyph_height = extents.maxs.y - extents.mins.y;
@@ -147,11 +151,12 @@ impl FontFace {
         };
         // extents.maxs.x +=  2048.0;
         // extents.maxs.y +=  2048.0;
+        extents.scale(1.0 / head_table.units_per_em as f32, 1.0 / head_table.units_per_em as f32);
         extents
     }
 
     pub fn to_outline(&mut self, ch: char) -> GlyphVisitor {
-        let mut sink = GlyphVisitor::new(1.0);
+        let mut sink = GlyphVisitor::new(1.0, SCALE / self.units_per_em as f32);
         sink.accumulate.tolerance = self.units_per_em as f32 * TOLERANCE;
 
         let (glyph_index, _) =
@@ -342,7 +347,7 @@ impl FontFace {
             .ok_or("missing head table")
             .unwrap();
         // log::info!("=========== 4");
-        let extents = Self::get_max_box(&head_table);
+        let max_box_normaliz = Self::get_max_box_normaliz(&head_table);
         let _loca_data = font
             .font_table_provider
             .read_table_data(tag::LOCA)
@@ -371,11 +376,15 @@ impl FontFace {
             .read_dep::<GlyfTable<'_>>(loca_ref)
             .unwrap();
         // log::info!("=========== 9");
-        let mut max_box_normaliz = extents.clone();
-        max_box_normaliz.scale(
-            1.0 / head_table.units_per_em as f32,
-            1.0 / head_table.units_per_em as f32,
-        );
+        let mut extents = max_box_normaliz.clone();
+        extents.scale(SCALE, SCALE);
+
+        // 抗锯齿需要
+        // extents.mins.x -= 128.0;
+        // extents.mins.y -= 128.0;
+        // extents.maxs.x += 128.0;
+        // extents.maxs.y += 128.0;
+        
         // log::info!("=========== 10");
         // todo!()
         Self {

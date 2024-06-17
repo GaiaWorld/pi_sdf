@@ -408,7 +408,7 @@ impl ArcOutline for Ellipse {
                 }
             }
         }
-        let mut sink = GlyphVisitor::new(1.0);
+        let mut sink = GlyphVisitor::new(1.0, 1.0);
         // 圆弧拟合贝塞尔曲线的精度，值越小越精确
         sink.accumulate.tolerance = 0.1;
         println!("=====e.area():{}", e.area());
@@ -684,7 +684,7 @@ impl Path {
 
 impl ArcOutline for Path {
     fn get_arc_endpoints(&self) -> Vec<ArcEndpoint> {
-        let mut sink = GlyphVisitor::new(1.0);
+        let mut sink = GlyphVisitor::new(1.0, 1.0);
         // 圆弧拟合贝塞尔曲线的精度，值越小越精确
         sink.accumulate.tolerance = 0.1;
 

@@ -41,6 +41,7 @@ pub static ENLIGHTEN_MAX: f32 = 0.0001; /* Per EM */
 
 pub static EMBOLDEN_MAX: f32 = 0.0001; /* Per EM */
 
+pub static SCALE: f32 = 2048.0; 
 pub struct User {
     pub accumulate: GlyphyArcAccumulator,
     pub path_str: String,
@@ -59,6 +60,7 @@ pub struct GlyphVisitor {
     pub(crate) svg_endpoints: Vec<[f32; 2]>,
 
     scale: f32,
+    scale2: f32,
     pub(crate) start: Point,
     pub(crate) previous: Point,
     pub index: usize,
@@ -66,7 +68,7 @@ pub struct GlyphVisitor {
 
 #[wasm_bindgen]
 impl GlyphVisitor {
-    pub fn new(scale: f32) -> Self {
+    pub fn new(scale: f32, scale2: f32) -> Self {
         let accumulate = GlyphyArcAccumulator::new();
         let rasterizer = ab_glyph_rasterizer::Rasterizer::new(512, 512);
         Self {
@@ -78,6 +80,7 @@ impl GlyphVisitor {
             svg_paths: vec![],
             svg_endpoints: vec![],
             scale,
+            scale2,
             start: Point::default(),
             previous: Point::default(),
             index: 0,
@@ -100,7 +103,7 @@ impl GlyphVisitor {
 
 impl OutlineSink for GlyphVisitor {
     fn move_to(&mut self, to: Vector2F) {
-        let to = Point::new(to.x(), to.y());
+        let to = Point::new(to.x(), to.y()) * self.scale2;
         log::debug!("M {} {} ", to.x, to.y);
 
         if self.scale > 0.02 {
@@ -116,7 +119,7 @@ impl OutlineSink for GlyphVisitor {
     }
 
     fn line_to(&mut self, to: Vector2F) {
-        let to = Point::new(to.x(), to.y());
+        let to = Point::new(to.x(), to.y())* self.scale2;
         log::debug!("+ L {} {} ", to.x, to.y);
         if self.scale > 0.02 {
             self.accumulate.line_to(to);
@@ -134,8 +137,8 @@ impl OutlineSink for GlyphVisitor {
     }
 
     fn quadratic_curve_to(&mut self, control: Vector2F, to: Vector2F) {
-        let control = Point::new(control.x(), control.y());
-        let to = Point::new(to.x(), to.y());
+        let control = Point::new(control.x(), control.y()) * self.scale2;
+        let to = Point::new(to.x(), to.y()) * self.scale2;
 
         log::debug!("+ Q {} {} {} {} ", control.x, control.y, to.x, to.y);
         if self.scale > 0.02 {
@@ -153,9 +156,9 @@ impl OutlineSink for GlyphVisitor {
 
     fn cubic_curve_to(&mut self, control: LineSegment2F, to: Vector2F) {
         // 字形数据没有三次贝塞尔曲线
-        let control1 = Point::new(control.from_x(), control.from_y());
-        let control2 = Point::new(control.to_x(), control.to_y());
-        let to = Point::new(to.x(), to.y());
+        let control1 = Point::new(control.from_x(), control.from_y()) * self.scale2;
+        let control2 = Point::new(control.to_x(), control.to_y()) * self.scale2;
+        let to = Point::new(to.x(), to.y()) * self.scale2;
 
         log::debug!(
             "+ C {}, {}, {}, {}, {}, {}",
