@@ -193,7 +193,7 @@ impl FontFace {
             &mut temp,
         );
 
-        println!("result_arcs: {:?}", result_arcs.len());
+        // println!("result_arcs: {:?}", result_arcs.len());
 
         // let width_cells = (extents.width() / min_width).floor();
         // let height_cells = (extents.height() / min_height).floor();
@@ -254,7 +254,7 @@ impl FontFace {
             let outline = self.to_outline(char);
             let (mut blod_arc, map) = Self::get_char_arc(self.max_box.clone(), outline);
             let size = blod_arc.encode_data_tex(&map, data_tex, width0, offset_x0, offset_y0)?;
-            println!("data_map: {}", map.len());
+            // println!("data_map: {}", map.len());
             let mut info = blod_arc.encode_index_tex(
                 index_tex, width1, offset_x1, offset_y1, map, size, sdf_tex, sdf_tex1, sdf_tex2,
                 sdf_tex3,
@@ -280,7 +280,7 @@ impl FontFace {
 
     pub fn compute_sdf(max_box: Aabb, outline: GlyphVisitor) -> SdfInfo {
         let (mut blod_arc, map) = Self::get_char_arc(max_box, outline);
-        println!("data_map: {}", map.len());
+        // println!("data_map: {}", map.len());
         let data_tex = blod_arc.encode_data_tex1(&map);
         let (tex_info, index_tex, sdf_tex1, sdf_tex2, sdf_tex3, sdf_tex4) =
             blod_arc.encode_index_tex1(map, data_tex.len() / 4);
@@ -391,7 +391,10 @@ impl FontFace {
         let mut info = Vec::with_capacity(text.len());
         for char in text.chars() {
             let outline = self.to_outline(char);
-            info.push(Self::compute_sdf(self.max_box.clone(), outline));
+            let mut v = Self::compute_sdf(self.max_box.clone(), outline);
+            v.tex_info.char = char;
+            info.push(v);
+            
         }
         info
     }

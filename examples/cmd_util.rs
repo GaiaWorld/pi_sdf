@@ -22,6 +22,7 @@ fn main() {
     let mut buffer2: Vec<u8> = Vec::new();
     for font in cfg.as_array().unwrap().iter(){
         let path = PathBuf::from(font["path"].as_str().unwrap());
+        let family_name = font["family_name"].as_str().unwrap();
         let font_data = std::fs::read(&path).unwrap();
         let text = font["text"].as_str().unwrap();
         println!("text: {}", text);
@@ -41,7 +42,7 @@ fn main() {
         
         println!("count: {}", count);
 
-        buffer.push((path.file_name().unwrap().to_str().unwrap().to_string(), sdf));
+        buffer.push((family_name.to_string(), sdf));
         
     }
 
@@ -52,10 +53,10 @@ fn main() {
     let mut reader = brotli::CompressorReader::new(Cursor::new(&buffer), buffer.len() /* buffer size */, 6, 22);
     reader.read_to_end(&mut out).unwrap();
 
-    std::fs::write("./sdfinfo", &out).unwrap();
+    std::fs::write("./font.sdf2", &out).unwrap();
 
     let time = std::time::Instant::now();
     let decoded: Vec<(String, Vec<SdfInfo>)> = bincode::deserialize(&buffer[..]).unwrap();
     println!("time2: {:?}", time.elapsed());
-    println!("decoded: {:?}", decoded[0].1[0].tex_info);
+    println!("decoded: {:?}", (&decoded[0].0, &decoded[0].1[0].tex_info));
 }

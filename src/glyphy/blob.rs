@@ -171,7 +171,7 @@ impl BlobArc {
         for v in map.values() {
             let unit_arc = unsafe { &mut *(*v as *mut UnitArc) };
             unit_arc.offset = len;
-            println!("unit_arc.data.len(): {}", unit_arc.data.len());
+            // println!("unit_arc.data.len(): {}", unit_arc.data.len());
             if unit_arc.data.len() == 1 {
                 assert!(unit_arc.data[0].line_encode.is_some());
                 if let Some(data) = &unit_arc.data[0].line_encode {
@@ -787,7 +787,7 @@ pub struct TexInfo {
     pub char: char,
     pub extents_min_x: f32,
     pub extents_min_y: f32,
-    
+
     pub extents_max_x: f32,
     pub extents_max_y: f32, 
     pub binding_box_min_x: f32,

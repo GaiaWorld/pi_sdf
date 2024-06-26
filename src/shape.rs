@@ -895,10 +895,10 @@ impl SvgScenes {
         ) in self.shapes.drain()
         {
             let binding_box = extents(binding_box);
-            println!("binding_box: {:?}", binding_box);
+            // println!("binding_box: {:?}", binding_box);
             let (mut blob_arc, map) = compute_near_arc_impl(binding_box, arc_endpoints, is_area);
             let size = blob_arc.encode_data_tex(&map, data_tex, width0, offset_x0, offset_y0)?;
-            println!("data_map: {}", map.len());
+            // println!("data_map: {}", map.len());
             let mut info = blob_arc.encode_index_tex(
                 index_tex, width1, offset_x1, offset_y1, map, size, sdf_tex, sdf_tex1, sdf_tex2,
                 sdf_tex3,
@@ -908,11 +908,11 @@ impl SvgScenes {
             info.index_offset_y = last_offset1.1;
             info.data_offset_x = *offset_x0;
             info.data_offset_y = *offset_y0;
-            println!(
-                "info.index_offset: {:?}, info.data_offset: {:?}",
-                (info.index_offset_x, info.index_offset_y),
-                (info.data_offset_x, info.data_offset_y)
-            );
+            // println!(
+            //     "info.index_offset: {:?}, info.data_offset: {:?}",
+            //     (info.index_offset_x, info.index_offset_y),
+            //     (info.data_offset_x, info.data_offset_y)
+            // );
             *offset_x0 += size / 8;
             if size % 8 != 0 {
                 *offset_x0 += 1;
