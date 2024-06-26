@@ -3,6 +3,7 @@ use parry2d::{bounding_volume::Aabb, math::Vector, shape::Segment};
 use std::hash::Hasher;
 use std::sync::atomic::AtomicU64;
 use std::{ops::Range, sync::atomic::Ordering};
+#[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::glyphy::util::{float_equals, xor};
@@ -34,7 +35,7 @@ pub struct ErrorValue {
     pub(crate) value: f32,
 }
 
-#[wasm_bindgen(getter_with_clone)]
+#[cfg_attr(target_arch="wasm32", wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Clone)]
 pub struct ArcEndpoint {
     pub(crate) p: Point,
@@ -46,7 +47,7 @@ pub struct ArcEndpoint {
     pub(crate) line_encode: Option<[f32; 4]>, // rgba
 }
 
-#[wasm_bindgen]
+#[cfg_attr(target_arch="wasm32", wasm_bindgen)]
 impl ArcEndpoint {
     pub fn new(x: f32, y: f32, d: f32) -> Self {
         Self {
@@ -89,7 +90,7 @@ impl ArcEndpoint {
 //    d > 0，和 (终 - 起).otho() 同向
 //    d < 0，和 上面 相反
 
-#[wasm_bindgen]
+#[cfg_attr(target_arch="wasm32", wasm_bindgen)]
 #[derive(Debug, Clone)]
 pub struct Arc {
     pub id: u64,

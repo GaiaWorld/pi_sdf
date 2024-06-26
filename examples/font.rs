@@ -72,7 +72,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     });
 
     // 加载字体文件
-    let buffer = std::fs::read("./source/WenQuanYiMicroHei.woff2").unwrap();
+    let buffer = std::fs::read("./source/ht.ttf").unwrap();
     // let buffer = std::fs::read("./source/msyh.ttf").unwrap();
     let mut ft_face = FontFace::new(buffer);
 
@@ -96,8 +96,8 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     };
     let time = std::time::Instant::now();
     let texs_info = ft_face.out_tex_data(&text, &mut tex_data).unwrap(); // 将字符串的sdf数据写入纹理
-    println!("out_tex_data: {:?}", time.elapsed());
-
+    println!("out_tex_data: {:?}", (time.elapsed(), ));
+    
     // 字体缩放
     let scale = [128.0f32, 128.0];
 

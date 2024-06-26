@@ -10,9 +10,10 @@ use allsorts::{
 };
 // use freetype_sys::FT_Vector;
 
-use parry2d::{bounding_volume::Aabb, na::Vector2};
+use parry2d::bounding_volume::Aabb;
+use serde::{Deserialize, Serialize};
+#[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::wasm_bindgen;
-// use parry2d::math::Point;
 
 use crate::{
     glyphy::{
@@ -24,11 +25,11 @@ use crate::{
         outline::glyphy_outline_winding_from_even_odd,
         util::GLYPHY_INFINITY,
     },
-    utils::{encode_uint_arc_data, GlyphVisitor, EMBOLDEN_MAX, MIN_FONT_SIZE, SCALE, TOLERANCE},
+    utils::{encode_uint_arc_data, GlyphVisitor, SCALE, TOLERANCE},
     Point,
 };
 
-#[wasm_bindgen]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub struct FontFace {
     pub(crate) _data: Vec<u8>,
     pub(crate) font: Font<DynamicFontTableProvider<'static>>,
@@ -46,38 +47,8 @@ impl FontFace {
         &self.font
     }
 
-    /// 水平宽度
-    pub fn horizontal_advance(&mut self, char: char) -> f32 {
-        let (glyph_index, _) =
-            self.font
-                .lookup_glyph_index(char, MatchingPresentation::NotRequired, None);
-        match self.font.horizontal_advance(glyph_index) {
-            Some(r) => r as f32 / self.units_per_em as f32,
-            None => 0.0,
-        }
-    }
-
-    pub fn ascender(&self) -> f32 {
-        self.font.hhea_table.ascender as f32 / self.units_per_em as f32
-    }
-
-    pub fn descender(&self) -> f32 {
-        self.font.hhea_table.descender as f32 / self.units_per_em as f32
-    }
-    pub fn max_box(&self) -> &Aabb {
-        &self.max_box
-    }
-
-    pub fn max_box_normaliz(&self) -> &Aabb {
-        &self.max_box_normaliz
-    }
-
-    pub fn debug_size(&self)-> usize{
-        self._data.len()
-    }
-
-    pub fn verties(&self, font_size: f32, shadow_offset: &mut [f32]) -> [f32; 16] {
-        let mut extents = self.max_box_normaliz.clone();
+    pub fn verties(&self, _font_size: f32,_shadow_offsett: &mut [f32]) -> [f32; 16] {
+        let extents = self.max_box_normaliz.clone();
 
         // let offset_x = shadow_offset[0] / font_size;
         // let offset_y = shadow_offset[1] / font_size;
@@ -135,7 +106,7 @@ impl FontFace {
         // let upem = head_table.units_per_em as f32;
         // let tolerance = upem * per_em; /* in font design units */
         // let faraway = upem / 32.0; //upem / (MIN_FONT_SIZE * 2.0f32.sqrt());
-                                   // let embolden_max = upem / 32.0;
+        // let embolden_max = upem / 32.0;
         // 抗锯齿需要
         // extents.mins.x -= 128.0;
         // extents.mins.y -= 128.0;
@@ -151,28 +122,19 @@ impl FontFace {
         };
         // extents.maxs.x +=  2048.0;
         // extents.maxs.y +=  2048.0;
-        extents.scale(1.0 / head_table.units_per_em as f32, 1.0 / head_table.units_per_em as f32);
+        extents.scale(
+            1.0 / head_table.units_per_em as f32,
+            1.0 / head_table.units_per_em as f32,
+        );
         extents
-    }
-
-    pub fn to_outline(&mut self, ch: char) -> GlyphVisitor {
-        let mut sink = GlyphVisitor::new(1.0, SCALE / self.units_per_em as f32);
-        sink.accumulate.tolerance = self.units_per_em as f32 * TOLERANCE;
-
-        let (glyph_index, _) =
-            self.font
-                .lookup_glyph_index(ch, MatchingPresentation::NotRequired, None);
-        // let r = self.font.horizontal_advance(glyph_index);
-        // let r1 = self.font.vertical_advance(glyph_index);
-        // println!("horizontal_advance, char: {}: horizontal_advance:{:?}, vertical_advance: {:?}", ch, r, r1);
-        let _ = self.glyf.visit(glyph_index, &mut sink);
-        sink
     }
 
     pub fn get_char_arc(extents: Aabb, mut sink: GlyphVisitor) -> (BlobArc, HashMap<u64, u64>) {
         // log::error!("get_char_arc: {:?}", char);
         // let extents = self.max_box.clone();
         let endpoints = &mut sink.accumulate.result;
+        // let r = endpoints.len();
+        // println!("endpoints: {}",  endpoints.len());
         if endpoints.len() > 0 {
             // 用奇偶规则，计算 每个圆弧的 环绕数
             glyphy_outline_winding_from_even_odd(endpoints, false);
@@ -231,7 +193,7 @@ impl FontFace {
             &mut temp,
         );
 
-        // println!("result_arcs: {:?}", result_arcs.len());
+        println!("result_arcs: {:?}", result_arcs.len());
 
         // let width_cells = (extents.width() / min_width).floor();
         // let height_cells = (extents.height() / min_height).floor();
@@ -298,8 +260,10 @@ impl FontFace {
                 sdf_tex3,
             )?;
 
-            info.index_offset = last_offset1;
-            info.data_offset = (*offset_x0, *offset_y0);
+            info.index_offset_x = last_offset1.0;
+            info.index_offset_y = last_offset1.1;
+            info.data_offset_x = *offset_x0;
+            info.data_offset_y = *offset_y0;
 
             *offset_x0 += size / 8;
             if size % 8 != 0 {
@@ -313,10 +277,31 @@ impl FontFace {
 
         Ok(infos)
     }
+
+    pub fn compute_sdf(max_box: Aabb, outline: GlyphVisitor) -> SdfInfo {
+        let (mut blod_arc, map) = Self::get_char_arc(max_box, outline);
+        println!("data_map: {}", map.len());
+        let data_tex = blod_arc.encode_data_tex1(&map);
+        let (tex_info, index_tex, sdf_tex1, sdf_tex2, sdf_tex3, sdf_tex4) =
+            blod_arc.encode_index_tex1(map, data_tex.len() / 4);
+        let grid_size = blod_arc.grid_size();
+
+        SdfInfo {
+            tex_info,
+            data_tex,
+            index_tex,
+            sdf_tex1,
+            sdf_tex2,
+            sdf_tex3,
+            sdf_tex4,
+            grid_size: vec![grid_size.0, grid_size.1],
+        }
+    }
 }
 
-#[wasm_bindgen(getter_with_clone)]
-pub struct SdfInfo{
+#[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
+pub struct SdfInfo {
     pub tex_info: TexInfo,
     pub data_tex: Vec<u8>,
     pub index_tex: Vec<u8>,
@@ -324,11 +309,12 @@ pub struct SdfInfo{
     pub sdf_tex2: Vec<u8>,
     pub sdf_tex3: Vec<u8>,
     pub sdf_tex4: Vec<u8>,
+    pub grid_size: Vec<f32>,
 }
 
 // pub struct SdfInfos
 
-#[wasm_bindgen]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 impl FontFace {
     pub fn new(_data: Vec<u8>) -> Self {
         let _ = console_log::init_with_level(log::Level::Info);
@@ -346,6 +332,7 @@ impl FontFace {
             .unwrap()
             .ok_or("missing head table")
             .unwrap();
+
         // log::info!("=========== 4");
         let max_box_normaliz = Self::get_max_box_normaliz(&head_table);
         let _loca_data = font
@@ -384,7 +371,7 @@ impl FontFace {
         // extents.mins.y -= 128.0;
         // extents.maxs.x += 128.0;
         // extents.maxs.y += 128.0;
-        
+
         // log::info!("=========== 10");
         // todo!()
         Self {
@@ -400,25 +387,88 @@ impl FontFace {
         }
     }
 
-    pub fn compute_sdf(&mut self, text: &str,)-> Vec<SdfInfo> {
-        let mut info = Vec::with_capacity(text.len()); 
+    pub fn compute_text_sdf(&mut self, text: &str) -> Vec<SdfInfo> {
+        let mut info = Vec::with_capacity(text.len());
         for char in text.chars() {
             let outline = self.to_outline(char);
-            let (mut blod_arc, map) = Self::get_char_arc(self.max_box.clone(), outline);
-            let data_tex = blod_arc.encode_data_tex1(&map);
-            let (tex_info, index_tex, sdf_tex1, sdf_tex2, sdf_tex3, sdf_tex4) = blod_arc.encode_index_tex1(map, data_tex.len() / 4);
-            info.push(SdfInfo {
-                tex_info,
-                data_tex,
-                index_tex,
-                sdf_tex1,
-                sdf_tex2,
-                sdf_tex3,
-                sdf_tex4,
-            });
+            info.push(Self::compute_sdf(self.max_box.clone(), outline));
         }
         info
     }
+
+    pub fn compute_sdf2(max_box: &[f32], outline: GlyphVisitor) -> Vec<u8> {
+        let max_box = Aabb::new(
+            Point::new(max_box[0], max_box[1]),
+            Point::new(max_box[2], max_box[3]),
+        );
+        bincode::serialize(&Self::compute_sdf(max_box, outline))
+        .unwrap()
+    }
+
+    /// 水平宽度
+    pub fn horizontal_advance(&mut self, char: char) -> f32 {
+        let (glyph_index, _) =
+            self.font
+                .lookup_glyph_index(char, MatchingPresentation::NotRequired, None);
+        match self.font.horizontal_advance(glyph_index) {
+            Some(r) => r as f32 / self.units_per_em as f32,
+            None => 0.0,
+        }
+    }
+
+    pub fn ascender(&self) -> f32 {
+        self.font.hhea_table.ascender as f32 / self.units_per_em as f32
+    }
+
+    pub fn descender(&self) -> f32 {
+        self.font.hhea_table.descender as f32 / self.units_per_em as f32
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn max_box(&self) -> Aabb {
+        self.max_box.clone()
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub fn max_box(&self) -> Vec<f32> {
+        vec![
+            self.max_box.mins.x,
+            self.max_box.mins.y,
+            self.max_box.maxs.x,
+            self.max_box.maxs.y,
+        ]
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn max_box_normaliz(&self) -> Aabb {
+        self.max_box_normaliz.clone()
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub fn max_box_normaliz(&self) -> Vec<f32> {
+        vec![
+            self.max_box_normaliz.mins.x,
+            self.max_box_normaliz.mins.y,
+            self.max_box_normaliz.maxs.x,
+            self.max_box_normaliz.maxs.y,
+        ]
+    }
+
+    pub fn to_outline(&mut self, ch: char) -> GlyphVisitor {
+        let mut sink = GlyphVisitor::new(1.0, SCALE / self.units_per_em as f32);
+        sink.accumulate.tolerance = self.units_per_em as f32 * TOLERANCE;
+
+        let (glyph_index, _) =
+            self.font
+                .lookup_glyph_index(ch, MatchingPresentation::NotRequired, None);
+        // let r = self.font.horizontal_advance(glyph_index);
+        // let r1 = self.font.vertical_advance(glyph_index);
+        // println!("horizontal_advance, char: {}: horizontal_advance:{:?}, vertical_advance: {:?}", ch, r, r1);
+        let _ = self.glyf.visit(glyph_index, &mut sink);
+        sink
+    }
+
+    pub fn debug_size(&self) -> usize {
+        self._data.len()
+    }
 }
-
-

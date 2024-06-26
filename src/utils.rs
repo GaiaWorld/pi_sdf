@@ -9,11 +9,12 @@ use allsorts::{
 
 // use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
 use usvg::{Color, Fill, NonZeroPositiveF32, Paint, Stroke};
+#[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::{
     glyphy::{geometry::arcs::GlyphyArcAccumulator, sdf::glyphy_sdf_from_arc_list2},
-    Point, shape::{SvgScenes, Rect, ArcOutline},
+    Point, shape::{SvgScenes, Rect},
 };
 use parry2d::bounding_volume::Aabb;
 use std::hash::Hasher;
@@ -49,7 +50,7 @@ pub struct User {
     pub svg_endpoints: Vec<[f32; 2]>,
 }
 
-#[wasm_bindgen]
+#[cfg_attr(target_arch="wasm32", wasm_bindgen)]
 pub struct GlyphVisitor {
     rasterizer: Rasterizer,
     pub(crate) accumulate: GlyphyArcAccumulator,
@@ -66,7 +67,7 @@ pub struct GlyphVisitor {
     pub index: usize,
 }
 
-#[wasm_bindgen]
+#[cfg_attr(target_arch="wasm32", wasm_bindgen)]
 impl GlyphVisitor {
     pub fn new(scale: f32, scale2: f32) -> Self {
         let accumulate = GlyphyArcAccumulator::new();
@@ -223,8 +224,8 @@ impl OutlineSink for GlyphVisitor {
 pub fn encode_uint_arc_data(
     result_arcs: Vec<(Vec<&Arc>, Aabb)>,
     extents: &Aabb,
-    min_width: f32,
-    min_height: f32,
+    _min_width: f32,
+    _min_height: f32,
     is_area: Option<bool>,
     // units_per_em: u16,
 ) -> (Vec<Vec<UnitArc>>, HashMap<u64, u64>) {
@@ -299,6 +300,7 @@ pub fn encode_uint_arc_data(
             near_endpoints.push(endpoint);
             _p1 = arc.p1;
         }
+        // println!("near_endpoints: {:?}", near_endpoints.len());
 
         let begin = cell.mins - extents.mins;
         let end = cell.maxs - extents.mins;
@@ -417,7 +419,7 @@ pub fn encode_uint_arc_data(
     (data, map)
 }
 
-#[wasm_bindgen]
+#[cfg_attr(target_arch="wasm32", wasm_bindgen)]
 pub fn get_char_arc_debug(char: String) -> BlobArc {
     // console_error_panic_hook::set_once();
 
@@ -442,11 +444,11 @@ pub fn get_char_arc_debug(char: String) -> BlobArc {
     rect.attribute.set_stroke_color(0, 0, 0);
     // 描边宽度，默认0.0
     rect.attribute.set_stroke_width(2.0);
-    shapes.add_shape(rect.get_hash(), Box::new(rect));
+    shapes.add_shape(rect.get_hash(), rect.get_svg_info(), rect.get_attribute());
     arcs
 }
 
-// #[wasm_bindgen]
+// #[cfg_attr(target_arch="wasm32", wasm_bindgen)]
 // pub fn compute_svg_debug() -> BlobArc {
 //     // console_error_panic_hook::set_once();
 

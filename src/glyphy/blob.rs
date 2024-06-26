@@ -5,6 +5,8 @@ use std::{collections::HashMap, ops::Range};
 // use hashlink::LinkedHashMap;
 use parry2d::{bounding_volume::Aabb, math::Vector};
 
+use serde::{Deserialize, Serialize};
+#[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::wasm_bindgen;
 
 use super::{
@@ -34,7 +36,7 @@ pub enum EncodeError {
     NewLine,
 }
 
-#[wasm_bindgen(getter_with_clone)]
+#[cfg_attr(target_arch="wasm32", wasm_bindgen(getter_with_clone))]
 #[derive(Clone, Debug)]
 pub struct UnitArc {
     pub parent_cell: Extents,
@@ -55,7 +57,7 @@ pub struct UnitArc {
     pub s_dist_3: u64,
 }
 
-#[wasm_bindgen]
+#[cfg_attr(target_arch="wasm32", wasm_bindgen)]
 impl UnitArc {
     pub fn get_data_len(&self) -> usize {
         self.data.len()
@@ -76,7 +78,7 @@ impl UnitArc {
     }
 }
 
-#[wasm_bindgen]
+#[cfg_attr(target_arch="wasm32", wasm_bindgen)]
 #[derive(Debug, Clone)]
 pub struct BlobArc {
     pub min_sdf: f32,
@@ -88,13 +90,13 @@ pub struct BlobArc {
     pub(crate) show: String,
 
     pub(crate) extents: Aabb,
-    #[wasm_bindgen(skip)]
-    pub data: Vec<Vec<UnitArc>>,
+
+    pub(crate) data: Vec<Vec<UnitArc>>,
     pub avg_fetch_achieved: f32,
     pub(crate) endpoints: Vec<ArcEndpoint>,
 }
 
-#[wasm_bindgen]
+#[cfg_attr(target_arch="wasm32", wasm_bindgen)]
 #[derive(Debug, Clone, Copy)]
 pub struct Extents {
     pub min_x: f32,
@@ -103,7 +105,7 @@ pub struct Extents {
     pub max_y: f32,
 }
 
-#[wasm_bindgen]
+#[cfg_attr(target_arch="wasm32", wasm_bindgen)]
 impl BlobArc {
     pub fn get_unit_arc(&self, i: usize, j: usize) -> UnitArc {
         // log::debug!("i: {}, j: {}", i, j);
@@ -169,7 +171,7 @@ impl BlobArc {
         for v in map.values() {
             let unit_arc = unsafe { &mut *(*v as *mut UnitArc) };
             unit_arc.offset = len;
-
+            println!("unit_arc.data.len(): {}", unit_arc.data.len());
             if unit_arc.data.len() == 1 {
                 assert!(unit_arc.data[0].line_encode.is_some());
                 if let Some(data) = &unit_arc.data[0].line_encode {
@@ -385,10 +387,19 @@ impl BlobArc {
 
             min_sdf: self.min_sdf,
             sdf_step,
-            index_offset: (0, 0),
-            data_offset: (0, 0),
-            extents: Aabb::new_invalid(),
-            binding_box:  Aabb::new_invalid(),
+            char: char::default(),
+            index_offset_x: 0,
+            index_offset_y:0,
+            data_offset_x: 0,
+            data_offset_y: 0,
+            extents_min_x: Default::default(),
+            extents_min_y: Default::default(),
+            extents_max_x: Default::default(),
+            extents_max_y: Default::default(),
+            binding_box_min_x: Default::default(),
+            binding_box_min_y: Default::default(),
+            binding_box_max_x: Default::default(),
+            binding_box_max_y: Default::default(),
         });
     }
 
@@ -514,10 +525,20 @@ impl BlobArc {
 
                 min_sdf: self.min_sdf,
                 sdf_step,
-                index_offset: (0, 0),
-                data_offset: (0, 0),
-                extents: Aabb::new_invalid(),
-                binding_box:  Aabb::new_invalid(),
+                char: char::default(),
+                index_offset_x: 0,
+                index_offset_y:0,
+                data_offset_x: 0,
+                data_offset_y: 0,
+                extents_min_x: Default::default(),
+                extents_min_y: Default::default(),
+                extents_max_x: Default::default(),
+                extents_max_y: Default::default(),
+                binding_box_min_x: Default::default(),
+                binding_box_min_y: Default::default(),
+                binding_box_max_x: Default::default(),
+                binding_box_max_y: Default::default(),
+           
             },
             index_tex,
             sdf_tex,
@@ -725,7 +746,7 @@ pub fn is_point_same_sign(point: Point, endpoints: &Vec<ArcEndpoint>, sdf_sign: 
     return v == sdf_sign;
 }
 
-#[wasm_bindgen(getter_with_clone)]
+#[cfg_attr(target_arch="wasm32", wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Clone)]
 pub struct TexData {
     pub index_tex: Vec<u8>, // 字节数 = 2 * 像素个数
@@ -747,8 +768,8 @@ pub struct TexData {
 //     pub fn new(index_tex: )
 // }
 
-#[wasm_bindgen]
-#[derive(Debug, Clone)]
+#[cfg_attr(target_arch="wasm32", wasm_bindgen)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TexInfo {
     pub grid_w: f32,
     pub grid_h: f32,
@@ -758,29 +779,45 @@ pub struct TexInfo {
     pub max_offset: usize,
     pub min_sdf: f32,
     pub sdf_step: f32,
-    #[wasm_bindgen(skip)]
-    pub index_offset: (usize, usize),
-    #[wasm_bindgen(skip)]
-    pub data_offset: (usize, usize),
-    #[wasm_bindgen(skip)]
-    pub extents: Aabb,
-    #[wasm_bindgen(skip)]
-    pub binding_box: Aabb,
+    
+    pub index_offset_x: usize,
+    pub index_offset_y: usize,
+    pub data_offset_x: usize,
+    pub data_offset_y: usize,
+    pub char: char,
+    pub extents_min_x: f32,
+    pub extents_min_y: f32,
+    
+    pub extents_max_x: f32,
+    pub extents_max_y: f32, 
+    pub binding_box_min_x: f32,
+    pub binding_box_min_y: f32,
+    pub binding_box_max_x: f32,
+    pub binding_box_max_y: f32,
 }
 
 impl Default for TexInfo {
     fn default() -> Self {
         Self {
-            extents: Aabb::new_invalid(),
-            binding_box: Aabb::new_invalid(),
             grid_w: Default::default(),
             grid_h: Default::default(),
             cell_size: Default::default(),
             max_offset: Default::default(),
             min_sdf: Default::default(),
             sdf_step: Default::default(),
-            index_offset: Default::default(),
-            data_offset: Default::default(),
+            char: char::default(),
+            index_offset_x: Default::default(),
+            index_offset_y: Default::default(),
+            data_offset_x: Default::default(),
+            data_offset_y: Default::default(),
+            extents_min_x: Default::default(),
+            extents_min_y: Default::default(),
+            extents_max_x: Default::default(),
+            extents_max_y: Default::default(),
+            binding_box_min_x: Default::default(),
+            binding_box_min_y: Default::default(),
+            binding_box_max_x: Default::default(),
+            binding_box_max_y: Default::default(),
             // ..
         }
     }

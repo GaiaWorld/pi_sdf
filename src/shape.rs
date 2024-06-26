@@ -10,7 +10,7 @@ use parry2d::{bounding_volume::Aabb, shape::Segment as MSegment};
 use serde::{Deserialize, Serialize};
 // use usvg::tiny_skia_path::PathSegment;
 
-use crate::{glyphy::geometry::aabb::AabbEXT, utils::Attribute};
+use crate::{font::SdfInfo, glyphy::geometry::aabb::AabbEXT, utils::Attribute};
 use crate::{
     glyphy::{
         blob::{EncodeError, TexData, TexInfo},
@@ -21,33 +21,39 @@ use crate::{
     utils::GlyphVisitor,
     Point,
 };
-use std::{collections::HashMap, fmt::Debug, hash::Hasher};
+use std::{collections::HashMap, fmt::Debug, hash::Hasher, mem::transmute};
 pub const FARWAY: f32 = 20.0;
 
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::prelude::wasm_bindgen;
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 #[derive(PartialEq, Clone, Copy, Debug, Serialize, Deserialize)]
 pub enum PathVerb {
     // 绝对点
     MoveTo = 1,
     // 相对点
-    MoveToRelative,
-    LineTo,
-    LineToRelative,
-    QuadTo,
-    QuadToRelative,
-    SmoothQuadTo,
-    SmoothQuadToRelative,
-    CubicTo,
-    CubicToRelative,
-    SmoothCubicTo,
-    SmoothCubicToRelative,
-    HorizontalLineTo,
-    HorizontalLineToRelative,
-    VerticalLineTo,
-    VerticalLineToRelative,
-    EllipticalArcTo,
-    EllipticalArcToRelative,
-    Close,
+    MoveToRelative = 2,
+    LineTo = 3,
+    LineToRelative = 4,
+    QuadTo = 5,
+    QuadToRelative = 6,
+    SmoothQuadTo = 7,
+    SmoothQuadToRelative = 8,
+    CubicTo = 9,
+    CubicToRelative = 10,
+    SmoothCubicTo = 11,
+    SmoothCubicToRelative = 12,
+    HorizontalLineTo = 13,
+    HorizontalLineToRelative = 14,
+    VerticalLineTo = 15,
+    VerticalLineToRelative = 16,
+    EllipticalArcTo = 17,
+    EllipticalArcToRelative = 18,
+    Close = 19,
 }
+
+
 
 impl Into<f32> for PathVerb {
     fn into(self) -> f32 {
@@ -74,76 +80,19 @@ impl Into<f32> for PathVerb {
         }
     }
 }
-pub trait ArcOutline: Send + Sync + Debug + ShapeClone {
-    fn get_arc_endpoints(&self) -> Vec<ArcEndpoint>;
-    fn get_attribute(&self) -> Attribute;
-    fn get_hash(&self) -> u64;
-    fn extents(&self) -> Aabb {
-        let mut binding_box = self.binding_box();
-        binding_box.mins.x = binding_box.mins.x - FARWAY;
-        binding_box.mins.y = binding_box.mins.y - FARWAY;
-        binding_box.maxs.x = binding_box.maxs.x + FARWAY;
-        binding_box.maxs.y = binding_box.maxs.y + FARWAY;
 
-        let width = binding_box.width();
-        let height = binding_box.height();
-        if width > height {
-            binding_box.maxs.y = binding_box.mins.y + width;
-        } else {
-            binding_box.maxs.x = binding_box.mins.x + height;
-        };
-        binding_box
-    }
-    fn binding_box(&self) -> Aabb;
-    fn is_area(&self) -> bool;
-}
-
-pub trait ShapeClone {
-    fn clone_box(&self) -> Box<dyn ArcOutline>;
-}
-
-impl<T> ShapeClone for T
-where
-    T: 'static + ArcOutline + Clone,
-{
-    fn clone_box(&self) -> Box<dyn ArcOutline> {
-        Box::new(self.clone())
-    }
-}
-
-impl Clone for Box<dyn ArcOutline> {
-    fn clone(&self) -> Box<dyn ArcOutline> {
-        self.clone_box()
-    }
-}
-
-// serialize_trait_object!(ArcOutline);
-// impl Serialize for Box<dyn ArcOutline> {
-//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-//     where
-//         S: serde::Serializer {
-//         todo!()
-//     }
-// }
-
-// impl Deserialize for Box<dyn ArcOutline> {
-//     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-//     where
-//         D: serde::Deserializer<'de> {
-//         todo!()
-//     }
-// }
-
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 #[derive(Clone, Debug)]
 pub struct Circle {
     radius: f32,
     cx: f32,
     cy: f32,
-    pub attribute: Attribute,
+    pub(crate) attribute: Attribute,
 }
 
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 impl Circle {
-    pub fn new(cx: f32, cy: f32, radius: f32) -> Result<Self, String> {
+    pub fn new(cx: f32, cy: f32, radius: f32) -> Result<Circle, String> {
         if radius <= 0.0 {
             return Err("radius < 0 of circle!!!".to_string());
         }
@@ -158,10 +107,8 @@ impl Circle {
             attribute,
         })
     }
-}
 
-impl ArcOutline for Circle {
-    fn get_arc_endpoints(&self) -> Vec<ArcEndpoint> {
+    pub fn get_arc_endpoints(&self) -> Vec<ArcEndpoint> {
         vec![
             ArcEndpoint::new(self.cx + self.radius, self.cy, f32::INFINITY),
             ArcEndpoint::new(
@@ -187,11 +134,7 @@ impl ArcOutline for Circle {
         ]
     }
 
-    fn get_attribute(&self) -> Attribute {
-        self.attribute.clone()
-    }
-
-    fn get_hash(&self) -> u64 {
+    pub fn get_hash(&self) -> u64 {
         let mut hasher = pi_hash::DefaultHasher::default();
         hasher.write(bytemuck::cast_slice(&[self.cx, self.cy, self.radius, 1.0]));
         hasher.finish()
@@ -204,20 +147,36 @@ impl ArcOutline for Circle {
         }
     }
 
-    fn is_area(&self) -> bool {
+    pub fn get_svg_info(&self) -> SvgInfo {
+        SvgInfo {
+            binding_box: self.binding_box(),
+            arc_endpoints: self.get_arc_endpoints(),
+            is_area: self.is_area(),
+        }
+    }
+
+    pub fn is_area(&self) -> bool {
         true
     }
 }
 
+impl Circle {
+    pub fn get_attribute(&self) -> Attribute {
+        self.attribute.clone()
+    }
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 #[derive(Clone, Debug)]
 pub struct Rect {
     x: f32,
     y: f32,
     width: f32,
     height: f32,
-    pub attribute: Attribute,
+    pub(crate) attribute: Attribute,
 }
 
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 impl Rect {
     pub fn new(x: f32, y: f32, width: f32, height: f32) -> Self {
         let mut attribute = Attribute::default();
@@ -232,10 +191,8 @@ impl Rect {
             attribute,
         }
     }
-}
 
-impl ArcOutline for Rect {
-    fn get_arc_endpoints(&self) -> Vec<ArcEndpoint> {
+    pub fn get_arc_endpoints(&self) -> Vec<ArcEndpoint> {
         if self.width * self.height >= 0.0 {
             vec![
                 ArcEndpoint::new(self.x, self.y, f32::INFINITY),
@@ -255,11 +212,7 @@ impl ArcOutline for Rect {
         }
     }
 
-    fn get_attribute(&self) -> Attribute {
-        self.attribute.clone()
-    }
-
-    fn get_hash(&self) -> u64 {
+    pub fn get_hash(&self) -> u64 {
         let mut hasher = pi_hash::DefaultHasher::default();
         hasher.write(bytemuck::cast_slice(&[
             self.x,
@@ -283,20 +236,38 @@ impl ArcOutline for Rect {
         }
     }
 
-    fn is_area(&self) -> bool {
+    pub fn get_svg_info(&self) -> SvgInfo {
+        SvgInfo {
+            binding_box: self.binding_box(),
+            arc_endpoints: self.get_arc_endpoints(),
+            is_area: self.is_area(),
+        }
+    }
+
+    pub fn is_area(&self) -> bool {
         true
     }
 }
 
+impl Rect {
+    pub fn get_attribute(&self) -> Attribute {
+        self.attribute.clone()
+    }
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 #[derive(Clone, Debug)]
 pub struct Segment {
     segment: MSegment,
-    pub attribute: Attribute,
+    pub(crate) attribute: Attribute,
 }
 
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 impl Segment {
-    pub fn new(a: Point, b: Point) -> Self {
+    pub fn new(a_x: f32, a_y: f32, b_x: f32, b_y: f32) -> Self {
         let mut attribute = Attribute::default();
+        let a = Point::new(a_x, a_y);
+        let b = Point::new(b_x, b_y);
         attribute.start = a;
         attribute.is_close = false;
         Self {
@@ -304,10 +275,8 @@ impl Segment {
             attribute,
         }
     }
-}
 
-impl ArcOutline for Segment {
-    fn get_arc_endpoints(&self) -> Vec<ArcEndpoint> {
+    pub fn get_arc_endpoints(&self) -> Vec<ArcEndpoint> {
         vec![
             ArcEndpoint::new(self.segment.a.x, self.segment.a.y, f32::INFINITY),
             ArcEndpoint::new(self.segment.b.x, self.segment.b.y, 0.0),
@@ -315,11 +284,7 @@ impl ArcOutline for Segment {
         ]
     }
 
-    fn get_attribute(&self) -> Attribute {
-        self.attribute.clone()
-    }
-
-    fn get_hash(&self) -> u64 {
+    pub fn get_hash(&self) -> u64 {
         let mut hasher = pi_hash::DefaultHasher::default();
 
         hasher.write(bytemuck::cast_slice(&[
@@ -344,20 +309,36 @@ impl ArcOutline for Segment {
         }
     }
 
-    fn is_area(&self) -> bool {
+    pub fn get_svg_info(&self) -> SvgInfo {
+        SvgInfo {
+            binding_box: self.binding_box(),
+            arc_endpoints: self.get_arc_endpoints(),
+            is_area: self.is_area(),
+        }
+    }
+
+    pub fn is_area(&self) -> bool {
         false
     }
 }
 
+impl Segment {
+    pub fn get_attribute(&self) -> Attribute {
+        self.attribute.clone()
+    }
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 #[derive(Clone, Debug)]
 pub struct Ellipse {
     cx: f32,
     cy: f32,
     rx: f32,
     ry: f32,
-    pub attribute: Attribute,
+    pub(crate) attribute: Attribute,
 }
 
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 impl Ellipse {
     pub fn new(cx: f32, cy: f32, rx: f32, ry: f32) -> Self {
         let mut attribute = Attribute::default();
@@ -371,10 +352,8 @@ impl Ellipse {
             attribute,
         }
     }
-}
 
-impl ArcOutline for Ellipse {
-    fn get_arc_endpoints(&self) -> Vec<ArcEndpoint> {
+    pub fn get_arc_endpoints(&self) -> Vec<ArcEndpoint> {
         let center = kurbo::Point::new(self.cx as f64, self.cy as f64);
         let e = kurbo::Ellipse::new(center, (self.rx as f64, self.ry as f64), 0.0);
 
@@ -425,11 +404,7 @@ impl ArcOutline for Ellipse {
         sink.accumulate.result
     }
 
-    fn get_attribute(&self) -> Attribute {
-        self.attribute.clone()
-    }
-
-    fn get_hash(&self) -> u64 {
+    pub fn get_hash(&self) -> u64 {
         let mut hasher = pi_hash::DefaultHasher::default();
         hasher.write(bytemuck::cast_slice(&[
             self.rx, self.ry, self.cx, self.cy, 4.0,
@@ -444,19 +419,39 @@ impl ArcOutline for Ellipse {
         }
     }
 
-    fn is_area(&self) -> bool {
+    pub fn get_svg_info(&self) -> SvgInfo {
+        SvgInfo {
+            binding_box: self.binding_box(),
+            arc_endpoints: self.get_arc_endpoints(),
+            is_area: self.is_area(),
+        }
+    }
+
+    pub fn is_area(&self) -> bool {
         true
     }
 }
 
+impl Ellipse {
+    pub fn get_attribute(&self) -> Attribute {
+        self.attribute.clone()
+    }
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 #[derive(Clone, Debug)]
 pub struct Polygon {
     points: Vec<Point>,
-    pub attribute: Attribute,
+    pub(crate) attribute: Attribute,
 }
 
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 impl Polygon {
-    pub fn new(mut points: Vec<Point>) -> Self {
+    pub fn new(points: Vec<f32>) -> Self {
+        let mut points = points
+            .chunks(2)
+            .map(|v| Point::new(v[0], v[1]))
+            .collect::<Vec<Point>>();
         if !compute_direction(&points) {
             points.reverse();
         };
@@ -466,10 +461,8 @@ impl Polygon {
 
         Self { points, attribute }
     }
-}
 
-impl ArcOutline for Polygon {
-    fn get_arc_endpoints(&self) -> Vec<ArcEndpoint> {
+    pub fn get_arc_endpoints(&self) -> Vec<ArcEndpoint> {
         let len = self.points.len();
         let mut points = self.points.iter();
 
@@ -490,11 +483,7 @@ impl ArcOutline for Polygon {
         result
     }
 
-    fn get_attribute(&self) -> Attribute {
-        self.attribute.clone()
-    }
-
-    fn get_hash(&self) -> u64 {
+    pub fn get_hash(&self) -> u64 {
         let mut key = Vec::with_capacity(self.points.len() * 2);
         for p in &self.points {
             key.push(p.x);
@@ -525,19 +514,40 @@ impl ArcOutline for Polygon {
         }
     }
 
-    fn is_area(&self) -> bool {
+    pub fn get_svg_info(&self) -> SvgInfo {
+        SvgInfo {
+            binding_box: self.binding_box(),
+            arc_endpoints: self.get_arc_endpoints(),
+            is_area: self.is_area(),
+        }
+    }
+
+    pub fn is_area(&self) -> bool {
         true
     }
 }
 
+impl Polygon {
+    pub fn get_attribute(&self) -> Attribute {
+        self.attribute.clone()
+    }
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 #[derive(Clone, Debug)]
 pub struct Polyline {
     points: Vec<Point>,
-    pub attribute: Attribute,
+    pub(crate) attribute: Attribute,
 }
 
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 impl Polyline {
-    pub fn new(mut points: Vec<Point>) -> Self {
+    pub fn new(points: Vec<f32>) -> Self {
+        let mut points = points
+            .chunks(2)
+            .map(|v| Point::new(v[0], v[1]))
+            .collect::<Vec<Point>>();
+
         if !compute_direction(&points) {
             points.reverse();
         };
@@ -564,10 +574,8 @@ impl Polyline {
 
         false
     }
-}
 
-impl ArcOutline for Polyline {
-    fn get_arc_endpoints(&self) -> Vec<ArcEndpoint> {
+    pub fn get_arc_endpoints(&self) -> Vec<ArcEndpoint> {
         let is_close = self.attribute.is_close;
 
         let mut points = self.points.iter();
@@ -591,11 +599,7 @@ impl ArcOutline for Polyline {
         result
     }
 
-    fn get_attribute(&self) -> Attribute {
-        self.attribute.clone()
-    }
-
-    fn get_hash(&self) -> u64 {
+    pub fn get_hash(&self) -> u64 {
         let mut key = Vec::with_capacity(self.points.len() * 2);
         for p in &self.points {
             key.push(p.x);
@@ -626,20 +630,45 @@ impl ArcOutline for Polyline {
         }
     }
 
-    fn is_area(&self) -> bool {
+    pub fn get_svg_info(&self) -> SvgInfo {
+        SvgInfo {
+            binding_box: self.binding_box(),
+            arc_endpoints: self.get_arc_endpoints(),
+            is_area: self.is_area(),
+        }
+    }
+
+    pub fn is_area(&self) -> bool {
         false
     }
 }
 
+impl Polyline {
+    pub fn get_attribute(&self) -> Attribute {
+        self.attribute.clone()
+    }
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 #[derive(Clone, Debug)]
 pub struct Path {
     verbs: Vec<PathVerb>,
     points: Vec<Point>,
-    pub attribute: Attribute,
+    pub(crate) attribute: Attribute,
 }
 
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 impl Path {
-    pub fn new(mut verbs: Vec<PathVerb>, mut points: Vec<Point>) -> Self {
+    pub fn new(verbs: Vec<u8>, points: Vec<f32>) -> Self {
+        let mut verbs = verbs
+            .into_iter().map(|v|unsafe { transmute (v) })
+            .collect::<Vec<PathVerb>>();
+
+        let mut points = points
+            .chunks(2)
+            .map(|v| Point::new(v[0], v[1]))
+            .collect::<Vec<Point>>();
+
         if points.len() > 2 && !compute_direction(&points) {
             points.reverse();
             verbs.reverse();
@@ -680,10 +709,8 @@ impl Path {
 
         false
     }
-}
 
-impl ArcOutline for Path {
-    fn get_arc_endpoints(&self) -> Vec<ArcEndpoint> {
+    pub fn get_arc_endpoints(&self) -> Vec<ArcEndpoint> {
         let mut sink = GlyphVisitor::new(1.0, 1.0);
         // 圆弧拟合贝塞尔曲线的精度，值越小越精确
         sink.accumulate.tolerance = 0.1;
@@ -700,11 +727,7 @@ impl ArcOutline for Path {
         sink.accumulate.result
     }
 
-    fn get_attribute(&self) -> Attribute {
-        self.attribute.clone()
-    }
-
-    fn get_hash(&self) -> u64 {
+    pub fn get_hash(&self) -> u64 {
         let mut key = Vec::with_capacity(self.points.len() * 4);
         for (p, v) in self.points.iter().zip(self.verbs.iter()) {
             key.push(p.x);
@@ -735,19 +758,81 @@ impl ArcOutline for Path {
             maxs: Point::new(max_x, max_y),
         }
     }
-    fn is_area(&self) -> bool {
+
+    pub fn get_svg_info(&self) -> SvgInfo {
+        SvgInfo {
+            binding_box: self.binding_box(),
+            arc_endpoints: self.get_arc_endpoints(),
+            is_area: self.is_area(),
+        }
+    }
+
+    pub fn is_area(&self) -> bool {
         self.is_close()
     }
 }
 
+impl Path {
+    pub fn get_attribute(&self) -> Attribute {
+        self.attribute.clone()
+    }
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
+pub struct SvgInfo {
+    binding_box: Aabb,
+    arc_endpoints: Vec<ArcEndpoint>,
+    is_area: bool,
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
+pub fn computer_svg_sdf2(info: SvgInfo) -> Vec<u8> {
+    bincode::serialize(&computer_svg_sdf(info)).unwrap()
+}
+
+pub fn computer_svg_sdf(info: SvgInfo) -> SdfInfo {
+    let SvgInfo {
+        binding_box,
+        arc_endpoints,
+        is_area,
+    } = info;
+    let extents = extents(binding_box);
+
+    let (mut blob_arc, map) = compute_near_arc_impl(extents, arc_endpoints, is_area);
+    let data_tex = blob_arc.encode_data_tex1(&map);
+    let (mut tex_info, index_tex, sdf_tex1, sdf_tex2, sdf_tex3, sdf_tex4) =
+        blob_arc.encode_index_tex1(map, data_tex.len() / 4);
+    let grid_size = blob_arc.grid_size();
+
+    tex_info.binding_box_min_x = binding_box.mins.x;
+    tex_info.binding_box_min_y = binding_box.mins.y;
+    tex_info.binding_box_max_x = binding_box.maxs.x;
+    tex_info.binding_box_max_y = binding_box.maxs.y;
+
+    tex_info.extents_min_x = extents.mins.x;
+    tex_info.extents_min_y = extents.mins.y;
+    tex_info.extents_max_x = extents.maxs.x;
+    tex_info.extents_max_y = extents.maxs.y;
+
+    SdfInfo {
+        tex_info,
+        data_tex,
+        index_tex,
+        sdf_tex1,
+        sdf_tex2,
+        sdf_tex3,
+        sdf_tex4,
+        grid_size: vec![grid_size.0, grid_size.1],
+    }
+}
+
 pub struct SvgScenes {
-    pub shapes: HashMap<u64, Box<dyn ArcOutline>>,
-    pub view_box: Aabb,
+    shapes: HashMap<u64, (SvgInfo, Attribute)>,
+    view_box: Aabb,
 }
 
 impl SvgScenes {
     pub fn new(view_box: Aabb) -> Self {
-        // 添加空隙
         let view_box = Aabb {
             mins: Point::new(view_box.mins.x, view_box.mins.y),
             maxs: Point::new(view_box.maxs.x, view_box.maxs.y),
@@ -758,19 +843,23 @@ impl SvgScenes {
         }
     }
 
-    pub fn add_shape(&mut self, hash: u64, shape: Box<dyn ArcOutline>) {
+    pub fn add_shape(&mut self, hash: u64, info: SvgInfo, attr: Attribute) {
         // let key = shape.get_hash();
-        self.shapes.insert(hash, shape);
+        self.shapes.insert(hash, (info, attr));
     }
 
-    pub fn verties(&self) -> [f32; 16] {
-        [
-            0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0,
-        ]
+    pub fn has_shape(&self, hash: u64) -> bool {
+        self.shapes.get(&hash).is_some()
     }
 
+    pub fn set_view_box(&mut self, mins_x: f32, mins_y: f32, maxs_x: f32, maxs_y: f32) {
+        self.view_box = Aabb::new(Point::new(mins_x, mins_y), Point::new(maxs_x, maxs_y));
+    }
+}
+
+impl SvgScenes {
     pub fn out_tex_data(
-        &self,
+        &mut self,
         tex_data: &mut TexData,
     ) -> Result<(Vec<TexInfo>, Vec<Attribute>, Vec<[f32; 4]>), EncodeError> {
         let mut infos = vec![];
@@ -793,11 +882,21 @@ impl SvgScenes {
         let sdf_tex2 = &mut tex_data.sdf_tex2;
         let sdf_tex3 = &mut tex_data.sdf_tex3;
 
-        for node in self.shapes.values() {
-            let binding_box = node.binding_box();
+        for (
+            _,
+            (
+                SvgInfo {
+                    binding_box,
+                    arc_endpoints,
+                    is_area,
+                },
+                attr,
+            ),
+        ) in self.shapes.drain()
+        {
+            let binding_box = extents(binding_box);
             println!("binding_box: {:?}", binding_box);
-            let (mut blob_arc, map) =
-                compute_near_arc_impl(binding_box, node.get_arc_endpoints(), node.is_area());
+            let (mut blob_arc, map) = compute_near_arc_impl(binding_box, arc_endpoints, is_area);
             let size = blob_arc.encode_data_tex(&map, data_tex, width0, offset_x0, offset_y0)?;
             println!("data_map: {}", map.len());
             let mut info = blob_arc.encode_index_tex(
@@ -805,11 +904,14 @@ impl SvgScenes {
                 sdf_tex3,
             )?;
 
-            info.index_offset = last_offset1;
-            info.data_offset = (*offset_x0, *offset_y0);
+            info.index_offset_x = last_offset1.0;
+            info.index_offset_y = last_offset1.1;
+            info.data_offset_x = *offset_x0;
+            info.data_offset_y = *offset_y0;
             println!(
                 "info.index_offset: {:?}, info.data_offset: {:?}",
-                info.index_offset, info.data_offset
+                (info.index_offset_x, info.index_offset_y),
+                (info.data_offset_x, info.data_offset_y)
             );
             *offset_x0 += size / 8;
             if size % 8 != 0 {
@@ -819,7 +921,7 @@ impl SvgScenes {
             last_offset1 = (*offset_x1, *offset_y1);
 
             infos.push(info);
-            attributes.push(node.get_attribute());
+            attributes.push(attr);
             transform.push([
                 binding_box.width(),
                 binding_box.height(),
@@ -829,6 +931,12 @@ impl SvgScenes {
         }
 
         Ok((infos, attributes, transform))
+    }
+
+    pub fn verties(&self) -> [f32; 16] {
+        [
+            0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0,
+        ]
     }
 }
 
@@ -947,4 +1055,20 @@ fn compute_outline<'a>(
         }
     }
     // is_close
+}
+
+pub fn extents(mut binding_box: Aabb) -> Aabb {
+    binding_box.mins.x = binding_box.mins.x - FARWAY;
+    binding_box.mins.y = binding_box.mins.y - FARWAY;
+    binding_box.maxs.x = binding_box.maxs.x + FARWAY;
+    binding_box.maxs.y = binding_box.maxs.y + FARWAY;
+
+    let width = binding_box.mins.x - binding_box.maxs.x;
+    let height = binding_box.mins.y - binding_box.maxs.y;
+    if width > height {
+        binding_box.maxs.y = binding_box.mins.y + width;
+    } else {
+        binding_box.maxs.x = binding_box.mins.x + height;
+    };
+    binding_box
 }
