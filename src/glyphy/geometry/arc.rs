@@ -14,7 +14,7 @@ use super::{
     signed_vector::SignedVector, vector::VectorEXT,
 };
 
-static ID: AtomicU64 = AtomicU64::new(0);
+pub(crate) static ID: AtomicU64 = AtomicU64::new(0);
 
 // sin( 2 * atan(d) )
 pub fn sin2atan(d: f32) -> f32 {

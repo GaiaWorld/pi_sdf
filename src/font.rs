@@ -47,7 +47,7 @@ impl FontFace {
         &self.font
     }
 
-    pub fn verties(&self, _font_size: f32,_shadow_offsett: &mut [f32]) -> [f32; 16] {
+    pub fn verties(&self, _font_size: f32, _shadow_offsett: &mut [f32]) -> [f32; 16] {
         let extents = self.max_box_normaliz.clone();
 
         // let offset_x = shadow_offset[0] / font_size;
@@ -394,7 +394,6 @@ impl FontFace {
             let mut v = Self::compute_sdf(self.max_box.clone(), outline);
             v.tex_info.char = char;
             info.push(v);
-            
         }
         info
     }
@@ -404,8 +403,7 @@ impl FontFace {
             Point::new(max_box[0], max_box[1]),
             Point::new(max_box[2], max_box[3]),
         );
-        bincode::serialize(&Self::compute_sdf(max_box, outline))
-        .unwrap()
+        bincode::serialize(&Self::compute_sdf(max_box, outline)).unwrap()
     }
 
     /// 水平宽度
@@ -466,9 +464,16 @@ impl FontFace {
                 .lookup_glyph_index(ch, MatchingPresentation::NotRequired, None);
         // let r = self.font.horizontal_advance(glyph_index);
         // let r1 = self.font.vertical_advance(glyph_index);
-        // println!("horizontal_advance, char: {}: horizontal_advance:{:?}, vertical_advance: {:?}", ch, r, r1);
+        // println!("horizontal_advance, char: {}: horizontal_advance:{:?}, vertical_advance: {:?}, {}", ch , r, r1, self.units_per_em);
         let _ = self.glyf.visit(glyph_index, &mut sink);
         sink
+    }
+
+    pub fn glyph_index(&mut self, ch: char) -> u16 {
+        let (glyph_index, _) =
+            self.font
+                .lookup_glyph_index(ch, MatchingPresentation::NotRequired, None);
+        glyph_index
     }
 
     pub fn debug_size(&self) -> usize {

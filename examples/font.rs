@@ -72,13 +72,13 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     });
 
     // 加载字体文件
-    let buffer = std::fs::read("./source/ht.ttf").unwrap();
+    let buffer = std::fs::read("./source/fzxk.woff2").unwrap();
     // let buffer = std::fs::read("./source/msyh.ttf").unwrap();
     let mut ft_face = FontFace::new(buffer);
 
     let tex_size = (1024, 1024);
     // 需要渲染的字符串
-    let text = "放".to_string();
+    let text = ".fksdfkasfklhklfdalksd魔".to_string();
     // 纹理数据
     let mut tex_data = TexData {
         index_tex: vec![0; tex_size.0 * tex_size.1 * 2], // 索引纹理数据
@@ -704,13 +704,13 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     let mut index = 0;
 
     for info in &texs_info {
-        index_info.push(info.index_offset.0 as f32); // 每个字符索引纹理的偏移
-        index_info.push(info.index_offset.1 as f32);
+        index_info.push(info.index_offset_x as f32); // 每个字符索引纹理的偏移
+        index_info.push(info.index_offset_y as f32);
         index_info.push(info.grid_w); // 每个字符索引纹理宽
         index_info.push(info.grid_w); // 每个字符索引纹理高
 
-        data_offset.push(info.data_offset.0 as f32); // 每个字符数据纹理的偏移
-        data_offset.push(info.data_offset.1 as f32); // 每个字符数据纹理的偏移
+        data_offset.push(info.data_offset_x as f32); // 每个字符数据纹理的偏移
+        data_offset.push(info.data_offset_y as f32); // 每个字符数据纹理的偏移
 
         // sdf 附带的信息
         let check = info.cell_size * 0.5 * 2.0f32.sqrt();
@@ -723,8 +723,6 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         let x = index % 15;
         let y = index / 15;
        
-
-
         fill_color[index * 4] = 1.0;
         fill_color[index * 4 + 1] = 0.0;
         fill_color[index * 4 + 2] = 0.0;

@@ -8,7 +8,7 @@ use allsorts::{
 // use image::{EncodableLayout, ImageBuffer, Rgba};
 
 // use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
-use usvg::{Color, Fill, NonZeroPositiveF32, Paint, Stroke};
+use usvg::{Color, Fill, NonZeroPositiveF64, Paint, Stroke};
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::wasm_bindgen;
 
@@ -577,20 +577,20 @@ impl Attribute {
 
     pub fn set_stroke_width(&mut self, width: f32) {
         if let Some(stroke) = &mut self.stroke {
-            stroke.width = NonZeroPositiveF32::new(width).unwrap();
+            stroke.width = NonZeroPositiveF64::new(width as f64).unwrap();
         } else {
             let mut stroke = Stroke::default();
-            stroke.width = NonZeroPositiveF32::new(width).unwrap();
+            stroke.width = NonZeroPositiveF64::new(width as f64).unwrap();
             self.stroke = Some(stroke);
         }
     }
 
     pub fn set_stroke_dasharray(&mut self, dasharray: Vec<f32>) {
         if let Some(stroke) = &mut self.stroke {
-            stroke.dasharray = Some(dasharray)
+            // stroke.dasharray = Some(dasharray)
         } else {
             let mut stroke = Stroke::default();
-            stroke.dasharray = Some(dasharray);
+            // stroke.dasharray = Some(dasharray);
             self.stroke = Some(stroke);
         }
     }

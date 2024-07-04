@@ -23,7 +23,7 @@ let datas = data.split("=");
 if (datas.length == 2) {
 	let d = datas[1].trim();
 	if (d !== "") {
-		outDir = path.join(d, "libs/pi_sys/src/web/native");
+		outDir = path.join(d, "node_modules/pi_wasm/src");
 	}
 	
 }
