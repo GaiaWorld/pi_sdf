@@ -1,5 +1,6 @@
 // use image::EncodableLayout;
 use parry2d::{bounding_volume::Aabb, math::Vector, shape::Segment};
+use serde::{Deserialize, Serialize};
 use std::hash::Hasher;
 use std::sync::atomic::AtomicU64;
 use std::{ops::Range, sync::atomic::Ordering};
@@ -36,9 +37,9 @@ pub struct ErrorValue {
 }
 
 #[cfg_attr(target_arch="wasm32", wasm_bindgen(getter_with_clone))]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ArcEndpoint {
-    pub(crate) p: Point,
+    pub(crate) p: [f32; 2],
     pub d: f32,
 
     // 线段特殊处理，只有一个值
@@ -51,7 +52,7 @@ pub struct ArcEndpoint {
 impl ArcEndpoint {
     pub fn new(x: f32, y: f32, d: f32) -> Self {
         Self {
-            p: Point::new(x, y),
+            p: [x, y],
             d,
             line_key: None,
             line_encode: None,
@@ -59,7 +60,7 @@ impl ArcEndpoint {
     }
 
     pub fn get_xy(&self) -> Vec<f32> {
-        vec![self.p.x, self.p.y]
+        vec![self.p[0], self.p[1]]
     }
 }
 
@@ -70,7 +71,7 @@ impl ArcEndpoint {
         //     self.p.x, self.p.y, self.d, ep1.p.x, ep1.p.y, ep1.d
         // );
         let mut hasher = pi_hash::DefaultHasher::default();
-        let data = [self.p.x, self.p.y, self.d, ep1.p.x, ep1.p.y, ep1.d];
+        let data = [self.p[0], self.p[1], self.d, ep1.p[0], ep1.p[1], ep1.d];
         // println!("data: {:?}", data);
         hasher.write(bytemuck::cast_slice(&data));
         let r = hasher.finish();
@@ -602,7 +603,7 @@ fn test_projection_to_top_bound() {
 fn test_projection_to_bottom_bound() {
     let s = Segment::new(Point::new(1077.0, 0.0), Point::new(189.0, 0.0));
     let r = squared_distance_segment(&Point::new(185.0, 5.0), &s);
-    println!("R: {}", r);
+    // println!("R: {}", r);
 }
 
 #[test]

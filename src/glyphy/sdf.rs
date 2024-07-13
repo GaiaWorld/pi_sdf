@@ -28,12 +28,12 @@ pub fn glyphy_sdf_from_arc_list(endpoints: &Vec<ArcEndpoint>, p: Point) -> (f32,
 
         if endpoint.d == GLYPHY_INFINITY {
             // 无穷代表 Move 语义
-            p0 = endpoint.p.clone();
+            p0 = Point::new(endpoint.p[0], endpoint.p[1]);
             continue;
         }
 
         // 当 d = 0 时候，代表线段
-        let arc = Arc::new(p0.clone(), endpoint.p.clone(), endpoint.d);
+        let arc = Arc::new(p0.clone(), Point::new(endpoint.p[0], endpoint.p[1]), endpoint.d);
 
         if arc.wedge_contains_point(&c) {
             // 在 扇形夹角范围内
@@ -93,7 +93,7 @@ pub fn glyphy_sdf_from_arc_list(endpoints: &Vec<ArcEndpoint>, p: Point) -> (f32,
             }
         }
 
-        p0 = endpoint.p.clone();
+        p0 = Point::new(endpoint.p[0], endpoint.p[1]);
     }
 
     if side == 0 {
@@ -219,5 +219,5 @@ fn test(){
         
     ];
     let sdf = glyphy_sdf_from_arc_list2(&vec![&arcs[0], &arcs[1]], Point::new(115.9375,178.4375));
-    println!("sdf: {}", sdf.0);
+    // println!("sdf: {}", sdf.0);
 }

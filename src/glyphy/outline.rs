@@ -4,7 +4,7 @@ use crate::glyphy::geometry::{arc::Arc, vector::VectorEXT};
 
 use super::{
     geometry::{arc::ArcEndpoint, point::PointExt},
-    util::{is_zero, xor, GLYPHY_EPSILON, GLYPHY_INFINITY},
+    util::{float_equals, is_zero, xor, GLYPHY_EPSILON, GLYPHY_INFINITY},
 };
 
 pub fn glyphy_outline_reverse(endpoints: &mut [ArcEndpoint]) {
@@ -55,12 +55,14 @@ pub fn winding(endpoints: &mut [ArcEndpoint]) -> bool {
     let mut area = 0.0;
     for i in 1..num_endpoints {
         let p0 = endpoints[i - 1].p;
+        let p0 = Point::new(p0[0], p0[1]);
         let p1 = endpoints[i].p;
+        let p1 = Point::new(p1[0], p1[1]);
         let d = endpoints[i].d;
 
         assert!(d != GLYPHY_INFINITY);
 
-        area += p0.into_vector().sdf_cross(&p1.into_vector());
+        area +=  p0.into_vector().sdf_cross(&p1.into_vector());
         area -= 0.5 * d * (p1 - p0).norm_squared();
     }
     return area < 0.0;
@@ -131,18 +133,18 @@ pub fn even_odd(
 ) -> bool {
     let num_c_endpoints = c_endpoints.len();
     let num_endpoints = endpoints.len();
-    let p = Point::new(c_endpoints[0].p.x, c_endpoints[0].p.y);
+    let p = Point::new(c_endpoints[0].p[0], c_endpoints[0].p[1]);
 
     let mut count = 0.0;
     let mut p0 = Point::new(0.0, 0.0);
     for i in 0..num_endpoints {
         let endpoint = &endpoints[i];
         if endpoint.d == GLYPHY_INFINITY {
-            p0 = Point::new(endpoint.p.x, endpoint.p.y);
+            p0 = Point::new(endpoint.p[0], endpoint.p[1]);
             continue;
         }
-        let arc = Arc::new(p0, endpoint.p, endpoint.d);
-        p0 = Point::new(endpoint.p.x, endpoint.p.y);
+        let arc = Arc::new(p0, Point::new(endpoint.p[0], endpoint.p[1]), endpoint.d);
+        p0 = Point::new(endpoint.p[0], endpoint.p[1]);
 
         /*
          * Skip our own contour
@@ -277,8 +279,8 @@ pub fn process_contour(
         log::warn!("Don't expect this");
         return false; // Need at least two arcs
     }
-
-    if !endpoints[0].p.equals(&endpoints[num_endpoints - 1].p) {
+    
+    if !(float_equals(endpoints[0].p[0], endpoints[num_endpoints - 1].p[0], None) && float_equals(endpoints[0].p[1], endpoints[num_endpoints - 1].p[1], None)) {
         log::warn!("Don't expect this");
         return false; // Need a closed contour
     }

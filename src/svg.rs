@@ -291,15 +291,15 @@ pub fn compute_near_arc_impl(
     // println!("extents2: {:?}", extents);
     let mut near_arcs = Vec::with_capacity(endpoints.len());
     let mut arcs = Vec::with_capacity(endpoints.len());
-    println!("endpoints: {:?}", endpoints);
+    // println!("endpoints: {:?}", endpoints);
     for i in 0..endpoints.len() {
         let endpoint = &endpoints[i];
         if endpoint.d == GLYPHY_INFINITY {
-            p0 = endpoint.p;
+            p0 = Point::new(endpoint.p[0], endpoint.p[1]);
             continue;
         }
-        let arc = Arc::new(p0, endpoint.p, endpoint.d);
-        p0 = endpoint.p;
+        let arc = Arc::new(p0, Point::new(endpoint.p[0], endpoint.p[1]), endpoint.d);
+        p0 = Point::new(endpoint.p[0], endpoint.p[1]);
 
         near_arcs.push(arc);
         arcs.push(unsafe { std::mem::transmute(near_arcs.last().unwrap()) });
@@ -307,7 +307,7 @@ pub fn compute_near_arc_impl(
 
     let mut result_arcs = vec![];
     let mut temp = Vec::with_capacity(arcs.len());
-    println!("arcs:{:?}", arcs.len());
+    // println!("arcs:{:?}", arcs.len());
     recursion_near_arcs_of_cell(
         &extents,
         &extents,

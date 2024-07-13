@@ -179,8 +179,8 @@ impl BlobArc {
                 }
             } else {
                 for endpoint in &unit_arc.data {
-                    let qx = quantize_x(endpoint.p.x, &self.extents, glyph_width);
-                    let qy = quantize_y(endpoint.p.y, &self.extents, glyph_height);
+                    let qx = quantize_x(endpoint.p[0], &self.extents, glyph_width);
+                    let qy = quantize_y(endpoint.p[1], &self.extents, glyph_height);
                     let rgba = arc_endpoint_encode(qx, qy, endpoint.d);
 
                     write_data_tex_by_width(&mut data_tex, &rgba, &mut len);
@@ -219,8 +219,8 @@ impl BlobArc {
                 }
             } else {
                 for endpoint in &unit_arc.data {
-                    let qx = quantize_x(endpoint.p.x, &self.extents, glyph_width);
-                    let qy = quantize_y(endpoint.p.y, &self.extents, glyph_height);
+                    let qx = quantize_x(endpoint.p[0], &self.extents, glyph_width);
+                    let qy = quantize_y(endpoint.p[1], &self.extents, glyph_height);
                     let rgba = arc_endpoint_encode(qx, qy, endpoint.d);
 
                     write_data_tex(
@@ -642,9 +642,9 @@ pub fn choose_best_arcs(
     for i in &arcs {
         new_arcs.push(i.clone());
     }
-    let msg = format!("choose_best_arcs error: start_index = {}, sdf_sign = {}, cp0 = ({}, {}), cp1 = ({}, {}), arcs = ", start_index, sdf_sign, cp0.x, cp0.y, cp1.x, cp1.y) ;
+    // let msg = format!("choose_best_arcs error: start_index = {}, sdf_sign = {}, cp0 = ({}, {}), cp1 = ({}, {}), arcs = ", start_index, sdf_sign, cp0.x, cp0.y, cp1.x, cp1.y) ;
 
-    log::warn!("{} {:?}, all endpoints = {:?}", msg, new_arcs, endpoints);
+    // log::warn!("{} {:?}, all endpoints = {:?}", msg, new_arcs, endpoints);
     // throw new Error(msg);
 
     return arcs;
@@ -665,7 +665,7 @@ pub fn is_best_arcs(
 
     for _i in 0..num {
         let endpoint = &endpoints[index];
-        r.push(ArcEndpoint::new(endpoint.p.x, endpoint.p.y, endpoint.d));
+        r.push(ArcEndpoint::new(endpoint.p[0], endpoint.p[1], endpoint.d));
         index = get_next_index(index, loop_start, loop_end);
     }
 

@@ -20,7 +20,8 @@ use crate::{
         blob::{recursion_near_arcs_of_cell, travel_data, BlobArc, EncodeError, TexData, TexInfo},
         geometry::{
             aabb::{AabbEXT, Direction},
-            arc::Arc,
+            arc::{Arc, ArcEndpoint},
+            arcs::GlyphyArcAccumulator,
         },
         outline::glyphy_outline_winding_from_even_odd,
         util::GLYPHY_INFINITY,
@@ -129,15 +130,18 @@ impl FontFace {
         extents
     }
 
-    pub fn get_char_arc(extents: Aabb, mut sink: GlyphVisitor) -> (BlobArc, HashMap<u64, u64>) {
+    pub fn get_char_arc(
+        extents: Aabb,
+        mut endpoints: Vec<ArcEndpoint>,
+    ) -> (BlobArc, HashMap<u64, u64>) {
         // log::error!("get_char_arc: {:?}", char);
         // let extents = self.max_box.clone();
-        let endpoints = &mut sink.accumulate.result;
+        // let endpoints = &mut endpoints;
         // let r = endpoints.len();
         // println!("endpoints: {}",  endpoints.len());
         if endpoints.len() > 0 {
             // 用奇偶规则，计算 每个圆弧的 环绕数
-            glyphy_outline_winding_from_even_odd(endpoints, false);
+            glyphy_outline_winding_from_even_odd(&mut endpoints, false);
         }
         // println!("extents: {:?}", extents);
 
@@ -152,11 +156,11 @@ impl FontFace {
         for i in 0..endpoints.len() {
             let endpoint = &endpoints[i];
             if endpoint.d == GLYPHY_INFINITY {
-                p0 = endpoint.p;
+                p0 = Point::new(endpoint.p[0], endpoint.p[1]);
                 continue;
             }
-            let arc = Arc::new(p0, endpoint.p, endpoint.d);
-            p0 = endpoint.p;
+            let arc = Arc::new(p0, Point::new(endpoint.p[0], endpoint.p[1]), endpoint.d);
+            p0 = Point::new(endpoint.p[0], endpoint.p[1]);
 
             near_arcs.push(arc);
             arcs.push(unsafe { std::mem::transmute(near_arcs.last().unwrap()) });
@@ -212,7 +216,7 @@ impl FontFace {
             extents,
             data: unit_arcs,
             avg_fetch_achieved: 0.0,
-            endpoints: endpoints.clone(),
+            endpoints: endpoints,
         };
 
         // extents.scale(1.0 / upem, 1.0 / upem);
@@ -251,8 +255,8 @@ impl FontFace {
 
         for char in text {
             // println!("char: {}", char);
-            let outline = self.to_outline(char);
-            let (mut blod_arc, map) = Self::get_char_arc(self.max_box.clone(), outline);
+            let result = self.to_outline(char);
+            let (mut blod_arc, map) = Self::get_char_arc(self.max_box.clone(), result);
             let size = blod_arc.encode_data_tex(&map, data_tex, width0, offset_x0, offset_y0)?;
             // println!("data_map: {}", map.len());
             let mut info = blod_arc.encode_index_tex(
@@ -278,8 +282,9 @@ impl FontFace {
         Ok(infos)
     }
 
-    pub fn compute_sdf(max_box: Aabb, outline: GlyphVisitor) -> SdfInfo {
-        let (mut blod_arc, map) = Self::get_char_arc(max_box, outline);
+    pub fn compute_sdf(max_box: Aabb, endpoints: Vec<ArcEndpoint>) -> SdfInfo {
+        log::error!("endpoints.len(): {}", endpoints.len()); 
+        let (mut blod_arc, map) = Self::get_char_arc(max_box, endpoints);
         // println!("data_map: {}", map.len());
         let data_tex = blod_arc.encode_data_tex1(&map);
         let (tex_info, index_tex, sdf_tex1, sdf_tex2, sdf_tex3, sdf_tex4) =
@@ -390,20 +395,21 @@ impl FontFace {
     pub fn compute_text_sdf(&mut self, text: &str) -> Vec<SdfInfo> {
         let mut info = Vec::with_capacity(text.len());
         for char in text.chars() {
-            let outline = self.to_outline(char);
-            let mut v = Self::compute_sdf(self.max_box.clone(), outline);
+            let result = self.to_outline(char);
+            let mut v = Self::compute_sdf(self.max_box.clone(), result);
             v.tex_info.char = char;
             info.push(v);
         }
         info
     }
 
-    pub fn compute_sdf2(max_box: &[f32], outline: GlyphVisitor) -> Vec<u8> {
+    pub fn compute_sdf2(max_box: Vec<f32>, endpoints: Vec<u8>) -> Vec<u8> {
         let max_box = Aabb::new(
             Point::new(max_box[0], max_box[1]),
             Point::new(max_box[2], max_box[3]),
         );
-        bincode::serialize(&Self::compute_sdf(max_box, outline)).unwrap()
+        let endpoints: Vec<ArcEndpoint> = bincode::deserialize(&endpoints).unwrap();
+        bincode::serialize(&Self::compute_sdf(max_box, endpoints)).unwrap()
     }
 
     /// 水平宽度
@@ -411,10 +417,15 @@ impl FontFace {
         let (glyph_index, _) =
             self.font
                 .lookup_glyph_index(char, MatchingPresentation::NotRequired, None);
-        match self.font.horizontal_advance(glyph_index) {
-            Some(r) => r as f32 / self.units_per_em as f32,
-            None => 0.0,
+        if glyph_index == 0 {
+            match self.font.horizontal_advance(glyph_index) {
+                Some(r) => return  r as f32 / self.units_per_em as f32,
+                None => return 0.0,
+            }
+        } else {
+            return 0.0;
         }
+       
     }
 
     pub fn ascender(&self) -> f32 {
@@ -455,7 +466,7 @@ impl FontFace {
         ]
     }
 
-    pub fn to_outline(&mut self, ch: char) -> GlyphVisitor {
+    pub fn to_outline(&mut self, ch: char) -> Vec<ArcEndpoint> {
         let mut sink = GlyphVisitor::new(1.0, SCALE / self.units_per_em as f32);
         sink.accumulate.tolerance = self.units_per_em as f32 * TOLERANCE;
 
@@ -466,7 +477,27 @@ impl FontFace {
         // let r1 = self.font.vertical_advance(glyph_index);
         // println!("horizontal_advance, char: {}: horizontal_advance:{:?}, vertical_advance: {:?}, {}", ch , r, r1, self.units_per_em);
         let _ = self.glyf.visit(glyph_index, &mut sink);
-        sink
+        let GlyphVisitor { accumulate, .. } = sink;
+        let GlyphyArcAccumulator { result, .. } = accumulate;
+        result
+    }
+
+    pub fn to_outline2(&mut self, ch: char) -> Vec<u8> {
+        let mut sink = GlyphVisitor::new(1.0, SCALE / self.units_per_em as f32);
+        sink.accumulate.tolerance = self.units_per_em as f32 * TOLERANCE;
+
+        let (glyph_index, _) =
+            self.font
+                .lookup_glyph_index(ch, MatchingPresentation::NotRequired, None);
+            log::error!("ch: {}, glyph_index: {}", ch, glyph_index);
+        // let r = self.font.horizontal_advance(glyph_index);
+        // let r1 = self.font.vertical_advance(glyph_index);
+        // println!("horizontal_advance, char: {}: horizontal_advance:{:?}, vertical_advance: {:?}, {}", ch , r, r1, self.units_per_em);
+        let _ = self.glyf.visit(glyph_index, &mut sink);
+
+        let GlyphVisitor { accumulate, .. } = sink;
+        let GlyphyArcAccumulator { result, .. } = accumulate;
+        bincode::serialize(&result).unwrap()
     }
 
     pub fn glyph_index(&mut self, ch: char) -> u16 {

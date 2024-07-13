@@ -403,5 +403,5 @@ fn test() {
         -0.14173229,
     );
     let dist = arc.squared_distance_to_point2(&Point::new(216.85324, 171.0));
-    println!("dist : {:?}", dist);
+    // println!("dist : {:?}", dist);
 }

@@ -28,6 +28,10 @@ pub fn float_equals(f1: f32, f2: f32, error: Option<f32>) -> bool {
     }
 }
 
+pub fn float2_equals(v1: &[f32; 2], v2: &[f32; 2]) -> bool {
+    float_equals(v1[0], v2[0], None) && float_equals(v1[1], v2[1], None)
+}
+
 /**
  * 比较 浮点数 是否等于0
  * @param error 比较的误差

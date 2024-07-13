@@ -169,11 +169,11 @@ pub fn glyphy_arc_list_extents(endpoints: &Vec<ArcEndpoint>, extents: &mut Aabb)
     for i in 0..num_endpoints {
         let endpoint = &endpoints[i];
         if endpoint.d == GLYPHY_INFINITY {
-            p0 = endpoint.p;
+            p0 = Point::new(endpoint.p[0], endpoint.p[1]);
             continue;
         }
-        let arc = Arc::new(p0, endpoint.p, endpoint.d);
-        p0 = endpoint.p;
+        let arc = Arc::new(p0, Point::new(endpoint.p[0], endpoint.p[1]), endpoint.d);
+        p0 = Point::new(endpoint.p[0], endpoint.p[1]);
 
         let mut arc_extents = Aabb::new(
             Point::new(GLYPHY_INFINITY, GLYPHY_INFINITY),

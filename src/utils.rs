@@ -13,10 +13,9 @@ use usvg::{Color, Fill, NonZeroPositiveF64, Paint, Stroke};
 use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::{
-    glyphy::{geometry::arcs::GlyphyArcAccumulator, sdf::glyphy_sdf_from_arc_list2},
-    Point, shape::{SvgScenes, Rect},
+    glyphy::{geometry::arcs::GlyphyArcAccumulator, sdf::glyphy_sdf_from_arc_list2, util::float2_equals}, shape::{Rect, SvgScenes}, Point
 };
-use parry2d::bounding_volume::Aabb;
+use parry2d::{bounding_volume::Aabb, math::Vector};
 use std::hash::Hasher;
 
 use crate::{
@@ -105,7 +104,7 @@ impl GlyphVisitor {
 impl OutlineSink for GlyphVisitor {
     fn move_to(&mut self, to: Vector2F) {
         let to = Point::new(to.x(), to.y()) * self.scale2;
-        log::debug!("M {} {} ", to.x, to.y);
+        // log::debug!("M {} {} ", to.x, to.y);
 
         if self.scale > 0.02 {
             self.accumulate
@@ -121,7 +120,7 @@ impl OutlineSink for GlyphVisitor {
 
     fn line_to(&mut self, to: Vector2F) {
         let to = Point::new(to.x(), to.y())* self.scale2;
-        log::debug!("+ L {} {} ", to.x, to.y);
+        // log::debug!("+ L {} {} ", to.x, to.y);
         if self.scale > 0.02 {
             self.accumulate.line_to(to);
             #[cfg(feature = "debug")]
@@ -141,7 +140,7 @@ impl OutlineSink for GlyphVisitor {
         let control = Point::new(control.x(), control.y()) * self.scale2;
         let to = Point::new(to.x(), to.y()) * self.scale2;
 
-        log::debug!("+ Q {} {} {} {} ", control.x, control.y, to.x, to.y);
+        // log::debug!("+ Q {} {} {} {} ", control.x, control.y, to.x, to.y);
         if self.scale > 0.02 {
             self.accumulate.conic_to(control, to);
             self.svg_endpoints.push([to.x, to.y]);
@@ -161,15 +160,15 @@ impl OutlineSink for GlyphVisitor {
         let control2 = Point::new(control.to_x(), control.to_y()) * self.scale2;
         let to = Point::new(to.x(), to.y()) * self.scale2;
 
-        log::debug!(
-            "+ C {}, {}, {}, {}, {}, {}",
-            control1.x,
-            control1.y,
-            control2.x,
-            control2.y,
-            to.x,
-            to.y
-        );
+        // log::debug!(
+        //     "+ C {}, {}, {}, {}, {}, {}",
+        //     control1.x,
+        //     control1.y,
+        //     control2.x,
+        //     control2.y,
+        //     to.x,
+        //     to.y
+        // );
 
         if self.scale > 0.02 {
             self.accumulate.cubic_to(control1, control2, to);
@@ -186,7 +185,7 @@ impl OutlineSink for GlyphVisitor {
 
     fn close(&mut self) {
         if self.previous != self.start {
-            log::debug!("+ L {} {} ", self.start.x, self.start.y);
+            // log::debug!("+ L {} {} ", self.start.x, self.start.y);
             if self.scale > 0.02 {
                 self.accumulate.line_to(self.start);
                 #[cfg(feature = "debug")]
@@ -324,8 +323,8 @@ pub fn encode_uint_arc_data(
             let end = &near_endpoints[1];
 
             let mut line = Line::from_points(
-                snap(&start.p, &extents, glyph_width, glyph_height),
-                snap(&end.p, &extents, glyph_width, glyph_height),
+                snap(&Point::new(start.p[0], start.p[1]), &extents, glyph_width, glyph_height),
+                snap(&Point::new(end.p[0], end.p[1]), &extents, glyph_width, glyph_height),
             );
             // Shader的最后 要加回去
             line.c -= line.n.dot(&c.into_vector());
@@ -343,8 +342,8 @@ pub fn encode_uint_arc_data(
         } else {
             if near_endpoints.len() == 4
                 && is_inf(near_endpoints[2].d)
-                && near_endpoints[0].p.x == near_endpoints[3].p.x
-                && near_endpoints[0].p.y == near_endpoints[3].p.y
+                && near_endpoints[0].p[0] == near_endpoints[3].p[0]
+                && near_endpoints[0].p[1] == near_endpoints[3].p[1]
             {
                 let e0 = near_endpoints[2].clone();
                 let e1 = near_endpoints[3].clone();
@@ -360,8 +359,8 @@ pub fn encode_uint_arc_data(
             let mut hasher = pi_hash::DefaultHasher::default();
             let mut key = Vec::with_capacity(20);
             for endpoint in &near_endpoints {
-                key.push(endpoint.p.x);
-                key.push(endpoint.p.y);
+                key.push(endpoint.p[0]);
+                key.push(endpoint.p[1]);
                 key.push(endpoint.d);
             }
             hasher.write(bytemuck::cast_slice(&key));
@@ -426,14 +425,14 @@ pub fn get_char_arc_debug(char: String) -> BlobArc {
     let _ = console_log::init_with_level(log::Level::Debug);
     // let buffer = include_bytes!("../source/msyh.ttf").to_vec();
     let buffer = vec![];
-    log::debug!("1111111111");
+    // log::debug!("1111111111");
     let mut ft_face = FontFace::new(buffer);
-    log::debug!("22222222char: {}", char);
+    // log::debug!("22222222char: {}", char);
     let char = char.chars().next().unwrap();
-    log::debug!("13333333");
-    let outline = ft_face.to_outline(char);
-    let (arcs, _map) = FontFace::get_char_arc( ft_face.max_box.clone(), outline);
-    log::debug!("44444444444");
+    // log::debug!("13333333");
+    let result = ft_face.to_outline(char);
+    let (arcs, _map) = FontFace::get_char_arc( ft_face.max_box.clone(), result);
+    // log::debug!("44444444444");
 
     let mut shapes = SvgScenes::new(Aabb::new(Point::new(0.0, 0.0), Point::new(400.0, 400.0)));
     // 矩形
@@ -466,34 +465,34 @@ pub fn to_arc_cmds(endpoints: &Vec<ArcEndpoint>) -> (Vec<Vec<String>>, Vec<[f32;
     let mut current_point = None;
     let mut pts = vec![];
     for ep in endpoints {
-        pts.push([ep.p.x, ep.p.y]);
+        pts.push([ep.p[0], ep.p[1]]);
 
         if ep.d == GLYPHY_INFINITY {
-            if current_point.is_none() || !ep.p.equals(current_point.as_ref().unwrap()) {
+            if current_point.is_none() || !float2_equals(&ep.p, current_point.as_ref().unwrap()) {
                 if _cmd.len() > 0 {
                     cmd_array.push(_cmd);
                     _cmd = vec![];
                 }
-                _cmd.push(format!(" M ${}, ${}", ep.p.x, ep.p.y));
+                _cmd.push(format!(" M ${}, ${}", ep.p[0], ep.p[1]));
                 current_point = Some(ep.p);
             }
         } else if ep.d == 0.0 {
             assert!(current_point.is_some());
-            if current_point.is_some() && !ep.p.equals(current_point.as_ref().unwrap()) {
-                _cmd.push(format!(" L {}, {}", ep.p.x, ep.p.y));
+            if current_point.is_some() && !float2_equals(&ep.p, current_point.as_ref().unwrap()) {
+                _cmd.push(format!(" L {}, {}", ep.p[0], ep.p[1]));
                 current_point = Some(ep.p);
             }
         } else {
             assert!(current_point.is_some());
             let mut _current_point = current_point.as_ref().unwrap();
-            if !ep.p.equals(_current_point) {
-                let arc = Arc::new(_current_point.clone(), ep.p, ep.d);
+            if !float2_equals(&ep.p, _current_point)  {
+                let arc = Arc::new(Point::new(_current_point[0], _current_point[1]), Point::new(ep.p[0], ep.p[1]) , ep.d);
                 let center = arc.center();
                 let radius = arc.radius();
-                let start_v = _current_point - center;
+                let start_v = Vector::new(_current_point[0] - center[0], _current_point[1] - center[1]);
                 let start_angle = start_v.sdf_angle();
 
-                let end_v = ep.p - (center);
+                let end_v = Vector::new(ep.p[0] - center[0], ep.p[1] - center[1]);
                 let end_angle = end_v.sdf_angle();
 
                 // 大于0，顺时针绘制
