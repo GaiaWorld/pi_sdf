@@ -417,7 +417,7 @@ impl FontFace {
         let (glyph_index, _) =
             self.font
                 .lookup_glyph_index(char, MatchingPresentation::NotRequired, None);
-        if glyph_index == 0 {
+        if glyph_index != 0 {
             match self.font.horizontal_advance(glyph_index) {
                 Some(r) => return  r as f32 / self.units_per_em as f32,
                 None => return 0.0,
