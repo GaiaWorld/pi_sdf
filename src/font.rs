@@ -283,7 +283,7 @@ impl FontFace {
     }
 
     pub fn compute_sdf(max_box: Aabb, endpoints: Vec<ArcEndpoint>) -> SdfInfo {
-        log::error!("endpoints.len(): {}", endpoints.len()); 
+        // log::error!("endpoints.len(): {}", endpoints.len()); 
         let (mut blod_arc, map) = Self::get_char_arc(max_box, endpoints);
         // println!("data_map: {}", map.len());
         let data_tex = blod_arc.encode_data_tex1(&map);
@@ -322,6 +322,7 @@ pub struct SdfInfo {
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 impl FontFace {
     pub fn new(_data: Vec<u8>) -> Self {
+        
         let _ = console_log::init_with_level(log::Level::Info);
         // log::info!("=========== 1, : {}", _data.len());
         let d: &'static Vec<u8> = unsafe { std::mem::transmute(&_data) };
@@ -489,7 +490,7 @@ impl FontFace {
         let (glyph_index, _) =
             self.font
                 .lookup_glyph_index(ch, MatchingPresentation::NotRequired, None);
-            log::error!("ch: {}, glyph_index: {}", ch, glyph_index);
+        // log::error!("ch: {}, glyph_index: {}", ch, glyph_index);
         // let r = self.font.horizontal_advance(glyph_index);
         // let r1 = self.font.vertical_advance(glyph_index);
         // println!("horizontal_advance, char: {}: horizontal_advance:{:?}, vertical_advance: {:?}, {}", ch , r, r1, self.units_per_em);
