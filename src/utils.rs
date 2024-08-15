@@ -5,9 +5,10 @@ use allsorts::{
     outline::OutlineSink,
     pathfinder_geometry::{line_segment::LineSegment2F, vector::Vector2F},
 };
-use std::sync::Arc as Arc2;
+
 // use image::{EncodableLayout, ImageBuffer, Rgba};
 
+use pi_share::Share;
 // use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
 use usvg::{Color, Fill, NonZeroPositiveF64, Paint, Stroke};
 #[cfg(target_arch = "wasm32")]
@@ -427,7 +428,7 @@ pub fn get_char_arc_debug(char: String) -> BlobArc {
     // let buffer = include_bytes!("../source/msyh.ttf").to_vec();
     let buffer = vec![];
     // log::debug!("1111111111");
-    let mut ft_face = FontFace::new(Arc2::new(buffer) );
+    let mut ft_face = FontFace::new(Share::new(buffer) );
     // log::debug!("22222222char: {}", char);
     let char = char.chars().next().unwrap();
     // log::debug!("13333333");

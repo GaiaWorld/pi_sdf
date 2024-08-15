@@ -8,7 +8,8 @@ use allsorts::{
     tables::{glyf::GlyfTable, loca::LocaTable, FontTableProvider, HeadTable},
     tag, Font,
 };
-use std::sync::Arc as Arc2;
+use pi_share::Share;
+
 
 use parry2d::bounding_volume::Aabb;
 use serde::{Deserialize, Serialize};
@@ -32,7 +33,7 @@ use crate::{
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub struct FontFace {
-    pub(crate) _data: Arc2<Vec<u8>>,
+    pub(crate) _data: Share<Vec<u8>>,
     pub(crate) font: Font<DynamicFontTableProvider<'static>>,
     pub(crate) glyf: GlyfTable<'static>,
     _glyf_data: Vec<u8>,
@@ -321,7 +322,7 @@ pub struct SdfInfo {
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 impl FontFace {
-    pub fn new(_data: Arc2<Vec<u8>>) -> Self {
+    pub fn new(_data: Share<Vec<u8>>) -> Self {
         
         let _ = console_log::init_with_level(log::Level::Info);
         // log::info!("=========== 1, : {}", _data.len());
