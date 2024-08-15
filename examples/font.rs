@@ -74,7 +74,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     // 加载字体文件
     let buffer = std::fs::read("./source/hwxw.ttf").unwrap();
     // let buffer = std::fs::read("./source/msyh.ttf").unwrap();
-    let mut ft_face = FontFace::new(buffer);
+    let mut ft_face = FontFace::new(Arc::new(buffer));
 
     let tex_size = (1024, 1024);
     // 需要渲染的字符串
