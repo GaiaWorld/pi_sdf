@@ -426,9 +426,13 @@ pub fn get_char_arc_debug(char: String) -> BlobArc {
 
     let _ = console_log::init_with_level(log::Level::Debug);
     // let buffer = include_bytes!("../source/msyh.ttf").to_vec();
-    let buffer = vec![];
+    let buffer: Vec<u8> = vec![];
     // log::debug!("1111111111");
+    #[cfg(not(target_arch = "wasm32"))]
     let mut ft_face = FontFace::new(Share::new(buffer) );
+    #[cfg(target_arch = "wasm32")]
+    let mut ft_face = FontFace::new(buffer );
+
     // log::debug!("22222222char: {}", char);
     let char = char.chars().next().unwrap();
     // log::debug!("13333333");

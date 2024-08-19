@@ -10,7 +10,6 @@ use allsorts::{
 };
 use pi_share::Share;
 
-
 use parry2d::bounding_volume::Aabb;
 use serde::{Deserialize, Serialize};
 #[cfg(target_arch = "wasm32")]
@@ -284,7 +283,7 @@ impl FontFace {
     }
 
     pub fn compute_sdf(max_box: Aabb, endpoints: Vec<ArcEndpoint>) -> SdfInfo {
-        // log::error!("endpoints.len(): {}", endpoints.len()); 
+        // log::error!("endpoints.len(): {}", endpoints.len());
         let (mut blod_arc, map) = Self::get_char_arc(max_box, endpoints);
         // println!("data_map: {}", map.len());
         let data_tex = blod_arc.encode_data_tex1(&map);
@@ -318,12 +317,8 @@ pub struct SdfInfo {
     pub grid_size: Vec<f32>,
 }
 
-// pub struct SdfInfos
-
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 impl FontFace {
-    pub fn new(_data: Share<Vec<u8>>) -> Self {
-        
+    pub fn new_inner(_data: Share<Vec<u8>>) -> Self {
         let _ = console_log::init_with_level(log::Level::Info);
         // log::info!("=========== 1, : {}", _data.len());
         let d: &'static Vec<u8> = unsafe { std::mem::transmute(_data.as_ref()) };
@@ -393,6 +388,22 @@ impl FontFace {
             units_per_em: head_table.units_per_em,
         }
     }
+}
+
+// pub struct SdfInfos
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
+impl FontFace {
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn new(_data: Share<Vec<u8>>) -> Self {
+        Self::new_inner(_data)
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub fn new(_data: Vec<u8>) -> Self {
+        let data = Share::new(_data);
+        Self::new_inner(data)
+    }
 
     pub fn compute_text_sdf(&mut self, text: &str) -> Vec<SdfInfo> {
         let mut info = Vec::with_capacity(text.len());
@@ -421,13 +432,12 @@ impl FontFace {
                 .lookup_glyph_index(char, MatchingPresentation::NotRequired, None);
         if glyph_index != 0 {
             match self.font.horizontal_advance(glyph_index) {
-                Some(r) => return  r as f32 / self.units_per_em as f32,
+                Some(r) => return r as f32 / self.units_per_em as f32,
                 None => return 0.0,
             }
         } else {
             return 0.0;
         }
-       
     }
 
     pub fn ascender(&self) -> f32 {
