@@ -2,9 +2,8 @@
  * Approximate outlines with multiple arcs
  */
 
-use parry2d::bounding_volume::Aabb;
 
-use super::aabb::AabbEXT;
+use super::aabb::{Aabb, AabbEXT};
 use super::arc::{Arc, ArcEndpoint, ErrorValue};
 use super::bezier::Bezier;
 use super::vector::VectorEXT;

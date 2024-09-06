@@ -1,5 +1,6 @@
 use std::{char, collections::HashMap};
 
+use crate::glyphy::blob::TexInfo2;
 use allsorts::{
     binary::read::ReadScope,
     font::MatchingPresentation,
@@ -9,8 +10,6 @@ use allsorts::{
     tag, Font,
 };
 use pi_share::Share;
-
-use parry2d::bounding_volume::Aabb;
 use serde::{Deserialize, Serialize};
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -19,14 +18,17 @@ use crate::{
     glyphy::{
         blob::{recursion_near_arcs_of_cell, travel_data, BlobArc, EncodeError, TexData, TexInfo},
         geometry::{
-            aabb::{AabbEXT, Direction},
+            aabb::{Aabb, AabbEXT, Direction},
             arc::{Arc, ArcEndpoint},
             arcs::GlyphyArcAccumulator,
         },
-        outline::glyphy_outline_winding_from_even_odd,
+        outline::{self, glyphy_outline_winding_from_even_odd},
         util::GLYPHY_INFINITY,
     },
-    utils::{encode_uint_arc_data, GlyphVisitor, SCALE, TOLERANCE},
+    utils::{
+        compute_layout, encode_uint_arc_data, GlyphInfo, GlyphVisitor, OutlineInfo, SCALE,
+        TOLERANCE,
+    },
     Point,
 };
 
@@ -130,10 +132,49 @@ impl FontFace {
         extents
     }
 
-    pub fn get_char_arc(
+    pub fn encode_uint_arc(
         extents: Aabb,
         mut endpoints: Vec<ArcEndpoint>,
     ) -> (BlobArc, HashMap<u64, u64>) {
+        // println!("result_arcs: {:?}", result_arcs.len());
+
+        // let width_cells = (extents.width() / min_width).floor();
+        // let height_cells = (extents.height() / min_height).floor();
+        // 根据最小格子大小计算每个格子的圆弧数据
+        let (result_arcs, min_width, min_height, near_arcs) =
+            Self::compute_near_arcs(extents, &mut endpoints);
+        log::trace!("near_arcs: {}", near_arcs.len());
+        let (unit_arcs, map) =
+            encode_uint_arc_data(result_arcs, &extents, min_width, min_height, None);
+        // println!("unit_arcs[14][5]: {:?}", unit_arcs[14][5]);
+
+        let [min_sdf, max_sdf] = travel_data(&unit_arcs);
+        let blob_arc = BlobArc {
+            min_sdf,
+            max_sdf,
+            cell_size: min_width,
+            #[cfg(feature = "debug")]
+            show: format!("<br> 格子数：宽 = {}, 高 = {} <br>", min_width, min_height),
+            extents,
+            data: unit_arcs,
+            avg_fetch_achieved: 0.0,
+            endpoints,
+        };
+
+        // extents.scale(1.0 / upem, 1.0 / upem);
+
+        // gi.nominal_w = width_cells;
+        // gi.nominal_h = height_cells;
+
+        // gi.extents.set(&extents);
+
+        (blob_arc, map)
+    }
+
+    pub fn compute_near_arcs<'a>(
+        extents: Aabb,
+        endpoints: &mut Vec<ArcEndpoint>,
+    ) -> (Vec<(Vec<&'a Arc>, Aabb)>, f32, f32, Vec<Arc>) {
         // log::error!("get_char_arc: {:?}", char);
         // let extents = self.max_box.clone();
         // let endpoints = &mut endpoints;
@@ -141,7 +182,7 @@ impl FontFace {
         // println!("endpoints: {}",  endpoints.len());
         if endpoints.len() > 0 {
             // 用奇偶规则，计算 每个圆弧的 环绕数
-            glyphy_outline_winding_from_even_odd(&mut endpoints, false);
+            glyphy_outline_winding_from_even_odd(endpoints, false);
         }
         // println!("extents: {:?}", extents);
 
@@ -196,37 +237,7 @@ impl FontFace {
             &mut result_arcs,
             &mut temp,
         );
-
-        // println!("result_arcs: {:?}", result_arcs.len());
-
-        // let width_cells = (extents.width() / min_width).floor();
-        // let height_cells = (extents.height() / min_height).floor();
-        // 根据最小格子大小计算每个格子的圆弧数据
-        let (unit_arcs, map) =
-            encode_uint_arc_data(result_arcs, &extents, min_width, min_height, None);
-        // println!("unit_arcs[14][5]: {:?}", unit_arcs[14][5]);
-
-        let [min_sdf, max_sdf] = travel_data(&unit_arcs);
-        let blob_arc = BlobArc {
-            min_sdf,
-            max_sdf,
-            cell_size: min_width,
-            #[cfg(feature = "debug")]
-            show: format!("<br> 格子数：宽 = {}, 高 = {} <br>", min_width, min_height),
-            extents,
-            data: unit_arcs,
-            avg_fetch_achieved: 0.0,
-            endpoints: endpoints,
-        };
-
-        // extents.scale(1.0 / upem, 1.0 / upem);
-
-        // gi.nominal_w = width_cells;
-        // gi.nominal_h = height_cells;
-
-        // gi.extents.set(&extents);
-
-        (blob_arc, map)
+        (result_arcs, min_width, min_height, near_arcs)
     }
 
     pub fn out_tex_data(
@@ -256,7 +267,7 @@ impl FontFace {
         for char in text {
             // println!("char: {}", char);
             let result = self.to_outline(char);
-            let (mut blod_arc, map) = Self::get_char_arc(self.max_box.clone(), result);
+            let (mut blod_arc, map) = Self::encode_uint_arc(self.max_box.clone(), result);
             let size = blod_arc.encode_data_tex(&map, data_tex, width0, offset_x0, offset_y0)?;
             // println!("data_map: {}", map.len());
             let mut info = blod_arc.encode_index_tex(
@@ -284,7 +295,8 @@ impl FontFace {
 
     pub fn compute_sdf(max_box: Aabb, endpoints: Vec<ArcEndpoint>) -> SdfInfo {
         // log::error!("endpoints.len(): {}", endpoints.len());
-        let (mut blod_arc, map) = Self::get_char_arc(max_box, endpoints);
+        // map 无序导致每次计算的数据不一样
+        let (mut blod_arc, map) = Self::encode_uint_arc(max_box, endpoints);
         // println!("data_map: {}", map.len());
         let data_tex = blod_arc.encode_data_tex1(&map);
         let (tex_info, index_tex, sdf_tex1, sdf_tex2, sdf_tex3, sdf_tex4) =
@@ -315,6 +327,12 @@ pub struct SdfInfo {
     pub sdf_tex3: Vec<u8>,
     pub sdf_tex4: Vec<u8>,
     pub grid_size: Vec<f32>,
+}
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SdfInfo2 {
+    pub tex_info: TexInfo2,
+    pub sdf_tex: Vec<u8>,
+    pub tex_size: usize,
 }
 
 impl FontFace {
@@ -376,6 +394,7 @@ impl FontFace {
 
         // log::info!("=========== 10");
         // todo!()
+        println!("units_per_em: {}", head_table.units_per_em);
         Self {
             _data,
             font,
@@ -431,6 +450,7 @@ impl FontFace {
             self.font
                 .lookup_glyph_index(char, MatchingPresentation::NotRequired, None);
         if glyph_index != 0 {
+            // self.font
             match self.font.horizontal_advance(glyph_index) {
                 Some(r) => return r as f32 / self.units_per_em as f32,
                 None => return 0.0,
@@ -442,6 +462,10 @@ impl FontFace {
 
     pub fn ascender(&self) -> f32 {
         self.font.hhea_table.ascender as f32 / self.units_per_em as f32
+    }
+
+    pub fn units_per_em(&self) -> u16 {
+        self.units_per_em
     }
 
     pub fn descender(&self) -> f32 {
@@ -479,37 +503,13 @@ impl FontFace {
     }
 
     pub fn to_outline(&mut self, ch: char) -> Vec<ArcEndpoint> {
-        let mut sink = GlyphVisitor::new(1.0, SCALE / self.units_per_em as f32);
-        sink.accumulate.tolerance = self.units_per_em as f32 * TOLERANCE;
-
-        let (glyph_index, _) =
-            self.font
-                .lookup_glyph_index(ch, MatchingPresentation::NotRequired, None);
-        // let r = self.font.horizontal_advance(glyph_index);
-        // let r1 = self.font.vertical_advance(glyph_index);
-        // println!("horizontal_advance, char: {}: horizontal_advance:{:?}, vertical_advance: {:?}, {}", ch , r, r1, self.units_per_em);
-        let _ = self.glyf.visit(glyph_index, &mut sink);
-        let GlyphVisitor { accumulate, .. } = sink;
-        let GlyphyArcAccumulator { result, .. } = accumulate;
-        result
+        let OutlineInfo { endpoints, .. } = self.to_outline3(ch);
+        endpoints
     }
 
     pub fn to_outline2(&mut self, ch: char) -> Vec<u8> {
-        let mut sink = GlyphVisitor::new(1.0, SCALE / self.units_per_em as f32);
-        sink.accumulate.tolerance = self.units_per_em as f32 * TOLERANCE;
-
-        let (glyph_index, _) =
-            self.font
-                .lookup_glyph_index(ch, MatchingPresentation::NotRequired, None);
-        // log::error!("ch: {}, glyph_index: {}", ch, glyph_index);
-        // let r = self.font.horizontal_advance(glyph_index);
-        // let r1 = self.font.vertical_advance(glyph_index);
-        // println!("horizontal_advance, char: {}: horizontal_advance:{:?}, vertical_advance: {:?}, {}", ch , r, r1, self.units_per_em);
-        let _ = self.glyf.visit(glyph_index, &mut sink);
-
-        let GlyphVisitor { accumulate, .. } = sink;
-        let GlyphyArcAccumulator { result, .. } = accumulate;
-        bincode::serialize(&result).unwrap()
+        let OutlineInfo { endpoints, .. } = self.to_outline3(ch);
+        bincode::serialize(&endpoints).unwrap()
     }
 
     pub fn glyph_index(&mut self, ch: char) -> u16 {
@@ -521,5 +521,118 @@ impl FontFace {
 
     pub fn debug_size(&self) -> usize {
         self._data.len()
+    }
+
+    pub fn to_outline3(&mut self, ch: char) -> OutlineInfo {
+        let mut sink = GlyphVisitor::new(SCALE / self.units_per_em as f32);
+        sink.accumulate.tolerance = self.units_per_em as f32 * TOLERANCE;
+
+        let (glyph_index, _) =
+            self.font
+                .lookup_glyph_index(ch, MatchingPresentation::NotRequired, None);
+        assert_ne!(glyph_index, 0);
+        let advance = self.font.horizontal_advance(glyph_index).unwrap();
+
+        let _ = self.glyf.visit(glyph_index, &mut sink);
+        let GlyphVisitor {
+            accumulate, bbox, ..
+        } = sink;
+
+        let GlyphyArcAccumulator { result, .. } = accumulate;
+
+        OutlineInfo {
+            endpoints: result,
+            bbox,
+            advance,
+            units_per_em: self.units_per_em,
+            char: ch,
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn compute_sdf_tex(
+        outline_info: OutlineInfo,
+        tex_size: usize, // 需要计算纹理的宽高，默认正方形，像素为单位
+        pxrange: u32,
+    ) -> SdfInfo2 {
+        let OutlineInfo {
+            char,
+            mut endpoints,
+            bbox,
+            advance,
+            units_per_em,
+        } = outline_info;
+        let mut extents = bbox;
+
+        let (plane_bounds, atlas_bounds, distance, tex_size) =
+            compute_layout(&mut extents, tex_size, pxrange, units_per_em);
+        // println!("pxrange: {}, tex_size: {}", pxrange, tex_size);
+        let (result_arcs, _, _, near_arcs) = Self::compute_near_arcs(extents, &mut endpoints);
+        log::trace!("near_arcs: {}", near_arcs.len());
+
+        let pixmap =
+            crate::utils::encode_sdf(result_arcs, &extents, tex_size, tex_size, distance, None);
+        SdfInfo2 {
+            tex_info: TexInfo2 {
+                char,
+                advance: advance as f32 / units_per_em as f32,
+                sdf_offset_x: 0,
+                sdf_offset_y: 0,
+                plane_min_x: plane_bounds.mins.x,
+                plane_min_y: plane_bounds.mins.y,
+                plane_max_x: plane_bounds.maxs.x,
+                plane_max_y: plane_bounds.maxs.y,
+                atlas_min_x: atlas_bounds.mins.x,
+                atlas_min_y: atlas_bounds.mins.y,
+                atlas_max_x: atlas_bounds.maxs.x,
+                atlas_max_y: atlas_bounds.maxs.y,
+            },
+            sdf_tex: pixmap,
+            tex_size,
+        }
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub fn compute_sdf_tex(
+        outline_info: OutlineInfo,
+        tex_size: usize, // 需要计算纹理的宽高，默认正方形，像素为单位
+        pxrange: u32,
+    ) -> Vec<u8> {
+        let OutlineInfo {
+            char,
+            mut endpoints,
+            bbox,
+            advance,
+            units_per_em,
+        } = outline_info;
+        let mut extents = bbox;
+
+        let (plane_bounds, atlas_bounds, distance, tex_size) =
+            compute_layout(&mut extents, tex_size, pxrange, units_per_em);
+        // println!("pxrange: {}, tex_size: {}", pxrange, tex_size);
+        let (result_arcs, _, _, near_arcs) = Self::compute_near_arcs(extents, &mut endpoints);
+        log::trace!("near_arcs: {}", near_arcs.len());
+
+        let pixmap =
+            crate::utils::encode_sdf(result_arcs, &extents, tex_size, tex_size, distance, None);
+        let info = GlyphInfo {
+            char,
+            advance: advance as f32 / units_per_em as f32,
+            plane_bounds: [
+                plane_bounds.mins.x,
+                plane_bounds.mins.y,
+                plane_bounds.maxs.x,
+                plane_bounds.maxs.y,
+            ],
+            atlas_bounds: [
+                atlas_bounds.mins.x,
+                atlas_bounds.mins.y,
+                atlas_bounds.maxs.x,
+                atlas_bounds.maxs.y,
+            ],
+            sdf_tex: pixmap,
+            tex_size: tex_size as u32,
+        };
+        bincode::serialize(&info).unwrap()
     }
 }

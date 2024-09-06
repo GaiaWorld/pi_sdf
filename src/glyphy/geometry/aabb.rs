@@ -1,13 +1,13 @@
 use std::ops::Range;
 
-use parry2d::{bounding_volume::Aabb, shape::Segment};
+use parry2d::shape::Segment;
 
+use super::arc::Arc;
 use crate::{
     glyphy::{geometry::segment::SegmentEXT, util::GLYPHY_INFINITY},
     Point,
 };
-
-use super::arc::Arc;
+pub use parry2d::bounding_volume::Aabb;
 
 pub enum Direction {
     Top,
@@ -32,11 +32,12 @@ pub trait AabbEXT {
         arcs: &Vec<&'static Arc>,
         segment: &Segment,
         result: &mut Vec<&'static Arc>,
-        temps : &mut Vec<(Point, f32, Vec<Range<f32>>)>,
+        temps: &mut Vec<(Point, f32, Vec<Range<f32>>)>,
     );
     fn bound(&self, direction: Direction) -> Segment;
     fn width(&self) -> f32;
     fn height(&self) -> f32;
+    fn extend_by(&mut self, x: f32, y: f32);
     fn half(&self, direction: Direction) -> (Aabb, Aabb);
 }
 
@@ -44,6 +45,13 @@ impl AabbEXT for Aabb {
     fn clear(&mut self) {
         self.maxs = Point::new(GLYPHY_INFINITY, GLYPHY_INFINITY);
         self.mins = Point::new(GLYPHY_INFINITY, GLYPHY_INFINITY);
+    }
+
+    fn extend_by(&mut self, x: f32, y: f32) {
+        self.mins.x = self.mins.x.min(x);
+        self.mins.y = self.mins.y.min(y);
+        self.maxs.x = self.maxs.x.max(x);
+        self.maxs.y = self.maxs.y.max(y);
     }
 
     fn set(&mut self, other: &Aabb) {
@@ -165,7 +173,7 @@ impl AabbEXT for Aabb {
         arcs: &Vec<&'static Arc>,
         segment: &Segment,
         result_arcs: &mut Vec<&'static Arc>,
-        temps : &mut Vec<(Point, f32, Vec<Range<f32>>)>,
+        temps: &mut Vec<(Point, f32, Vec<Range<f32>>)>,
     ) {
         // let mut temps = Vec::with_capacity(arcs.len());
         temps.clear();
@@ -182,7 +190,7 @@ impl AabbEXT for Aabb {
                 temps.push((p, min_dist, vec![rang]));
             } else {
                 let mut is_push = true;
-                
+
                 for j in 0..result_arcs.len() {
                     let result_arc = result_arcs[j];
                     let dist = result_arc.squared_distance_to_point2(&p).norm_squared();
@@ -206,7 +214,7 @@ impl AabbEXT for Aabb {
                         let d21 = arcs[i].squared_distance_to_point2(&p1).norm_squared();
                         let d22 = arcs[i].squared_distance_to_point2(&p2).norm_squared();
 
-                        if (d11 < d21 && d12 < d22) || (d11 < d22  && d12 < d21){
+                        if (d11 < d21 && d12 < d22) || (d11 < d22 && d12 < d21) {
                             is_push = false;
                             break;
                         }

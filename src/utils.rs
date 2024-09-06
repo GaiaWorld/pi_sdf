@@ -9,15 +9,25 @@ use allsorts::{
 // use image::{EncodableLayout, ImageBuffer, Rgba};
 
 use pi_share::Share;
+use serde::{Deserialize, Serialize};
 // use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
 use usvg::{Color, Fill, NonZeroPositiveF64, Paint, Stroke};
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::{
-    glyphy::{geometry::arcs::GlyphyArcAccumulator, sdf::glyphy_sdf_from_arc_list2, util::float2_equals}, shape::{Rect, SvgScenes}, Point
+    glyphy::{
+        geometry::{
+            aabb::{Aabb, AabbEXT},
+            arcs::GlyphyArcAccumulator,
+        },
+        sdf::glyphy_sdf_from_arc_list2,
+        util::float2_equals,
+    },
+    shape::{Rect, SvgScenes},
+    Point,
 };
-use parry2d::{bounding_volume::Aabb, math::Vector};
+use parry2d::math::Vector;
 use std::hash::Hasher;
 
 use crate::{
@@ -25,7 +35,6 @@ use crate::{
     glyphy::{
         blob::{line_encode, snap, BlobArc, Extents, UnitArc},
         geometry::{
-            aabb::AabbEXT,
             arc::{Arc, ArcEndpoint},
             line::Line,
             point::PointExt,
@@ -43,7 +52,7 @@ pub static ENLIGHTEN_MAX: f32 = 0.0001; /* Per EM */
 
 pub static EMBOLDEN_MAX: f32 = 0.0001; /* Per EM */
 
-pub static SCALE: f32 = 2048.0; 
+pub static SCALE: f32 = 2048.0;
 pub struct User {
     pub accumulate: GlyphyArcAccumulator,
     pub path_str: String,
@@ -51,7 +60,7 @@ pub struct User {
     pub svg_endpoints: Vec<[f32; 2]>,
 }
 
-#[cfg_attr(target_arch="wasm32", wasm_bindgen)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub struct GlyphVisitor {
     rasterizer: Rasterizer,
     pub(crate) accumulate: GlyphyArcAccumulator,
@@ -62,15 +71,16 @@ pub struct GlyphVisitor {
     pub(crate) svg_endpoints: Vec<[f32; 2]>,
 
     scale: f32,
-    scale2: f32,
+    // scale2: f32,
     pub(crate) start: Point,
     pub(crate) previous: Point,
     pub index: usize,
+    pub(crate) bbox: Aabb,
 }
 
-#[cfg_attr(target_arch="wasm32", wasm_bindgen)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 impl GlyphVisitor {
-    pub fn new(scale: f32, scale2: f32) -> Self {
+    pub fn new(scale: f32) -> Self {
         let accumulate = GlyphyArcAccumulator::new();
         let rasterizer = ab_glyph_rasterizer::Rasterizer::new(512, 512);
         Self {
@@ -82,10 +92,14 @@ impl GlyphVisitor {
             svg_paths: vec![],
             svg_endpoints: vec![],
             scale,
-            scale2,
+            // scale2,
             start: Point::default(),
             previous: Point::default(),
             index: 0,
+            bbox: Aabb::new(
+                Point::new(core::f32::MAX, core::f32::MAX),
+                Point::new(core::f32::MIN, core::f32::MIN),
+            ),
         }
     }
 }
@@ -105,114 +119,119 @@ impl GlyphVisitor {
 
 impl OutlineSink for GlyphVisitor {
     fn move_to(&mut self, to: Vector2F) {
-        let to = Point::new(to.x(), to.y()) * self.scale2;
+        let to = Point::new(to.x(), to.y()) * self.scale;
         // log::debug!("M {} {} ", to.x, to.y);
 
-        if self.scale > 0.02 {
-            self.accumulate
-                .move_to(Point::new(to.x as f32, to.y as f32));
-            #[cfg(feature = "debug")]
-            self.path_str.push_str(&format!("M {} {}", to.x, to.y));
-            self.svg_endpoints.push([to.x as f32, to.y as f32]);
-        }
-
+        // if self.scale > 0.02 {
+        self.accumulate.move_to(Point::new(to.x, to.y));
+        #[cfg(feature = "debug")]
+        self.path_str.push_str(&format!("M {} {}", to.x, to.y));
+        self.svg_endpoints.push([to.x, to.y]);
+        // }
+        self.bbox.extend_by(to.x, to.y);
         self.start = to;
         self.previous = to;
     }
 
     fn line_to(&mut self, to: Vector2F) {
-        let to = Point::new(to.x(), to.y())* self.scale2;
+        let to = Point::new(to.x(), to.y()) * self.scale;
         // log::debug!("+ L {} {} ", to.x, to.y);
-        if self.scale > 0.02 {
-            self.accumulate.line_to(to);
-            #[cfg(feature = "debug")]
-            self.path_str.push_str(&format!("L {} {}", to.x, to.y));
-            self.svg_endpoints.push([to.x as f32, to.y as f32]);
-        } else {
-            self.rasterizer.draw_line(
-                point(self.previous.x * self.scale, self.previous.y * self.scale),
-                point(to.x, to.y),
-            );
-        }
-
+        // if self.scale > 0.02 {
+        self.accumulate.line_to(to);
+        #[cfg(feature = "debug")]
+        self.path_str.push_str(&format!("L {} {}", to.x, to.y));
+        self.svg_endpoints.push([to.x, to.y]);
+        // } else {
+        //     self.rasterizer.draw_line(
+        //         point(self.previous.x * self.scale, self.previous.y * self.scale),
+        //         point(to.x, to.y),
+        //     );
+        // }
+        self.bbox.extend_by(to.x, to.y);
         self.previous = to;
     }
 
     fn quadratic_curve_to(&mut self, control: Vector2F, to: Vector2F) {
-        let control = Point::new(control.x(), control.y()) * self.scale2;
-        let to = Point::new(to.x(), to.y()) * self.scale2;
+        let control = Point::new(control.x(), control.y()) * self.scale;
+        let to = Point::new(to.x(), to.y()) * self.scale;
 
         // log::debug!("+ Q {} {} {} {} ", control.x, control.y, to.x, to.y);
-        if self.scale > 0.02 {
-            self.accumulate.conic_to(control, to);
-            self.svg_endpoints.push([to.x, to.y]);
-        } else {
-            self.rasterizer.draw_quad(
-                point(self.previous.x * self.scale, self.previous.y * self.scale),
-                point(control.x * self.scale, control.y * self.scale),
-                point(to.x * self.scale, to.y * self.scale),
-            );
-        }
+        // if self.scale > 0.02 {
+        self.accumulate.conic_to(control, to);
+        self.svg_endpoints.push([to.x, to.y]);
+        // } else {
+        //     self.rasterizer.draw_quad(
+        //         point(self.previous.x * self.scale, self.previous.y * self.scale),
+        //         point(control.x * self.scale, control.y * self.scale),
+        //         point(to.x * self.scale, to.y * self.scale),
+        //     );
+        // }
+        self.bbox.extend_by(control.x, control.y);
+        self.bbox.extend_by(to.x, to.y);
         self.previous = to;
     }
 
     fn cubic_curve_to(&mut self, control: LineSegment2F, to: Vector2F) {
         // 字形数据没有三次贝塞尔曲线
-        let control1 = Point::new(control.from_x(), control.from_y()) * self.scale2;
-        let control2 = Point::new(control.to_x(), control.to_y()) * self.scale2;
-        let to = Point::new(to.x(), to.y()) * self.scale2;
+        let control1 = Point::new(control.from_x(), control.from_y()) * self.scale;
+        let control2 = Point::new(control.to_x(), control.to_y()) * self.scale;
+        let to = Point::new(to.x(), to.y()) * self.scale;
 
-        // log::debug!(
-        //     "+ C {}, {}, {}, {}, {}, {}",
-        //     control1.x,
-        //     control1.y,
-        //     control2.x,
-        //     control2.y,
-        //     to.x,
-        //     to.y
-        // );
+        log::debug!(
+            "+ C {}, {}, {}, {}, {}, {}",
+            control1.x,
+            control1.y,
+            control2.x,
+            control2.y,
+            to.x,
+            to.y
+        );
 
-        if self.scale > 0.02 {
-            self.accumulate.cubic_to(control1, control2, to);
-            self.svg_endpoints.push([to.x, to.y]);
-        } else {
-            self.rasterizer.draw_cubic(
-                point(self.previous.x * self.scale, self.previous.y * self.scale),
-                point(control1.x * self.scale, control1.y * self.scale),
-                point(control1.x * self.scale, control1.y * self.scale),
-                point(to.x * self.scale, to.y * self.scale),
-            );
-        }
+        // if self.scale > 0.02 {
+        self.accumulate.cubic_to(control1, control2, to);
+        self.svg_endpoints.push([to.x, to.y]);
+        // } else {
+        //     self.rasterizer.draw_cubic(
+        //         point(self.previous.x * self.scale, self.previous.y * self.scale),
+        //         point(control1.x * self.scale, control1.y * self.scale),
+        //         point(control1.x * self.scale, control1.y * self.scale),
+        //         point(to.x * self.scale, to.y * self.scale),
+        //     );
+        // }
+        self.bbox.extend_by(control1.x, control1.y);
+        self.bbox.extend_by(control2.x, control2.y);
+        self.bbox.extend_by(to.x, to.y);
+
+        self.previous = to;
     }
 
     fn close(&mut self) {
         if self.previous != self.start {
             // log::debug!("+ L {} {} ", self.start.x, self.start.y);
-            if self.scale > 0.02 {
-                self.accumulate.line_to(self.start);
-                #[cfg(feature = "debug")]
-                self.path_str
-                    .push_str(&format!("M {} {}", self.start.x, self.start.y));
-                self.svg_endpoints
-                    .push([self.start.x as f32, self.start.y as f32]);
-            } else {
-                let x = self.previous.x * self.scale;
-                self.rasterizer.draw_line(
-                    point(x, (self.previous.y) * self.scale),
-                    point(self.start.x * self.scale, self.start.y * self.scale),
-                )
-            }
+            // if self.scale > 0.02 {
+            self.accumulate.line_to(self.start);
+            #[cfg(feature = "debug")]
+            self.path_str
+                .push_str(&format!("M {} {}", self.start.x, self.start.y));
+            self.svg_endpoints.push([self.start.x, self.start.y]);
+            // } else {
+            //     let x = self.previous.x * self.scale;
+            //     self.rasterizer.draw_line(
+            //         point(x, (self.previous.y) * self.scale),
+            //         point(self.start.x * self.scale, self.start.y * self.scale),
+            //     )
+            // }
         }
         log::debug!("+ Z");
-        if self.scale > 0.02 {
-            self.accumulate.close_path();
-            #[cfg(feature = "debug")]
-            {
-                self.path_str.push_str("Z");
-                self.svg_paths.push(self.path_str.clone());
-                self.path_str.clear();
-            }
+        // if self.scale > 0.02 {
+        self.accumulate.close_path();
+        #[cfg(feature = "debug")]
+        {
+            self.path_str.push_str("Z");
+            self.svg_paths.push(self.path_str.clone());
+            self.path_str.clear();
         }
+        // }
 
         // let r = self.compute_direction();
         // let s = if r { "顺时针" } else { "逆时针" };
@@ -325,8 +344,18 @@ pub fn encode_uint_arc_data(
             let end = &near_endpoints[1];
 
             let mut line = Line::from_points(
-                snap(&Point::new(start.p[0], start.p[1]), &extents, glyph_width, glyph_height),
-                snap(&Point::new(end.p[0], end.p[1]), &extents, glyph_width, glyph_height),
+                snap(
+                    &Point::new(start.p[0], start.p[1]),
+                    &extents,
+                    glyph_width,
+                    glyph_height,
+                ),
+                snap(
+                    &Point::new(end.p[0], end.p[1]),
+                    &extents,
+                    glyph_width,
+                    glyph_height,
+                ),
             );
             // Shader的最后 要加回去
             line.c -= line.n.dot(&c.into_vector());
@@ -391,25 +420,8 @@ pub fn encode_uint_arc_data(
                     (i as f32 + 0.5) * min_width + extents.mins.x,
                     (j as f32 + 0.5) * min_height + extents.mins.y,
                 );
-                let sdf = glyphy_sdf_from_arc_list2(&near_arcs, p).0;
-                let a = if let Some(is_area) = is_area {
-                    let sdf1 = if !is_area {
-                        (256.0 - (sdf.abs()) * 32.0).clamp(0.0, 255.0)
-                    } else {
-                        (256.0 - sdf * 32.0).clamp(0.0, 255.0)
-                    };
-                    sdf1
-                } else {
-                    // let sdf = glyphy_sdf_from_arc_list2(&near_arcs, p).0;
-                    // let temp = units_per_em as f32 / 2048.0;
-                    // (0.5 - (sdf / (glyph_width / 64.0))).clamp(0.0, 1.0) * 255.0
-                    (128.0 - sdf).clamp(0.0, 255.0)
-                };
-                // println!(
-                //     "========== i: {}, j: {}, sdf: {}, near_arcs: {:?}, p: {:?}",
-                //     i, j, sdf, near_arcs, p
-                // );
-                unit_arc.s_dist = a as u8;
+
+                unit_arc.s_dist = compute_sdf(p, &near_arcs, is_area);
             }
         }
         let key = data[begin_y][begin_x].get_key();
@@ -420,7 +432,82 @@ pub fn encode_uint_arc_data(
     (data, map)
 }
 
-#[cfg_attr(target_arch="wasm32", wasm_bindgen)]
+pub fn encode_sdf(
+    result_arcs: Vec<(Vec<&Arc>, Aabb)>,
+    extents: &Aabb,
+    width_cells: usize,
+    height_cells: usize,
+    distance: f32, // sdf在这个值上alpha 衰减为 0
+    is_area: Option<bool>,
+) -> Vec<u8> {
+    // // todo 为了兼容阴影minimip先强制索引纹理为32 * 32
+    // let mut width_cells = 32 as usize;
+    // // 格子行的数量
+    // let mut height_cells = 32 as usize;
+
+    let glyph_width = extents.width();
+    let glyph_height = extents.height();
+
+    // 格子列的数量
+    let min_width = glyph_width / width_cells as f32;
+    // 格子行的数量
+    let min_height = glyph_height / height_cells as f32;
+
+    let mut data = vec![0; width_cells * height_cells];
+
+    for (near_arcs, cell) in result_arcs {
+        // println!("near_endpoints: {:?}", near_endpoints.len());
+
+        let begin = cell.mins - extents.mins;
+        let end = cell.maxs - extents.mins;
+        let begin_x = (begin.x / min_width).round() as usize;
+        let begin_y = (begin.y / min_height).round() as usize;
+
+        let end_x = (end.x / min_width).round() as usize;
+        let end_y = (end.y / min_height).round() as usize;
+
+        // If the arclist is two arcs that can be combined in encoding if reordered, do that.
+        for i in begin_x..end_x {
+            for j in begin_y..end_y {
+                let p = Point::new(
+                    (i as f32 + 0.5) * min_width + extents.mins.x,
+                    (j as f32 + 0.5) * min_height + extents.mins.y,
+                );
+
+                data[(height_cells - j - 1) * width_cells + i] =
+                    compute_sdf2(p, &near_arcs, distance, None);
+            }
+        }
+    }
+    data
+}
+
+fn compute_sdf(p: Point, near_arcs: &Vec<&Arc>, is_area: Option<bool>) -> u8 {
+    let sdf = glyphy_sdf_from_arc_list2(near_arcs, p).0;
+    let a = if let Some(is_area) = is_area {
+        let sdf1 = if !is_area {
+            (256.0 - (sdf.abs()) * 32.0).clamp(0.0, 255.0)
+        } else {
+            (256.0 - sdf * 32.0).clamp(0.0, 255.0)
+        };
+        sdf1
+    } else {
+        // let sdf = glyphy_sdf_from_arc_list2(&near_arcs, p).0;
+        // let temp = units_per_em as f32 / 2048.0;
+        // (0.5 - (sdf / (glyph_width / 64.0))).clamp(0.0, 1.0) * 255.0
+        (128.0 - sdf).clamp(0.0, 255.0)
+    };
+
+    a as u8
+}
+
+fn compute_sdf2(p: Point, near_arcs: &Vec<&Arc>, distance: f32, width: Option<f32>) -> u8 {
+    let sdf = glyphy_sdf_from_arc_list2(near_arcs, p.clone()).0 / distance;
+
+    ((1.0 - sdf) * 128.0) as u8
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub fn get_char_arc_debug(char: String) -> BlobArc {
     // console_error_panic_hook::set_once();
 
@@ -429,15 +516,15 @@ pub fn get_char_arc_debug(char: String) -> BlobArc {
     let buffer: Vec<u8> = vec![];
     // log::debug!("1111111111");
     #[cfg(not(target_arch = "wasm32"))]
-    let mut ft_face = FontFace::new(Share::new(buffer) );
+    let mut ft_face = FontFace::new(Share::new(buffer));
     #[cfg(target_arch = "wasm32")]
-    let mut ft_face = FontFace::new(buffer );
+    let mut ft_face = FontFace::new(buffer);
 
     // log::debug!("22222222char: {}", char);
     let char = char.chars().next().unwrap();
     // log::debug!("13333333");
     let result = ft_face.to_outline(char);
-    let (arcs, _map) = FontFace::get_char_arc( ft_face.max_box.clone(), result);
+    let (arcs, _map) = FontFace::encode_uint_arc(ft_face.max_box.clone(), result);
     // log::debug!("44444444444");
 
     let mut shapes = SvgScenes::new(Aabb::new(Point::new(0.0, 0.0), Point::new(400.0, 400.0)));
@@ -445,7 +532,7 @@ pub fn get_char_arc_debug(char: String) -> BlobArc {
     let mut rect = Rect::new(120.0, 70.0, 100.0, 50.0);
     // 填充颜色 默认0. 0. 0. 0.
     rect.attribute.set_fill_color(0, 0, 255);
-    // 描边颜色 默认 0. 0. 0. 
+    // 描边颜色 默认 0. 0. 0.
     rect.attribute.set_stroke_color(0, 0, 0);
     // 描边宽度，默认0.0
     rect.attribute.set_stroke_width(2.0);
@@ -491,11 +578,16 @@ pub fn to_arc_cmds(endpoints: &Vec<ArcEndpoint>) -> (Vec<Vec<String>>, Vec<[f32;
         } else {
             assert!(current_point.is_some());
             let mut _current_point = current_point.as_ref().unwrap();
-            if !float2_equals(&ep.p, _current_point)  {
-                let arc = Arc::new(Point::new(_current_point[0], _current_point[1]), Point::new(ep.p[0], ep.p[1]) , ep.d);
+            if !float2_equals(&ep.p, _current_point) {
+                let arc = Arc::new(
+                    Point::new(_current_point[0], _current_point[1]),
+                    Point::new(ep.p[0], ep.p[1]),
+                    ep.d,
+                );
                 let center = arc.center();
                 let radius = arc.radius();
-                let start_v = Vector::new(_current_point[0] - center[0], _current_point[1] - center[1]);
+                let start_v =
+                    Vector::new(_current_point[0] - center[0], _current_point[1] - center[1]);
                 let start_angle = start_v.sdf_angle();
 
                 let end_v = Vector::new(ep.p[0] - center[0], ep.p[1] - center[1]);
@@ -590,13 +682,95 @@ impl Attribute {
         }
     }
 
-    pub fn set_stroke_dasharray(&mut self, dasharray: Vec<f32>) {
+    pub fn set_stroke_dasharray(&mut self, dasharray: Vec<f64>) {
         if let Some(stroke) = &mut self.stroke {
-            // stroke.dasharray = Some(dasharray)
+            stroke.dasharray = Some(dasharray)
         } else {
             let mut stroke = Stroke::default();
-            // stroke.dasharray = Some(dasharray);
+            stroke.dasharray = Some(dasharray);
             self.stroke = Some(stroke);
         }
     }
+}
+
+// #[cfg(not(target_arch = "wasm32"))]
+// #[derive(Debug, Clone)]
+// pub struct GlyphInfo {
+//     pub char: char,
+//     pub plane_bounds: Aabb,
+//     pub atlas_bounds: Aabb,
+//     pub advance: f32,
+//     pub sdf_tex: Vec<u8>,
+//     pub tex_size: u32,
+// }
+
+// #[cfg(target_arch = "wasm32")]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GlyphInfo {
+    pub char: char,
+    pub plane_bounds: [f32; 4],
+    pub atlas_bounds:  [f32; 4],
+    pub advance: f32,
+    pub sdf_tex: Vec<u8>,
+    pub tex_size: u32,
+}
+
+
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
+#[derive(Debug, Clone)]
+pub struct OutlineInfo {
+    pub(crate) char: char,
+    pub(crate) endpoints: Vec<ArcEndpoint>,
+    pub(crate) bbox: Aabb,
+    pub(crate) advance: u16,
+    pub(crate) units_per_em: u16,
+}
+
+pub fn compute_layout(
+    extents: &mut Aabb,
+    tex_size: usize,
+    pxrange: u32,
+    units_per_em: u16,
+) -> (Aabb, Aabb, f32, usize) {
+    // map 无序导致每次计算的数据不一样
+    let extents_w = extents.width();
+    let extents_h = extents.height();
+
+    let px_distance = extents_w.max(extents_h) / tex_size as f32;
+    let distance = px_distance * (pxrange >> 1) as f32;
+    println!("distance: {}", distance);
+    extents.mins.x -= distance;
+    extents.mins.y -= distance;
+    extents.maxs.x += distance;
+    extents.maxs.y += distance;
+
+    let scale = 1.0 / units_per_em as f32;
+    let mut plane_bounds = extents.scaled(&Vector::new(scale, scale));
+
+    let pxrange = (pxrange >> 2 << 2) + 4;
+    let tex_size = tex_size + pxrange as usize;
+    let mut atlas_bounds = Aabb::new_invalid();
+    atlas_bounds.mins.x = 0.5;
+    atlas_bounds.mins.y = 0.5;
+    atlas_bounds.maxs.x = tex_size as f32 - 0.5;
+    atlas_bounds.maxs.y = tex_size as f32 - 0.5;
+
+    let temp = extents_w - extents_h;
+    if temp > 0.0 {
+        extents.maxs.y += temp;
+        atlas_bounds.maxs.y -= (temp / extents.height() * tex_size as f32 - 0.5).round() + 0.5;
+    } else {
+        extents.maxs.x -= temp;
+        atlas_bounds.maxs.x -= (temp.abs() / extents.width() * tex_size as f32 - 0.5).round() + 0.5;
+    }
+    plane_bounds.scale(
+        atlas_bounds.width() / 32.0 / plane_bounds.width(),
+        atlas_bounds.height() / 32.0 / plane_bounds.width(),
+    );
+    println!(
+        "plane_bounds: {:?}, atlas_bounds: {:?}",
+        plane_bounds, atlas_bounds
+    );
+    (plane_bounds, atlas_bounds, distance, tex_size)
 }

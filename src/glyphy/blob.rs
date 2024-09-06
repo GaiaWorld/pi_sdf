@@ -3,7 +3,7 @@ use std::{collections::HashMap, ops::Range};
 // use freetype_sys::FT_New_Face;
 // use parry2d::na::ComplexField;
 // use hashlink::LinkedHashMap;
-use parry2d::{bounding_volume::Aabb, math::Vector};
+use parry2d::{ math::Vector};
 
 use serde::{Deserialize, Serialize};
 #[cfg(target_arch = "wasm32")]
@@ -11,7 +11,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 
 use super::{
     geometry::{
-        aabb::Direction,
+        aabb::{Aabb, AabbEXT, Direction},
         arc::{Arc, ArcEndpoint},
         line::Line,
         segment::SegmentEXT,
@@ -20,7 +20,7 @@ use super::{
     sdf::glyphy_sdf_from_arc_list,
     util::{is_inf, GLYPHY_INFINITY},
 };
-use crate::glyphy::geometry::aabb::AabbEXT;
+
 use crate::Point;
 
 pub const MAX_GRID_SIZE: f32 = 63.0;
@@ -787,13 +787,29 @@ pub struct TexInfo {
     pub char: char,
     pub extents_min_x: f32,
     pub extents_min_y: f32,
-
     pub extents_max_x: f32,
     pub extents_max_y: f32, 
     pub binding_box_min_x: f32,
     pub binding_box_min_y: f32,
     pub binding_box_max_x: f32,
     pub binding_box_max_y: f32,
+}
+
+#[cfg_attr(target_arch="wasm32", wasm_bindgen)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct TexInfo2 {
+    pub sdf_offset_x: usize,
+    pub sdf_offset_y: usize,
+    pub advance: f32,
+    pub char: char,
+    pub plane_min_x: f32,
+    pub plane_min_y: f32,
+    pub plane_max_x: f32,
+    pub plane_max_y: f32, 
+    pub atlas_min_x: f32,
+    pub atlas_min_y: f32,
+    pub atlas_max_x: f32,
+    pub atlas_max_y: f32,
 }
 
 impl Default for TexInfo {

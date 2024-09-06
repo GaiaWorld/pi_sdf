@@ -9,6 +9,7 @@ crate-type = ["cdylib", "rlib"]
 # doctest = false
 
 [dependencies]
+derive-deref-rs = "0.1"
 parry2d = "0.13"
 log = {version = "0.4"}#, features = ["release_max_level_error"]}
 # lazy_static = "1.4"
@@ -41,13 +42,13 @@ tracing-subscriber = "0.3"
 naga = "0.19"
 pi_wgpu = { registry = "yn", version = "0.1",features = ["use_wgpu"] }
 serde_json = "1.0"
-
+image = "0.24"
 brotli = "6.0"
 
 [profile.release]
 # incremental = true
 # strip = true
-lto = true
+# lto = true
 # panic = "abort"
 # codegen-units = 1
 # opt-level = "s"

@@ -1,5 +1,5 @@
 // use image::EncodableLayout;
-use parry2d::{bounding_volume::Aabb, math::Vector, shape::Segment};
+use parry2d::{math::Vector, shape::Segment};
 use serde::{Deserialize, Serialize};
 use std::hash::Hasher;
 use std::sync::atomic::AtomicU64;
@@ -10,9 +10,10 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use crate::glyphy::util::{float_equals, xor};
 use crate::Point;
 
+use super::aabb::{Aabb, AabbEXT};
 use super::{
-    aabb::AabbEXT, bezier::Bezier, line::Line, point::PointExt, segment::SegmentEXT,
-    signed_vector::SignedVector, vector::VectorEXT,
+    bezier::Bezier, line::Line, point::PointExt, segment::SegmentEXT, signed_vector::SignedVector,
+    vector::VectorEXT,
 };
 
 pub(crate) static ID: AtomicU64 = AtomicU64::new(0);
@@ -36,7 +37,7 @@ pub struct ErrorValue {
     pub(crate) value: f32,
 }
 
-#[cfg_attr(target_arch="wasm32", wasm_bindgen(getter_with_clone))]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ArcEndpoint {
     pub(crate) p: [f32; 2],
@@ -48,7 +49,7 @@ pub struct ArcEndpoint {
     pub(crate) line_encode: Option<[f32; 4]>, // rgba
 }
 
-#[cfg_attr(target_arch="wasm32", wasm_bindgen)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 impl ArcEndpoint {
     pub fn new(x: f32, y: f32, d: f32) -> Self {
         Self {
@@ -91,7 +92,7 @@ impl ArcEndpoint {
 //    d > 0，和 (终 - 起).otho() 同向
 //    d < 0，和 上面 相反
 
-#[cfg_attr(target_arch="wasm32", wasm_bindgen)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 #[derive(Debug, Clone)]
 pub struct Arc {
     pub id: u64,
@@ -601,8 +602,8 @@ fn test_projection_to_top_bound() {
 
 #[test]
 fn test_projection_to_bottom_bound() {
-    let s = Segment::new(Point::new(1077.0, 0.0), Point::new(189.0, 0.0));
-    let r = squared_distance_segment(&Point::new(185.0, 5.0), &s);
+    // let s = Segment::new(Point::new(1077.0, 0.0), Point::new(189.0, 0.0));
+    // let r = squared_distance_segment(&Point::new(185.0, 5.0), &s);
     // println!("R: {}", r);
 }
 

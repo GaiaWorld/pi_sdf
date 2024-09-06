@@ -1,10 +1,10 @@
-use parry2d::{bounding_volume::Aabb, math::Point};
+use parry2d::math::Point;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::wasm_bindgen;
 
-use super::geometry::aabb::AabbEXT;
+use super::geometry::aabb::{Aabb, AabbEXT};
 
-#[cfg_attr(target_arch="wasm32", wasm_bindgen)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 #[derive(Debug, Clone)]
 pub struct GlyphInfo {
     pub(crate) extents: Aabb,
@@ -19,7 +19,7 @@ pub struct GlyphInfo {
     atlas_y: f32,
 }
 
-#[cfg_attr(target_arch="wasm32", wasm_bindgen)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 impl GlyphInfo {
     pub fn new() -> Self {
         Self {

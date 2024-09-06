@@ -6,18 +6,23 @@ use allsorts::{
 // use erased_serde::serialize_trait_object;
 // use image::EncodableLayout;
 use kurbo::Shape;
-use parry2d::{bounding_volume::Aabb, shape::Segment as MSegment};
+use parry2d::shape::Segment as MSegment;
 use serde::{Deserialize, Serialize};
 // use usvg::tiny_skia_path::PathSegment;
-
-use crate::{font::SdfInfo, glyphy::geometry::aabb::AabbEXT, utils::Attribute};
+use crate::font::SdfInfo2;
+use crate::glyphy::blob::TexInfo2;
+use crate::{
+    font::SdfInfo,
+    glyphy::geometry::aabb::{Aabb, AabbEXT},
+    utils::{compute_layout, Attribute, GlyphInfo},
+};
 use crate::{
     glyphy::{
         blob::{EncodeError, TexData, TexInfo},
         geometry::{arc::ArcEndpoint, point::PointExt},
         util::float_equals,
     },
-    svg::compute_near_arc_impl,
+    svg::encode_uint_arc_impl,
     utils::GlyphVisitor,
     Point,
 };
@@ -52,8 +57,6 @@ pub enum PathVerb {
     EllipticalArcToRelative = 18,
     Close = 19,
 }
-
-
 
 impl Into<f32> for PathVerb {
     fn into(self) -> f32 {
@@ -141,10 +144,10 @@ impl Circle {
     }
 
     fn binding_box(&self) -> Aabb {
-        Aabb {
-            mins: Point::new(self.cx - self.radius, self.cy - self.radius),
-            maxs: Point::new(self.cx + self.radius, self.cy + self.radius),
-        }
+        Aabb::new(
+            Point::new(self.cx - self.radius, self.cy - self.radius),
+            Point::new(self.cx + self.radius, self.cy + self.radius),
+        )
     }
 
     pub fn get_svg_info(&self) -> SvgInfo {
@@ -230,10 +233,7 @@ impl Rect {
         let max_x = self.x.max(self.x + self.width);
         let max_y = self.y.max(self.y + self.height);
 
-        Aabb {
-            mins: Point::new(min_x, min_y),
-            maxs: Point::new(max_x, max_y),
-        }
+        Aabb::new(Point::new(min_x, min_y), Point::new(max_x, max_y))
     }
 
     pub fn get_svg_info(&self) -> SvgInfo {
@@ -303,10 +303,7 @@ impl Segment {
         let max_x = self.segment.a.x.max(self.segment.b.x);
         let max_y = self.segment.a.y.max(self.segment.b.y);
 
-        Aabb {
-            mins: Point::new(min_x, min_y),
-            maxs: Point::new(max_x, max_y),
-        }
+        Aabb::new(Point::new(min_x, min_y), Point::new(max_x, max_y))
     }
 
     pub fn get_svg_info(&self) -> SvgInfo {
@@ -387,7 +384,7 @@ impl Ellipse {
                 }
             }
         }
-        let mut sink = GlyphVisitor::new(1.0, 1.0);
+        let mut sink = GlyphVisitor::new(1.0);
         // 圆弧拟合贝塞尔曲线的精度，值越小越精确
         sink.accumulate.tolerance = 0.1;
         // println!("=====e.area():{}", e.area());
@@ -413,10 +410,10 @@ impl Ellipse {
     }
 
     fn binding_box(&self) -> Aabb {
-        Aabb {
-            mins: Point::new(self.cx - self.rx, self.cy - self.rx),
-            maxs: Point::new(self.cx + self.rx, self.cy + self.rx),
-        }
+        Aabb::new(
+            Point::new(self.cx - self.rx, self.cy - self.rx),
+            Point::new(self.cx + self.rx, self.cy + self.rx),
+        )
     }
 
     pub fn get_svg_info(&self) -> SvgInfo {
@@ -508,10 +505,7 @@ impl Polygon {
             max_y = max_y.max(v.y);
         });
 
-        Aabb {
-            mins: Point::new(min_x, min_y),
-            maxs: Point::new(max_x, max_y),
-        }
+        Aabb::new(Point::new(min_x, min_y), Point::new(max_x, max_y))
     }
 
     pub fn get_svg_info(&self) -> SvgInfo {
@@ -624,10 +618,7 @@ impl Polyline {
             max_y = max_y.max(v.y);
         });
 
-        Aabb {
-            mins: Point::new(min_x, min_y),
-            maxs: Point::new(max_x, max_y),
-        }
+        Aabb::new(Point::new(min_x, min_y), Point::new(max_x, max_y))
     }
 
     pub fn get_svg_info(&self) -> SvgInfo {
@@ -661,7 +652,8 @@ pub struct Path {
 impl Path {
     pub fn new(verbs: Vec<u8>, points: Vec<f32>) -> Self {
         let mut verbs = verbs
-            .into_iter().map(|v|unsafe { transmute (v) })
+            .into_iter()
+            .map(|v| unsafe { transmute(v) })
             .collect::<Vec<PathVerb>>();
 
         let mut points = points
@@ -711,7 +703,7 @@ impl Path {
     }
 
     pub fn get_arc_endpoints(&self) -> Vec<ArcEndpoint> {
-        let mut sink = GlyphVisitor::new(1.0, 1.0);
+        let mut sink = GlyphVisitor::new(1.0);
         // 圆弧拟合贝塞尔曲线的精度，值越小越精确
         sink.accumulate.tolerance = 0.1;
 
@@ -753,10 +745,7 @@ impl Path {
             max_y = max_y.max(p.y);
         }
 
-        Aabb {
-            mins: Point::new(min_x, min_y),
-            maxs: Point::new(max_x, max_y),
-        }
+        Aabb::new(Point::new(min_x, min_y), Point::new(max_x, max_y))
     }
 
     pub fn get_svg_info(&self) -> SvgInfo {
@@ -786,6 +775,30 @@ pub struct SvgInfo {
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
+impl SvgInfo {
+    #[cfg(target_arch = "wasm32")]
+    pub fn new(binding_box: &[f32], arc_endpoints: &Vec<u8>) -> SvgInfo {
+        let arc_endpoints: Vec<ArcEndpoint> = bincode::deserialize(arc_endpoints).unwrap();
+        SvgInfo {
+            binding_box: Aabb {
+                mins: Point::new(binding_box[0], binding_box[1]),
+                maxs: Point::new(binding_box[2], binding_box[3]),
+            },
+            arc_endpoints,
+            is_area: true,
+        }
+    }
+    
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn new(binding_box: Aabb, arc_endpoints: Vec<ArcEndpoint>) -> SvgInfo {
+        SvgInfo {
+            binding_box,
+            arc_endpoints,
+            is_area: true,
+        }
+    }
+}
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub fn computer_svg_sdf2(info: SvgInfo) -> Vec<u8> {
     bincode::serialize(&computer_svg_sdf(info)).unwrap()
 }
@@ -798,7 +811,7 @@ pub fn computer_svg_sdf(info: SvgInfo) -> SdfInfo {
     } = info;
     let extents = extents(binding_box);
 
-    let (mut blob_arc, map) = compute_near_arc_impl(extents, arc_endpoints, is_area);
+    let (mut blob_arc, map) = encode_uint_arc_impl(extents, arc_endpoints, is_area);
     let data_tex = blob_arc.encode_data_tex1(&map);
     let (mut tex_info, index_tex, sdf_tex1, sdf_tex2, sdf_tex3, sdf_tex4) =
         blob_arc.encode_index_tex1(map, data_tex.len() / 4);
@@ -833,10 +846,10 @@ pub struct SvgScenes {
 
 impl SvgScenes {
     pub fn new(view_box: Aabb) -> Self {
-        let view_box = Aabb {
-            mins: Point::new(view_box.mins.x, view_box.mins.y),
-            maxs: Point::new(view_box.maxs.x, view_box.maxs.y),
-        };
+        let view_box = Aabb::new(
+            Point::new(view_box.mins.x, view_box.mins.y),
+            Point::new(view_box.maxs.x, view_box.maxs.y),
+        );
         Self {
             shapes: Default::default(),
             view_box,
@@ -896,7 +909,7 @@ impl SvgScenes {
         {
             let binding_box = extents(binding_box);
             // println!("binding_box: {:?}", binding_box);
-            let (mut blob_arc, map) = compute_near_arc_impl(binding_box, arc_endpoints, is_area);
+            let (mut blob_arc, map) = encode_uint_arc_impl(binding_box, arc_endpoints, is_area);
             let size = blob_arc.encode_data_tex(&map, data_tex, width0, offset_x0, offset_y0)?;
             // println!("data_map: {}", map.len());
             let mut info = blob_arc.encode_index_tex(
@@ -1071,4 +1084,117 @@ pub fn extents(mut binding_box: Aabb) -> Aabb {
         binding_box.maxs.x = binding_box.mins.x + height;
     };
     binding_box
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub fn compute_arcs_sdf_tex(
+    mut endpoints: Vec<ArcEndpoint>,
+    bbox: Aabb,
+    tex_size: usize, // 需要计算纹理的宽高，默认正方形，像素为单位
+    pxrange: u32,
+) -> SdfInfo2 {
+    // log::error!("endpoints.len(): {}", endpoints.len());
+
+    let mut extents = bbox;
+    let (plane_bounds, atlas_bounds, distance, tex_size) =
+        compute_layout(&mut extents, tex_size, pxrange, 1);
+    let (result_arcs, _, _, near_arcs) = crate::svg::compute_near_arcs(extents, &mut endpoints);
+    log::trace!("near_arcs: {}", near_arcs.len());
+
+    let pixmap =
+        crate::utils::encode_sdf(result_arcs, &extents, tex_size, tex_size, distance, None);
+
+    SdfInfo2 {
+        sdf_tex: pixmap,
+        tex_size: tex_size,
+        tex_info: TexInfo2 {
+            sdf_offset_x: 0,
+            sdf_offset_y: 0,
+            advance: todo!(),
+            char: '1',
+            plane_min_x: plane_bounds.mins.x,
+            plane_min_y: plane_bounds.mins.y,
+            plane_max_x: plane_bounds.maxs.x,
+            plane_max_y: plane_bounds.maxs.y,
+            atlas_min_x: atlas_bounds.mins.x,
+            atlas_min_y: atlas_bounds.mins.y,
+            atlas_max_x: atlas_bounds.maxs.x,
+            atlas_max_y: atlas_bounds.maxs.y,
+        },
+    }
+}
+#[cfg(target_arch = "wasm32")]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
+pub fn compute_arcs_sdf_tex(
+    mut endpoints: Vec<ArcEndpoint>,
+    bbox: &[f32],
+    tex_size: usize, // 需要计算纹理的宽高，默认正方形，像素为单位
+    pxrange: u32,
+) -> Vec<u8> {
+    // log::error!("endpoints.len(): {}", endpoints.len());
+    let bbox = Aabb::new(Point::new(bbox[0], bbox[1]), Point::new(bbox[2], bbox[3]));
+    let mut extents = bbox;
+    let (plane_bounds, atlas_bounds, distance, tex_size) =
+        compute_layout(&mut extents, tex_size, pxrange, 1);
+    let (result_arcs, _, _, near_arcs) = crate::svg::compute_near_arcs(extents, &mut endpoints);
+    log::trace!("near_arcs: {}", near_arcs.len());
+
+    let pixmap =
+        crate::utils::encode_sdf(result_arcs, &extents, tex_size, tex_size, distance, None);
+
+    let info = GlyphInfo {
+        char: ' ',
+        advance: bbox.width(),
+        plane_bounds: [
+            plane_bounds.mins.x,
+            plane_bounds.mins.y,
+            plane_bounds.maxs.x,
+            plane_bounds.maxs.y,
+        ],
+        atlas_bounds: [
+            atlas_bounds.mins.x,
+            atlas_bounds.mins.y,
+            atlas_bounds.maxs.x,
+            atlas_bounds.maxs.y,
+        ],
+        sdf_tex: pixmap,
+        tex_size: tex_size as u32,
+    };
+    bincode::serialize(&info).unwrap()
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub fn compute_shape_sdf_tex(
+    svginfo: SvgInfo,
+    tex_size: usize, // 需要计算纹理的宽高，默认正方形，像素为单位
+    pxrange: u32,
+) -> SdfInfo2 {
+    let SvgInfo {
+        binding_box,
+        arc_endpoints,
+        ..
+    } = svginfo;
+    compute_arcs_sdf_tex(arc_endpoints, binding_box, tex_size, pxrange)
+}
+
+#[cfg(target_arch = "wasm32")]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
+pub fn compute_shape_sdf_tex(
+    svginfo: SvgInfo,
+    tex_size: usize, // 需要计算纹理的宽高，默认正方形，像素为单位
+    pxrange: u32,
+) -> Vec<u8> {
+    let SvgInfo {
+        binding_box,
+        arc_endpoints,
+        ..
+    } = svginfo;
+    let binding_box = [
+        binding_box.mins.x,
+        binding_box.mins.y,
+        binding_box.maxs.x,
+        binding_box.maxs.y,
+    ];
+    let info = compute_arcs_sdf_tex(arc_endpoints, &binding_box, tex_size, pxrange);
+    bincode::serialize(&info).unwrap()
 }

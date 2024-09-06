@@ -4,19 +4,23 @@ use allsorts::{
     outline::OutlineSink,
     pathfinder_geometry::{line_segment::LineSegment2F, vector::Vector2F},
 };
-use parry2d::bounding_volume::Aabb;
 
 use usvg::{
     // tiny_skia_path::{self, PathVerb},
-    NodeKind, PathCommand, TreeParsing
+    TreeParsing,
 };
 
 use crate::{
     glyphy::{
-        blob::{recursion_near_arcs_of_cell, travel_data, BlobArc, EncodeError, TexData, TexInfo},
-        geometry::{aabb::AabbEXT, arc::{Arc, ArcEndpoint}},
+        blob::{recursion_near_arcs_of_cell, travel_data, BlobArc},
+        geometry::{
+            aabb::{Aabb, AabbEXT},
+            arc::{Arc, ArcEndpoint},
+        },
         util::GLYPHY_INFINITY,
-    }, shape::PathVerb, utils::{encode_uint_arc_data, Attribute, GlyphVisitor}, Point
+    },
+    utils::encode_uint_arc_data,
+    Point,
 };
 
 #[derive(Debug, Clone)]
@@ -45,7 +49,7 @@ impl PathType {
 }
 
 pub struct Svg {
-    pub(crate) tree: usvg::Tree,
+    pub(crate) _tree: usvg::Tree,
     pub(crate) view_box: Aabb,
 }
 
@@ -74,11 +78,11 @@ impl Svg {
         bottom += 10.0;
 
         Self {
-            tree,
-            view_box: Aabb {
-                mins: Point::new(left as f32, top as f32),
-                maxs: Point::new(right as f32, bottom as f32),
-            },
+            _tree: tree,
+            view_box: Aabb::new(
+                 Point::new(left as f32, top as f32),
+                 Point::new(right as f32, bottom as f32),
+            ),
         }
     }
 
@@ -103,8 +107,12 @@ impl Svg {
         ]
     }
 
-    pub fn compute_near_arc(&self, endpoints: Vec<ArcEndpoint>, is_area: bool) -> (BlobArc, HashMap<u64, u64>) {
-        compute_near_arc_impl(self.view_box, endpoints, is_area)
+    pub fn encode_uint_arc(
+        &self,
+        endpoints: Vec<ArcEndpoint>,
+        is_area: bool,
+    ) -> (BlobArc, HashMap<u64, u64>) {
+        encode_uint_arc_impl(self.view_box, endpoints, is_area)
     }
 
     // pub fn out_tex_data(
@@ -277,11 +285,40 @@ impl Svg {
 //     is_colse
 // }
 
-pub fn compute_near_arc_impl(
+pub fn encode_uint_arc_impl(
     view_box: Aabb,
-    endpoints: Vec<ArcEndpoint>,
+    mut endpoints: Vec<ArcEndpoint>,
     is_area: bool,
 ) -> (BlobArc, HashMap<u64, u64>) {
+    let extents = view_box;
+    let (result_arcs, min_width, min_height, near_arcs) =
+        compute_near_arcs(extents, &mut endpoints);
+    log::trace!("near_arcs: {}", near_arcs.len());
+
+    let (unit_arcs, map) =
+        encode_uint_arc_data(result_arcs, &extents, min_width, min_height, Some(is_area));
+
+    let [min_sdf, max_sdf] = travel_data(&unit_arcs);
+    let blob_arc = BlobArc {
+        min_sdf,
+        max_sdf,
+        cell_size: extents.width() / unit_arcs.len() as f32,
+        #[cfg(feature = "debug")]
+        show: format!("<br> 格子数：宽 = {}, 高 = {} <br>", min_width, min_height),
+
+        extents,
+        data: unit_arcs,
+        avg_fetch_achieved: 0.0,
+        endpoints: endpoints.clone(),
+    };
+
+    (blob_arc, map)
+}
+
+pub fn compute_near_arcs<'a>(
+    view_box: Aabb,
+    endpoints: &mut Vec<ArcEndpoint>,
+) -> (Vec<(Vec<&'a Arc>, Aabb)>, f32, f32, Vec<Arc>) {
     let extents = view_box;
     // println!("extents: {:?}", extents);
     let mut min_width = f32::INFINITY;
@@ -322,21 +359,5 @@ pub fn compute_near_arc_impl(
         &mut temp,
     );
 
-    let (unit_arcs, map) = encode_uint_arc_data(result_arcs, &extents, min_width, min_height, Some(is_area));
-
-    let [min_sdf, max_sdf] = travel_data(&unit_arcs);
-    let blob_arc = BlobArc {
-        min_sdf,
-        max_sdf,
-        cell_size: extents.width() / unit_arcs.len() as f32,
-        #[cfg(feature = "debug")]
-        show: format!("<br> 格子数：宽 = {}, 高 = {} <br>", min_width, min_height),
-  
-        extents,
-        data: unit_arcs,
-        avg_fetch_achieved: 0.0,
-        endpoints: endpoints.clone(),
-    };
-
-    (blob_arc, map)
+    (result_arcs, min_width, min_height, near_arcs)
 }
