@@ -554,6 +554,7 @@ impl FontFace {
         outline_info: OutlineInfo,
         tex_size: usize, // 需要计算纹理的宽高，默认正方形，像素为单位
         pxrange: u32,
+        is_outer_glow: bool,
     ) -> SdfInfo2 {
         let OutlineInfo {
             char,
@@ -571,7 +572,7 @@ impl FontFace {
         log::trace!("near_arcs: {}", near_arcs.len());
 
         let pixmap =
-            crate::utils::encode_sdf(result_arcs, &extents, tex_size, tex_size, distance, None);
+            crate::utils::encode_sdf(result_arcs, &extents, tex_size, tex_size, distance, None, is_outer_glow);
         SdfInfo2 {
             tex_info: TexInfo2 {
                 char,

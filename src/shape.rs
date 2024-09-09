@@ -280,8 +280,53 @@ impl Segment {
         vec![
             ArcEndpoint::new(self.segment.a.x, self.segment.a.y, f32::INFINITY),
             ArcEndpoint::new(self.segment.b.x, self.segment.b.y, 0.0),
-            ArcEndpoint::new(self.segment.a.x, self.segment.a.y, 0.0),
+            // ArcEndpoint::new(self.segment.a.x, self.segment.a.y, 0.0),
         ]
+    }
+
+    pub fn get_stroke_dasharray_arc_endpoints(&self, step: [f32; 2]) -> Vec<ArcEndpoint> {
+        let length = self.segment.length();
+        let part = step[0] + step[1];
+        let num = length / part;
+        let mmod = num - num.trunc();
+        let dir = (self.segment.b - self.segment.a).normalize();
+
+        let real = dir * step[0];
+        let a_virtual = dir * step[1];
+
+        let mut arcs = vec![ArcEndpoint::new(
+            self.segment.a.x,
+            self.segment.a.y,
+            f32::INFINITY,
+        )];
+
+        for _ in 0..num as usize {
+            let last = arcs.last().unwrap();
+            let x = last.p[0] + real[0];
+            let y = last.p[1] + real[1];
+            let p1 = ArcEndpoint::new(x, y, 0.0);
+            let x = p1.p[0] + a_virtual[0];
+            let y = p1.p[1] + a_virtual[1];
+            let p2 = ArcEndpoint::new(x, y, f32::INFINITY);
+
+            arcs.push(p1);
+            arcs.push(p2);
+        }
+
+        let last = arcs.last().unwrap();
+        if mmod > step[0] / part {
+            let x = last.p[0] + real[0];
+            let y = last.p[1] + real[1];
+            let p = ArcEndpoint::new(x, y, 0.0);
+            arcs.push(p);
+        } else {
+            let x = self.segment.b.x;
+            let y = self.segment.b.y;
+            let p = ArcEndpoint::new(x, y, 0.0);
+            arcs.push(p);
+        }
+
+        arcs
     }
 
     pub fn get_hash(&self) -> u64 {
@@ -788,7 +833,7 @@ impl SvgInfo {
             is_area: true,
         }
     }
-    
+
     #[cfg(not(target_arch = "wasm32"))]
     pub fn new(binding_box: Aabb, arc_endpoints: Vec<ArcEndpoint>) -> SvgInfo {
         SvgInfo {
@@ -1092,6 +1137,8 @@ pub fn compute_arcs_sdf_tex(
     bbox: Aabb,
     tex_size: usize, // 需要计算纹理的宽高，默认正方形，像素为单位
     pxrange: u32,
+    width: Option<f32>, 
+    is_outer_glow: bool,
 ) -> SdfInfo2 {
     // log::error!("endpoints.len(): {}", endpoints.len());
 
@@ -1102,7 +1149,7 @@ pub fn compute_arcs_sdf_tex(
     log::trace!("near_arcs: {}", near_arcs.len());
 
     let pixmap =
-        crate::utils::encode_sdf(result_arcs, &extents, tex_size, tex_size, distance, None);
+        crate::utils::encode_sdf(result_arcs, &extents, tex_size, tex_size, distance, width, is_outer_glow,);
 
     SdfInfo2 {
         sdf_tex: pixmap,
@@ -1110,8 +1157,7 @@ pub fn compute_arcs_sdf_tex(
         tex_info: TexInfo2 {
             sdf_offset_x: 0,
             sdf_offset_y: 0,
-            advance: todo!(),
-            char: '1',
+            advance: bbox.width(),
             plane_min_x: plane_bounds.mins.x,
             plane_min_y: plane_bounds.mins.y,
             plane_max_x: plane_bounds.maxs.x,
@@ -1120,6 +1166,7 @@ pub fn compute_arcs_sdf_tex(
             atlas_min_y: atlas_bounds.mins.y,
             atlas_max_x: atlas_bounds.maxs.x,
             atlas_max_y: atlas_bounds.maxs.y,
+            char: '1',
         },
     }
 }
@@ -1168,13 +1215,21 @@ pub fn compute_shape_sdf_tex(
     svginfo: SvgInfo,
     tex_size: usize, // 需要计算纹理的宽高，默认正方形，像素为单位
     pxrange: u32,
+    is_outer_glow: bool,
 ) -> SdfInfo2 {
     let SvgInfo {
         binding_box,
         arc_endpoints,
-        ..
+        is_area
     } = svginfo;
-    compute_arcs_sdf_tex(arc_endpoints, binding_box, tex_size, pxrange)
+    compute_arcs_sdf_tex(
+        arc_endpoints,
+        binding_box,
+        tex_size,
+        pxrange,
+        if is_area { None } else { Some(1.0) },
+        is_outer_glow,
+    )
 }
 
 #[cfg(target_arch = "wasm32")]

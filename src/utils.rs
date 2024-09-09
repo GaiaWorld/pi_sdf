@@ -27,7 +27,7 @@ use crate::{
     shape::{Rect, SvgScenes},
     Point,
 };
-use parry2d::math::Vector;
+use parry2d::{math::Vector, na::ComplexField};
 use std::hash::Hasher;
 
 use crate::{
@@ -438,7 +438,8 @@ pub fn encode_sdf(
     width_cells: usize,
     height_cells: usize,
     distance: f32, // sdf在这个值上alpha 衰减为 0
-    is_area: Option<bool>,
+    width: Option<f32>,
+    is_outer_glow: bool,
 ) -> Vec<u8> {
     // // todo 为了兼容阴影minimip先强制索引纹理为32 * 32
     // let mut width_cells = 32 as usize;
@@ -473,9 +474,12 @@ pub fn encode_sdf(
                     (i as f32 + 0.5) * min_width + extents.mins.x,
                     (j as f32 + 0.5) * min_height + extents.mins.y,
                 );
-
-                data[(height_cells - j - 1) * width_cells + i] =
-                    compute_sdf2(p, &near_arcs, distance, None);
+                if i == 4{
+                    println!("=====")
+                }
+                let r = compute_sdf2(p, &near_arcs, distance, width, is_outer_glow,);
+                println!("{:?}", (i, j));
+                data[(height_cells - j - 1) * width_cells + i] =r;
             }
         }
     }
@@ -501,10 +505,29 @@ fn compute_sdf(p: Point, near_arcs: &Vec<&Arc>, is_area: Option<bool>) -> u8 {
     a as u8
 }
 
-fn compute_sdf2(p: Point, near_arcs: &Vec<&Arc>, distance: f32, width: Option<f32>) -> u8 {
-    let sdf = glyphy_sdf_from_arc_list2(near_arcs, p.clone()).0 / distance;
+fn compute_sdf2(
+    p: Point,
+    near_arcs: &Vec<&Arc>,
+    distance: f32,
+    width: Option<f32>,
+    is_outer_glow: bool,
+) -> u8 {
+    let mut sdf = glyphy_sdf_from_arc_list2(near_arcs, p.clone()).0;
+    if let Some(_) = width {
+        sdf = sdf.abs(); // - (width * 0.5);
+    }
 
-    ((1.0 - sdf) * 128.0) as u8
+    if is_outer_glow {
+        let radius = distance;
+        println!("{:?}", (radius, sdf));
+        sdf = ((radius - sdf) / radius).clamp(0.0, 1.0).powf(5.0);
+        println!("{:?}", (radius, sdf));
+        return (sdf * 255.0).round() as u8;
+        // println!("{:?}", (radius, sdf));
+    } else {
+        sdf = sdf / distance;
+        return  ((1.0 - sdf) * 128.0) as u8
+    }
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
@@ -709,13 +732,11 @@ impl Attribute {
 pub struct GlyphInfo {
     pub char: char,
     pub plane_bounds: [f32; 4],
-    pub atlas_bounds:  [f32; 4],
+    pub atlas_bounds: [f32; 4],
     pub advance: f32,
     pub sdf_tex: Vec<u8>,
     pub tex_size: u32,
 }
-
-
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 #[derive(Debug, Clone)]
