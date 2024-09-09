@@ -120,7 +120,7 @@ impl GlyphVisitor {
 impl OutlineSink for GlyphVisitor {
     fn move_to(&mut self, to: Vector2F) {
         let to = Point::new(to.x(), to.y()) * self.scale;
-        // log::debug!("M {} {} ", to.x, to.y);
+        log::info!("M {} {} ", to.x, to.y);
 
         // if self.scale > 0.02 {
         self.accumulate.move_to(Point::new(to.x, to.y));
@@ -135,7 +135,7 @@ impl OutlineSink for GlyphVisitor {
 
     fn line_to(&mut self, to: Vector2F) {
         let to = Point::new(to.x(), to.y()) * self.scale;
-        // log::debug!("+ L {} {} ", to.x, to.y);
+        log::info!("+ L {} {} ", to.x, to.y);
         // if self.scale > 0.02 {
         self.accumulate.line_to(to);
         #[cfg(feature = "debug")]
@@ -155,7 +155,7 @@ impl OutlineSink for GlyphVisitor {
         let control = Point::new(control.x(), control.y()) * self.scale;
         let to = Point::new(to.x(), to.y()) * self.scale;
 
-        // log::debug!("+ Q {} {} {} {} ", control.x, control.y, to.x, to.y);
+        log::info!("+ Q {} {} {} {} ", control.x, control.y, to.x, to.y);
         // if self.scale > 0.02 {
         self.accumulate.conic_to(control, to);
         self.svg_endpoints.push([to.x, to.y]);
@@ -177,7 +177,7 @@ impl OutlineSink for GlyphVisitor {
         let control2 = Point::new(control.to_x(), control.to_y()) * self.scale;
         let to = Point::new(to.x(), to.y()) * self.scale;
 
-        log::debug!(
+        log::info!(
             "+ C {}, {}, {}, {}, {}, {}",
             control1.x,
             control1.y,
@@ -222,7 +222,7 @@ impl OutlineSink for GlyphVisitor {
             //     )
             // }
         }
-        log::debug!("+ Z");
+        log::info!("+ Z");
         // if self.scale > 0.02 {
         self.accumulate.close_path();
         #[cfg(feature = "debug")]
@@ -474,11 +474,11 @@ pub fn encode_sdf(
                     (i as f32 + 0.5) * min_width + extents.mins.x,
                     (j as f32 + 0.5) * min_height + extents.mins.y,
                 );
-                if i == 4{
-                    println!("=====")
-                }
+                // if i == 4{
+                //     // println!("=====")
+                // }
                 let r = compute_sdf2(p, &near_arcs, distance, width, is_outer_glow,);
-                println!("{:?}", (i, j));
+                // println!("{:?}", (i, j));
                 data[(height_cells - j - 1) * width_cells + i] =r;
             }
         }
@@ -519,15 +519,67 @@ fn compute_sdf2(
 
     if is_outer_glow {
         let radius = distance;
-        println!("{:?}", (radius, sdf));
+        // println!("{:?}", (radius, sdf));
         sdf = ((radius - sdf) / radius).clamp(0.0, 1.0).powf(5.0);
-        println!("{:?}", (radius, sdf));
-        return (sdf * 255.0).round() as u8;
+        // println!("{:?}", (radius, sdf));
+        return (sdf * 128.0).round() as u8;
         // println!("{:?}", (radius, sdf));
     } else {
         sdf = sdf / distance;
         return  ((1.0 - sdf) * 128.0) as u8
     }
+}
+
+pub fn compute_layout(
+    extents: &mut Aabb,
+    tex_size: usize,
+    pxrange: u32,
+    units_per_em: u16,
+) -> (Aabb, Aabb, f32, usize) {
+    // map 无序导致每次计算的数据不一样
+    // let bbox = extents.clone();
+    let extents_w = extents.width();
+    let extents_h = extents.height();
+
+    let px_distance = extents_w.max(extents_h) / tex_size as f32;
+    let distance = px_distance * (pxrange >> 1) as f32;
+    println!("distance: {}", distance);
+    extents.mins.x -= distance;
+    extents.mins.y -= distance;
+    extents.maxs.x += distance;
+    extents.maxs.y += distance;
+
+    let scale = 1.0 / units_per_em as f32;
+    let plane_bounds = extents.scaled(&Vector::new(scale, scale));
+
+    let pxrange = (pxrange >> 2 << 2) + 4;
+    let tex_size = tex_size + pxrange as usize;
+    let mut atlas_bounds = Aabb::new_invalid();
+    atlas_bounds.mins.x = pxrange as f32 * 0.5;
+    atlas_bounds.mins.y = pxrange as f32 * 0.5;
+    atlas_bounds.maxs.x = tex_size as f32 - pxrange as f32 * 0.5;
+    atlas_bounds.maxs.y = tex_size as f32 - pxrange as f32 * 0.5;
+
+    let temp = extents_w - extents_h;
+    if temp > 0.0 {
+        extents.maxs.y += temp;
+        atlas_bounds.mins.y +=  (temp / extents.height() * tex_size as f32 - 1.0).ceil();
+        // atlas_bounds.maxs.y -= (temp / extents.height() * tex_size as f32).round();
+    } else {
+        extents.maxs.x -= temp;
+     
+        atlas_bounds.maxs.x -= (temp.abs() / extents.width() * tex_size as f32).trunc();
+    }
+
+    // plane_bounds.scale(
+    //     atlas_bounds.width() / 32.0 / plane_bounds.width(),
+    //     atlas_bounds.height() / 32.0 / plane_bounds.width(),
+    // );
+    println!(
+        "plane_bounds: {:?}, atlas_bounds: {:?}, tex_size: {}",
+        plane_bounds, atlas_bounds, tex_size
+    );
+    (plane_bounds, atlas_bounds, distance, tex_size)
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
@@ -748,50 +800,4 @@ pub struct OutlineInfo {
     pub(crate) units_per_em: u16,
 }
 
-pub fn compute_layout(
-    extents: &mut Aabb,
-    tex_size: usize,
-    pxrange: u32,
-    units_per_em: u16,
-) -> (Aabb, Aabb, f32, usize) {
-    // map 无序导致每次计算的数据不一样
-    let extents_w = extents.width();
-    let extents_h = extents.height();
 
-    let px_distance = extents_w.max(extents_h) / tex_size as f32;
-    let distance = px_distance * (pxrange >> 1) as f32;
-    println!("distance: {}", distance);
-    extents.mins.x -= distance;
-    extents.mins.y -= distance;
-    extents.maxs.x += distance;
-    extents.maxs.y += distance;
-
-    let scale = 1.0 / units_per_em as f32;
-    let mut plane_bounds = extents.scaled(&Vector::new(scale, scale));
-
-    let pxrange = (pxrange >> 2 << 2) + 4;
-    let tex_size = tex_size + pxrange as usize;
-    let mut atlas_bounds = Aabb::new_invalid();
-    atlas_bounds.mins.x = 0.5;
-    atlas_bounds.mins.y = 0.5;
-    atlas_bounds.maxs.x = tex_size as f32 - 0.5;
-    atlas_bounds.maxs.y = tex_size as f32 - 0.5;
-
-    let temp = extents_w - extents_h;
-    if temp > 0.0 {
-        extents.maxs.y += temp;
-        atlas_bounds.maxs.y -= (temp / extents.height() * tex_size as f32 - 0.5).round() + 0.5;
-    } else {
-        extents.maxs.x -= temp;
-        atlas_bounds.maxs.x -= (temp.abs() / extents.width() * tex_size as f32 - 0.5).round() + 0.5;
-    }
-    plane_bounds.scale(
-        atlas_bounds.width() / 32.0 / plane_bounds.width(),
-        atlas_bounds.height() / 32.0 / plane_bounds.width(),
-    );
-    println!(
-        "plane_bounds: {:?}, atlas_bounds: {:?}",
-        plane_bounds, atlas_bounds
-    );
-    (plane_bounds, atlas_bounds, distance, tex_size)
-}

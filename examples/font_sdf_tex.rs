@@ -80,9 +80,9 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     println!("max_box_normaliz: {:?}", ft_face.max_box_normaliz());
     let pxrange = 10;
     let time = std::time::Instant::now();
-    let  outline_info = ft_face.to_outline3('b');
+    let  outline_info = ft_face.to_outline3('1');
     // println!("bbox: {:?}", outline_info.bbox);
-    let glpyh_info = FontFace::compute_sdf_tex(outline_info.clone(),  32, pxrange);
+    let glpyh_info = FontFace::compute_sdf_tex(outline_info.clone(),  32, pxrange, false);
     println!("time: {:?}", time.elapsed());
     println!("glpyh_info: {:?}", glpyh_info);
     let tex_size = glpyh_info.tex_size;

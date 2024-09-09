@@ -1103,9 +1103,18 @@ fn compute_outline<'a>(
                 sink.line_to(to);
                 prev_to = to;
             }
-            PathVerb::EllipticalArcTo | PathVerb::EllipticalArcToRelative => {
+            PathVerb::EllipticalArcTo=>  {
+                // let center = points.next().unwrap();
+                // let center = kurbo::Point::new(self.cx as f64, self.cy as f64);
+
+                // let e = kurbo::Arc::new(center, radii, start_angle, sweep_angle, x_rotation);
+                // let to = Vector2F::new(prev_to.x(), points.next().unwrap().y + prev_to.y());
+                
+
                 panic!("EllipticalArcTo is not surpport!!!")
             }
+
+             PathVerb::EllipticalArcToRelative =>panic!("EllipticalArcTo is not surpport!!!"),
 
             PathVerb::Close => {
                 sink.close();
