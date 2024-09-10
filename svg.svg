@@ -15,8 +15,10 @@
     <path d="M 210 30 C 210 250 25 190 110 150" stroke="blue" stroke-width="2" fill="none" />
     <!-- 虚线 -->
     <path d="M10 400 l215 0" style="fill:none;stroke:black;stroke-width:3;stroke-dasharray:20,10"/>
-    <path d="
-		M 120 45 
-		A 60 45 0 0 0 80 125  // large-arc-flag=0(小弧)，sweep-flag=0（逆时针）
-	" stroke="black" fill="none"></path> 
+    <path d="M 10 315
+           L 110 215
+           A 30 50 0 0 1 162.55 162.45
+           L 172.55 152.45
+           A 30 50 -45 0 1 215.1 109.9
+           L 315 10" stroke="black" fill="green" stroke-width="2" fill-opacity="0.5"/>
 </svg>

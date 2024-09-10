@@ -440,6 +440,7 @@ pub fn encode_sdf(
     distance: f32, // sdf在这个值上alpha 衰减为 0
     width: Option<f32>,
     is_outer_glow: bool,
+    is_svg: bool
 ) -> Vec<u8> {
     // // todo 为了兼容阴影minimip先强制索引纹理为32 * 32
     // let mut width_cells = 32 as usize;
@@ -479,7 +480,13 @@ pub fn encode_sdf(
                 // }
                 let r = compute_sdf2(p, &near_arcs, distance, width, is_outer_glow,);
                 // println!("{:?}", (i, j));
-                data[(height_cells - j - 1) * width_cells + i] =r;
+                if is_svg{
+                    data[j * width_cells + i] = r;
+                }else{
+                    data[(height_cells - j - 1) * width_cells + i] = r;
+                }
+                
+                // 
             }
         }
     }

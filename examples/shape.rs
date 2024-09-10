@@ -10,8 +10,11 @@ use tracing_subscriber::fmt::Subscriber;
 // use nalgebra::Vector3;
 use pi_sdf::{
     glyphy::blob::TexData,
-    shape::{Circle, Ellipse, Path, PathVerb, Polygon, Polyline, Rect, Segment, SvgScenes, ArcOutline},
-    Point, utils::create_indices,
+    shape::{
+        ArcOutline, Circle, Ellipse, Path, PathVerb, Polygon, Polyline, Rect, Segment, SvgScenes,
+    },
+    utils::create_indices,
+    Point,
 };
 use pi_wgpu as wgpu;
 use wgpu::{util::DeviceExt, BlendState, ColorTargetState};
@@ -21,7 +24,7 @@ use winit::{
     window::{Window, WindowBuilder},
 };
 
-async fn run(event_loop: EventLoop<()>, window: Arc<Window> ) {
+async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     let subscriber = Subscriber::builder().with_max_level(Level::TRACE).finish();
 
     tracing::subscriber::set_global_default(subscriber).unwrap();
@@ -33,7 +36,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window> ) {
     //     dx12_shader_compiler: Dx12Compiler::default(),
     // });
 
-    let surface =  { instance.create_surface(window.clone()) }.unwrap();
+    let surface = { instance.create_surface(window.clone()) }.unwrap();
     let adapter = instance
         .request_adapter(&wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::default(),
@@ -103,9 +106,9 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window> ) {
     println!("out_tex_data: {:?}", time.elapsed());
     let vertexs = shapes.verties();
     // 字体缩放
-  
+
     // 阴影偏移和模糊等级
-    let  shadow_offset_and_blur_level = vec![50.0f32 / 140.0, 50. / 140.0, 6.0, 0.0];
+    let shadow_offset_and_blur_level = vec![50.0f32 / 140.0, 50. / 140.0, 6.0, 0.0];
     println!("vertexs: {:?}", vertexs);
 
     let view_matrix = na::Matrix4::<f32>::identity(); // 视口矩阵
@@ -141,7 +144,6 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window> ) {
         contents: bytemuck::cast_slice(&slope),
         usage: wgpu::BufferUsages::UNIFORM,
     });
-
 
     let u_gradient_start_end: [f32; 4] = [-0.5, -0.5, 0.5, 0.5];
     let u_gradient_start_end_buffer =
@@ -688,7 +690,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window> ) {
     let mut data_offset = vec![]; // 每个标签的数据纹偏移
     let mut u_info = vec![]; // 每个标签的sdf信息
     let mut fill_color = vec![0.0; attributes.len() * 4]; // 每个标签的填充颜色
-    let mut stroke_color_and_width = vec![0.0; attributes.len() * 4];// 每个标签的描边颜色和描边宽度
+    let mut stroke_color_and_width = vec![0.0; attributes.len() * 4]; // 每个标签的描边颜色和描边宽度
     let mut start_and_step = Vec::with_capacity(attributes.len() * 4); // 每个标签的虚线描边信息
 
     for info in &texs_info {
@@ -1002,7 +1004,7 @@ fn create_shape() -> SvgScenes {
     let mut rect = Rect::new(120.0, 70.0, 100.0, 50.0);
     // 填充颜色 默认0. 0. 0. 0.
     rect.attribute.set_fill_color(0, 0, 255);
-    // 描边颜色 默认 0. 0. 0. 
+    // 描边颜色 默认 0. 0. 0.
     rect.attribute.set_stroke_color(0, 0, 0);
     // 描边宽度，默认0.0
     rect.attribute.set_stroke_width(2.0);
@@ -1057,18 +1059,21 @@ fn create_shape() -> SvgScenes {
 
     // // 路径
     let mut path = Path::new(
-        vec![PathVerb::MoveTo, PathVerb::CubicTo],
-        vec![
-            Point::new(210., 30.),
-            Point::new(210., 250.),
-            Point::new(25., 190.),
-            Point::new(110., 150.),
-        ],
+        vec![1, 17],
+        vec![110., 215., 30., 50., 0., 1., 162.55, 162.45],
     );
+    let r = path.get_svg_info();
     // polygon.attribute.set_fill_color(0, 255, 0);
-    path.attribute.set_stroke_color(0, 255, 255);
-    path.attribute.set_stroke_width(2.0);
-    shapes.add_shape(path.get_hash(), Box::new(path));
+    // path.attribute.set_stroke_color(0, 255, 255);
+    // path.attribute.set_stroke_width(2.0);
+    // shapes.add_shape(path.get_hash(), Box::new(path));
+
+    // M 10 315
+    // L 110 215
+    // A 30 50 0 0 1 162.55 162.45
+    // L 172.55 152.45
+    // A 30 50 -45 0 1 215.1 109.9
+    // L 315 10
 
     // // 虚线
     // let mut path = Path::new(

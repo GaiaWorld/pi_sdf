@@ -12,6 +12,7 @@ pub mod shape;
 pub mod svg;
 pub mod utils;
 pub mod blur;
+mod arc_to;
 
 pub type Point = parry2d::math::Point<f32>;
 pub type Matrix4 = parry2d::na::Matrix4<f32>;

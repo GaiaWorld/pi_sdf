@@ -572,7 +572,7 @@ impl FontFace {
         log::trace!("near_arcs: {}", near_arcs.len());
 
         let pixmap =
-            crate::utils::encode_sdf(result_arcs, &extents, tex_size, tex_size, distance, None, is_outer_glow);
+            crate::utils::encode_sdf(result_arcs, &extents, tex_size, tex_size, distance, None, is_outer_glow, false);
         SdfInfo2 {
             tex_info: TexInfo2 {
                 char,

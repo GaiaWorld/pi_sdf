@@ -5,17 +5,21 @@ use allsorts::{
 };
 // use erased_serde::serialize_trait_object;
 // use image::EncodableLayout;
-use kurbo::Shape;
-use parry2d::shape::Segment as MSegment;
+use kurbo::{Shape, SvgArc};
+// use lyon_geom::{point, vector, Angle, ArcFlags,};
+use parry2d::{
+    // na::{Matrix, Matrix3},
+    shape::Segment as MSegment,
+};
 use serde::{Deserialize, Serialize};
 // use usvg::tiny_skia_path::PathSegment;
-use crate::font::SdfInfo2;
 use crate::glyphy::blob::TexInfo2;
 use crate::{
     font::SdfInfo,
     glyphy::geometry::aabb::{Aabb, AabbEXT},
     utils::{compute_layout, Attribute, GlyphInfo},
 };
+use crate::{font::SdfInfo2, Vector2};
 use crate::{
     glyphy::{
         blob::{EncodeError, TexData, TexInfo},
@@ -398,6 +402,7 @@ impl Ellipse {
     pub fn get_arc_endpoints(&self) -> Vec<ArcEndpoint> {
         let center = kurbo::Point::new(self.cx as f64, self.cy as f64);
         let e = kurbo::Ellipse::new(center, (self.rx as f64, self.ry as f64), 0.0);
+        // let e = kurbo::SvgArc::(center, (self.rx as f64, self.ry as f64), 0.0);
 
         let path = e.into_path(0.1);
 
@@ -438,9 +443,9 @@ impl Ellipse {
             let len = verbs.len();
             verbs[0] = verbs[len - 1];
             verbs[len - 1] = temp;
-            compute_outline(points.iter().rev(), verbs.iter().rev(), &mut sink)
+            compute_outline(points.iter().rev(), verbs.iter().rev(), &mut sink, false)
         } else {
-            compute_outline(points.iter(), verbs.iter(), &mut sink)
+            compute_outline(points.iter(), verbs.iter(), &mut sink, false)
         }
 
         sink.accumulate.result
@@ -691,6 +696,7 @@ pub struct Path {
     verbs: Vec<PathVerb>,
     points: Vec<Point>,
     pub(crate) attribute: Attribute,
+    is_reverse: bool,
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
@@ -705,16 +711,19 @@ impl Path {
             .chunks(2)
             .map(|v| Point::new(v[0], v[1]))
             .collect::<Vec<Point>>();
+        let mut is_reverse = false;
+        // if points.len() > 2 && !compute_direction(&points) {
+        //     points.reverse();
+        //     verbs.reverse();
+        //     is_reverse = true;
 
-        if points.len() > 2 && !compute_direction(&points) {
-            points.reverse();
-            verbs.reverse();
+        //     let temp = verbs[0];
+        //     let len = verbs.len();
+        //     verbs[0] = verbs[len - 1];
+        //     verbs[len - 1] = temp;
+        // };
 
-            let temp = verbs[0];
-            let len = verbs.len();
-            verbs[0] = verbs[len - 1];
-            verbs[len - 1] = temp;
-        };
+        // println!("{:?}", (&points, &verbs));
 
         let mut attribute = Attribute::default();
         attribute.start = points[0];
@@ -723,6 +732,7 @@ impl Path {
             verbs,
             points,
             attribute,
+            is_reverse,
         };
         r.attribute.is_close = r.is_close();
 
@@ -747,21 +757,30 @@ impl Path {
         false
     }
 
-    pub fn get_arc_endpoints(&self) -> Vec<ArcEndpoint> {
+    pub fn get_arc_endpoints(&self) -> (Vec<ArcEndpoint>, Aabb) {
         let mut sink = GlyphVisitor::new(1.0);
         // 圆弧拟合贝塞尔曲线的精度，值越小越精确
-        sink.accumulate.tolerance = 0.1;
+        sink.accumulate.tolerance = 0.01;
 
         let is_close = self.is_close();
-        compute_outline(self.points.iter(), self.verbs.iter(), &mut sink);
-        if !is_close {
-            compute_outline(
-                self.points[0..self.points.len() - 1].iter().rev(),
-                self.verbs[1..self.verbs.len()].iter().rev(),
-                &mut sink,
-            );
-        }
-        sink.accumulate.result
+        compute_outline(
+            self.points.iter(),
+            self.verbs.iter(),
+            &mut sink,
+            self.is_reverse,
+        );
+        // if !is_close {
+        //     compute_outline(
+        //         self.points[0..self.points.len() - 1].iter().rev(),
+        //         self.verbs[1..self.verbs.len()].iter().rev(),
+        //         &mut sink,
+        //         self.is_reverse,
+        //     );
+        // }
+        let GlyphVisitor {
+            accumulate, bbox, ..
+        } = sink;
+        (accumulate.result, bbox)
     }
 
     pub fn get_hash(&self) -> u64 {
@@ -794,9 +813,10 @@ impl Path {
     }
 
     pub fn get_svg_info(&self) -> SvgInfo {
+        let (arc_endpoints, binding_box) = self.get_arc_endpoints();
         SvgInfo {
-            binding_box: self.binding_box(),
-            arc_endpoints: self.get_arc_endpoints(),
+            binding_box,
+            arc_endpoints,
             is_area: self.is_area(),
         }
     }
@@ -1033,7 +1053,9 @@ fn compute_outline<'a>(
     mut points: impl Iterator<Item = &'a Point>,
     verbs: impl Iterator<Item = &'a PathVerb>,
     sink: &mut impl OutlineSink,
+    is_reverse: bool,
 ) {
+    // println!("p: {:?}", points);
     let mut prev_to = Vector2F::default();
     for p in verbs {
         match p {
@@ -1103,18 +1125,94 @@ fn compute_outline<'a>(
                 sink.line_to(to);
                 prev_to = to;
             }
-            PathVerb::EllipticalArcTo=>  {
-                // let center = points.next().unwrap();
-                // let center = kurbo::Point::new(self.cx as f64, self.cy as f64);
+            PathVerb::EllipticalArcTo => {
+                // let arc = if is_reverse {
+                //     let center = points.next().unwrap();
+                //     let radii = kurbo::Vec2 {
+                //         x: center.x as f64,
+                //         y: center.y as f64,
+                //     };
 
-                // let e = kurbo::Arc::new(center, radii, start_angle, sweep_angle, x_rotation);
-                // let to = Vector2F::new(prev_to.x(), points.next().unwrap().y + prev_to.y());
-                
+                //     let p = points.next().unwrap();
 
-                panic!("EllipticalArcTo is not surpport!!!")
+                //     let to = points.next().unwrap();
+                //     let to = kurbo::Point {
+                //         x: to.x as f64,
+                //         y: to.y as f64,
+                //     };
+                //     let (large_arc, sweep) = to_arc_flags(p.y);
+                //     SvgArc {
+                //         from: kurbo::Point {
+                //             x: prev_to.x() as f64,
+                //             y: prev_to.y() as f64,
+                //         },
+                //         radii,
+                //         x_rotation: p.x as f64,
+                //         to,
+                //         large_arc,
+                //         sweep: !sweep,
+                //     }
+                // } else {
+                let center = points.next().unwrap();
+                let radii = kurbo::Vec2 {
+                    x: center.x as f64,
+                    y: center.y as f64,
+                };
+
+                let p = points.next().unwrap();
+
+                let to = points.next().unwrap();
+                let to = kurbo::Point {
+                    x: to.x as f64,
+                    y: to.y as f64,
+                };
+
+                let (large_arc, sweep) = to_arc_flags(p.y);
+                let arc = SvgArc {
+                    from: kurbo::Point {
+                        x: prev_to.x() as f64,
+                        y: prev_to.y() as f64,
+                    },
+                    radii,
+                    x_rotation: p.x as f64,
+                    to,
+                    large_arc,
+                    sweep,
+                };
+                // };
+                let arc = kurbo::Arc::from_svg_arc(&arc).unwrap();
+                let path = arc.into_path(0.1);
+
+                for p in path {
+                    match p {
+                        kurbo::PathEl::MoveTo(to) => {
+                            sink.move_to(Vector2F::new(to.x as f32, to.y as f32));
+                        }
+                        kurbo::PathEl::LineTo(to) => {
+                            sink.line_to(Vector2F::new(to.x as f32, to.y as f32));
+                        }
+                        kurbo::PathEl::QuadTo(c, to) => {
+                            sink.quadratic_curve_to(
+                                Vector2F::new(c.x as f32, c.y as f32),
+                                Vector2F::new(to.x as f32, to.y as f32),
+                            );
+                        }
+                        kurbo::PathEl::CurveTo(c1, c2, to) => {
+                            sink.cubic_curve_to(
+                                LineSegment2F::new(
+                                    Vector2F::new(c1.x as f32, c1.y as f32),
+                                    Vector2F::new(c2.x as f32, c2.y as f32),
+                                ),
+                                Vector2F::new(to.x as f32, to.y as f32),
+                            );
+                        }
+                        kurbo::PathEl::ClosePath => {
+                            sink.close();
+                        }
+                    }
+                }
             }
-
-             PathVerb::EllipticalArcToRelative =>panic!("EllipticalArcTo is not surpport!!!"),
+            PathVerb::EllipticalArcToRelative => {}
 
             PathVerb::Close => {
                 sink.close();
@@ -1122,6 +1220,17 @@ fn compute_outline<'a>(
         }
     }
     // is_close
+}
+
+fn to_arc_flags(flag: f32) -> (bool, bool) {
+    println!("flag: {}", flag);
+    match flag as u32 {
+        0 => (false, false),
+        1 => (false, true),
+        2 => (true, false),
+        3 => (true, true),
+        _ => panic!(),
+    }
 }
 
 pub fn extents(mut binding_box: Aabb) -> Aabb {
@@ -1146,7 +1255,7 @@ pub fn compute_arcs_sdf_tex(
     bbox: Aabb,
     tex_size: usize, // 需要计算纹理的宽高，默认正方形，像素为单位
     pxrange: u32,
-    width: Option<f32>, 
+    width: Option<f32>,
     is_outer_glow: bool,
 ) -> SdfInfo2 {
     // log::error!("endpoints.len(): {}", endpoints.len());
@@ -1157,8 +1266,16 @@ pub fn compute_arcs_sdf_tex(
     let (result_arcs, _, _, near_arcs) = crate::svg::compute_near_arcs(extents, &mut endpoints);
     log::trace!("near_arcs: {}", near_arcs.len());
 
-    let pixmap =
-        crate::utils::encode_sdf(result_arcs, &extents, tex_size, tex_size, distance, width, is_outer_glow,);
+    let pixmap = crate::utils::encode_sdf(
+        result_arcs,
+        &extents,
+        tex_size,
+        tex_size,
+        distance,
+        width,
+        is_outer_glow,
+        true,
+    );
 
     SdfInfo2 {
         sdf_tex: pixmap,
@@ -1229,7 +1346,7 @@ pub fn compute_shape_sdf_tex(
     let SvgInfo {
         binding_box,
         arc_endpoints,
-        is_area
+        is_area,
     } = svginfo;
     compute_arcs_sdf_tex(
         arc_endpoints,
