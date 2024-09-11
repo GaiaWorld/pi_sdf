@@ -1,13 +1,18 @@
-use std::ops::Range;
+use derive_deref_rs::Deref;
+use parry2d::{bounding_volume::Aabb as AabbInner, shape::Segment};
+use serde::{
+    de::{self, Error, MapAccess, SeqAccess, Visitor},
+    ser::{SerializeStruct, SerializeTuple},
+    Deserialize, Serialize,
+};
+use std::{fmt, ops::Range};
 
-use parry2d::shape::Segment;
-
-use super::arc::Arc;
 use crate::{
     glyphy::{geometry::segment::SegmentEXT, util::GLYPHY_INFINITY},
     Point,
 };
-pub use parry2d::bounding_volume::Aabb;
+
+use super::arc::Arc;
 
 pub enum Direction {
     Top,
@@ -17,51 +22,149 @@ pub enum Direction {
     Row,
     Col,
 }
-// use pr
-pub trait AabbEXT {
-    fn clear(&mut self);
-    fn set(&mut self, other: &Aabb);
-    fn add(&mut self, p: Point);
-    fn is_empty(&self) -> bool;
-    fn extend(&mut self, other: &Aabb);
-    fn includes(&self, p: &Point) -> bool;
-    fn scale(&mut self, x_scale: f32, y_scale: f32);
-    fn near_area(&self, direction: Direction) -> Aabb;
-    fn near_arcs<'a>(
-        &self,
-        arcs: &Vec<&'static Arc>,
-        segment: &Segment,
-        result: &mut Vec<&'static Arc>,
-        temps: &mut Vec<(Point, f32, Vec<Range<f32>>)>,
-    );
-    fn bound(&self, direction: Direction) -> Segment;
-    fn width(&self) -> f32;
-    fn height(&self) -> f32;
-    fn extend_by(&mut self, x: f32, y: f32);
-    fn half(&self, direction: Direction) -> (Aabb, Aabb);
+
+#[derive(Debug, Clone, Copy, Deref)]
+pub struct Aabb(pub AabbInner);
+impl Serialize for Aabb {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut s = serializer.serialize_struct("Aabb", 4)?;
+        s.serialize_field("mins_x", &self.mins.x)?;
+        s.serialize_field("mins_y", &self.mins.y)?;
+        s.serialize_field("maxs_x", &self.maxs.x)?;
+        s.serialize_field("maxs_y", &self.maxs.y)?;
+        s.end()
+    }
 }
 
-impl AabbEXT for Aabb {
-    fn clear(&mut self) {
+impl<'de> Deserialize<'de> for Aabb {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        enum Field {
+            min_x,
+            min_y,
+            max_x,
+            max_y,
+        }
+
+        struct AabbVisitor;
+
+        impl<'de> Visitor<'de> for AabbVisitor {
+            type Value = Aabb;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("struct Aabb")
+            }
+
+            fn visit_map<V>(self, mut map: V) -> Result<Aabb, V::Error>
+            where
+                V: MapAccess<'de>,
+            {
+                let mut min_x = None;
+                let mut min_y = None;
+                let mut max_x = None;
+                let mut max_y = None;
+                while let Some(key) = map.next_key()? {
+                    match key {
+                        Field::min_x => {
+                            if min_x.is_some() {
+                                return Err(de::Error::duplicate_field("min_x"));
+                            }
+                            min_x = Some(map.next_value()?);
+                        }
+                        Field::min_y => {
+                            if min_y.is_some() {
+                                return Err(de::Error::duplicate_field("min_y"));
+                            }
+                            min_y = Some(map.next_value()?);
+                        }
+
+                        Field::max_x => {
+                            if max_x.is_some() {
+                                return Err(de::Error::duplicate_field("max_x"));
+                            }
+                            max_x = Some(map.next_value()?);
+                        }
+
+                        Field::max_y => {
+                            if max_y.is_some() {
+                                return Err(de::Error::duplicate_field("max_y"));
+                            }
+                            max_y = Some(map.next_value()?);
+                        }
+                    }
+                }
+                let min_x = min_x.ok_or_else(|| de::Error::missing_field("min_x"))?;
+                let min_y = min_y.ok_or_else(|| de::Error::missing_field("min_y"))?;
+                let max_x = max_x.ok_or_else(|| de::Error::missing_field("max_x"))?;
+                let max_y = max_y.ok_or_else(|| de::Error::missing_field("max_y"))?;
+                Ok(Aabb(parry2d::bounding_volume::Aabb::new(
+                    Point::new(min_x, min_y),
+                    Point::new(max_x, max_y),
+                )))
+            }
+
+            fn visit_seq<V>(self, mut seq: V) -> Result<Aabb, V::Error>
+            where
+                V: SeqAccess<'de>,
+            {
+                let x = seq
+                    .next_element()?
+                    .ok_or_else(|| de::Error::invalid_length(0, &self))?;
+                let y = seq
+                    .next_element()?
+                    .ok_or_else(|| de::Error::invalid_length(1, &self))?;
+                let x1 = seq
+                    .next_element()?
+                    .ok_or_else(|| de::Error::invalid_length(1, &self))?;
+                let y1 = seq
+                    .next_element()?
+                    .ok_or_else(|| de::Error::invalid_length(1, &self))?;
+
+                Ok(Aabb(parry2d::bounding_volume::Aabb::new(
+                    Point::new(x, y),
+                    Point::new(x1, y1),
+                )))
+            }
+        }
+
+        const FIELDS: &'static [&'static str] = &["min_x", "min_y", "max_x", "max_y"];
+        deserializer.deserialize_struct("Point", FIELDS, AabbVisitor)
+    }
+    //     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    //     where
+    //         D: serde::Deserializer<'de> {
+
+    //         deserializer.deserialize_struct("Aabb", &["mins_x", "mins_y", "maxs_x", "maxs_y"], visitor)
+    //     }
+}
+
+impl Aabb {
+    pub fn new(min: Point, max: Point) -> Self {
+        Self(AabbInner::new(min, max))
+    }
+
+    pub fn new_invalid() -> Self {
+        Self(AabbInner::new_invalid())
+    }
+    pub fn clear(&mut self) {
         self.maxs = Point::new(GLYPHY_INFINITY, GLYPHY_INFINITY);
         self.mins = Point::new(GLYPHY_INFINITY, GLYPHY_INFINITY);
     }
 
-    fn extend_by(&mut self, x: f32, y: f32) {
-        self.mins.x = self.mins.x.min(x);
-        self.mins.y = self.mins.y.min(y);
-        self.maxs.x = self.maxs.x.max(x);
-        self.maxs.y = self.maxs.y.max(y);
-    }
-
-    fn set(&mut self, other: &Aabb) {
+    pub fn set(&mut self, other: &Aabb) {
         self.mins.x = other.mins.x;
         self.mins.y = other.mins.y;
         self.maxs.x = other.maxs.x;
         self.maxs.y = other.maxs.y;
     }
 
-    fn add(&mut self, p: Point) {
+    pub fn add(&mut self, p: Point) {
         if self.is_empty() {
             self.mins.x = p.x;
             self.mins.y = p.y;
@@ -76,12 +179,12 @@ impl AabbEXT for Aabb {
         self.maxs.y = if p.y > self.maxs.y { p.y } else { self.maxs.y };
     }
 
-    fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         // 当最小值是无穷时，包围盒是空的
         return self.mins.x == GLYPHY_INFINITY || self.mins.x == -GLYPHY_INFINITY;
     }
 
-    fn extend(&mut self, other: &Aabb) {
+    pub fn extend(&mut self, other: &Aabb) {
         // 对方是空，就是自己
         if other.is_empty() {
             return;
@@ -115,50 +218,58 @@ impl AabbEXT for Aabb {
         };
     }
 
-    fn includes(&self, p: &Point) -> bool {
+    pub fn extend_by(&mut self, x: f32, y: f32) {
+        self.mins.x = self.mins.x.min(x);
+        self.mins.y = self.mins.y.min(y);
+        self.maxs.x = self.maxs.x.max(x);
+        self.maxs.y = self.maxs.y.max(y);
+    }
+
+    pub fn includes(&self, p: &Point) -> bool {
         return self.mins.x <= p.x
             && p.x <= self.maxs.x
             && self.mins.y <= p.y
             && p.y <= self.maxs.y;
     }
 
-    fn scale(&mut self, x_scale: f32, y_scale: f32) {
+    pub fn scale(&mut self, x_scale: f32, y_scale: f32) {
         self.mins.x *= x_scale;
         self.maxs.x *= x_scale;
         self.mins.y *= y_scale;
         self.maxs.y *= y_scale;
     }
 
-    fn near_area(&self, direction: Direction) -> Aabb {
-        match direction {
-            Direction::Top => Aabb::new(
+    pub fn near_area(&self, direction: Direction) -> Aabb {
+        let ab = match direction {
+            Direction::Top => AabbInner::new(
                 Point::new(self.mins.x, -f32::INFINITY),
                 Point::new(self.maxs.x, self.mins.y),
             ),
-            Direction::Bottom => Aabb::new(
+            Direction::Bottom => AabbInner::new(
                 Point::new(self.mins.x, self.maxs.y),
                 Point::new(self.maxs.x, f32::INFINITY),
             ),
-            Direction::Left => Aabb::new(
+            Direction::Left => AabbInner::new(
                 Point::new(-f32::INFINITY, self.mins.y),
                 Point::new(self.mins.x, self.maxs.y),
             ),
-            Direction::Right => Aabb::new(
+            Direction::Right => AabbInner::new(
                 Point::new(self.maxs.x, self.mins.y),
                 Point::new(f32::INFINITY, self.maxs.y),
             ),
-            Direction::Row => Aabb::new(
+            Direction::Row => AabbInner::new(
                 Point::new(self.mins.x, -f32::INFINITY),
                 Point::new(self.maxs.x, f32::INFINITY),
             ),
-            Direction::Col => Aabb::new(
+            Direction::Col => AabbInner::new(
                 Point::new(-f32::INFINITY, self.mins.y),
                 Point::new(f32::INFINITY, self.maxs.y),
             ),
-        }
+        };
+        Self(ab)
     }
 
-    fn bound(&self, direction: Direction) -> Segment {
+    pub fn bound(&self, direction: Direction) -> Segment {
         match direction {
             Direction::Top => Segment::new(self.mins, Point::new(self.maxs.x, self.mins.y)),
             Direction::Bottom => Segment::new(Point::new(self.mins.x, self.maxs.y), self.maxs),
@@ -168,7 +279,7 @@ impl AabbEXT for Aabb {
         }
     }
 
-    fn near_arcs(
+    pub fn near_arcs(
         &self,
         arcs: &Vec<&'static Arc>,
         segment: &Segment,
@@ -374,42 +485,55 @@ impl AabbEXT for Aabb {
     //     }
     // }
 
-    fn width(&self) -> f32 {
+    pub fn width(&self) -> f32 {
         self.maxs.x - self.mins.x
     }
 
-    fn height(&self) -> f32 {
+    pub fn height(&self) -> f32 {
         self.maxs.y - self.mins.y
     }
 
-    fn half(&self, direction: Direction) -> (Aabb, Aabb) {
+    pub fn half(&self, direction: Direction) -> (Aabb, Aabb) {
         match direction {
             Direction::Row => {
                 let temp_y = self.mins.y + (self.maxs.y - self.mins.y) / 2.0;
                 (
-                    Aabb::new(self.mins, Point::new(self.maxs.x, temp_y)),
-                    Aabb::new(Point::new(self.mins.x, temp_y), self.maxs),
+                    Self(AabbInner::new(self.mins, Point::new(self.maxs.x, temp_y))),
+                    Self(AabbInner::new(Point::new(self.mins.x, temp_y), self.maxs)),
                 )
             }
             Direction::Col => {
                 let temp_x = self.mins.x + (self.maxs.x - self.mins.x) / 2.0;
                 (
-                    Aabb::new(self.mins, Point::new(temp_x, self.maxs.y)),
-                    Aabb::new(Point::new(temp_x, self.mins.y), self.maxs),
+                    Self(AabbInner::new(self.mins, Point::new(temp_x, self.maxs.y))),
+                    Self(AabbInner::new(Point::new(temp_x, self.mins.y), self.maxs)),
                 )
             }
             _ => panic!("half not surport!!!"),
         }
     }
+
+    pub fn collision(&self, other: &Aabb) -> Option<Aabb> {
+        let minx = self.mins.x.max(other.mins.x);
+        let miny = self.mins.y.max(other.mins.y);
+        let maxx = self.maxs.x.min(other.maxs.x);
+        let maxy = self.maxs.y.min(other.maxs.y);
+
+        if minx <= maxx && miny <= maxy {
+            return Some(Self(AabbInner::new(Point::new(minx, miny), Point::new(maxx, maxy))));
+        }
+
+        return None;
+    }
 }
 
 #[test]
 fn test() {
-    let arc = Arc::new(
-        Point::new(220.0, 171.0),
-        Point::new(91.0, 744.0),
-        -0.14173229,
-    );
-    let dist = arc.squared_distance_to_point2(&Point::new(216.85324, 171.0));
+    // let arc = Arc::new(
+    //     Point::new(220.0, 171.0),
+    //     Point::new(91.0, 744.0),
+    //     -0.14173229,
+    // );
+    // let dist = arc.squared_distance_to_point2(&Point::new(216.85324, 171.0));
     // println!("dist : {:?}", dist);
 }

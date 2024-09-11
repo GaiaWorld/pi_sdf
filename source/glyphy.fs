@@ -627,10 +627,10 @@ void main() {
 	fragColor = finalColor;
 	// 阴影
 	fragColor = shadow_blur(fragColor, shadow_color, shadow_offset_and_blur_level.xy, shadow_offset_and_blur_level.z, p);
-	if (abs(shadow_color.w - 0.0) < 0.1){
+	// if (abs(shadow_color.w - 0.0) < 0.1){
 		// 外发光 只有没有阴影的时候才会有外发光
-		// fragColor = outer_glow(sdist, fragColor, vec4(outer_glow_color_and_dist.xyz, 1.0) , outer_glow_color_and_dist.w);
-	}
+		fragColor = outer_glow(sdist, fragColor, vec4(outer_glow_color_and_dist.xyz, 1.0) , outer_glow_color_and_dist.w);
+	// }
 	
 	// 虚线，svg用
 	fragColor = stroke_dasharray(fragColor, u_startAndStep);

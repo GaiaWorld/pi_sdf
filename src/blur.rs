@@ -1,6 +1,5 @@
-use parry2d::bounding_volume::Aabb;
 
-use crate::{glyphy::geometry::aabb::AabbEXT, Point, Vector2};
+use crate::{ glyphy::geometry::aabb::Aabb, Point, Vector2};
 
 fn erf(mut x: f32) -> f32 {
     let negative = x < 0.0;
@@ -59,13 +58,15 @@ pub struct BlurInfo {
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
-pub fn blur_box(bbox: &[f32], sigma: f32, txe_size: usize) -> BlurInfo {
+pub fn blur_box(bbox: &[f32], pxrange: f32, txe_size: usize) -> BlurInfo {
     let bbox = Aabb::new(Point::new(bbox[0], bbox[1]), Point::new(bbox[2], bbox[3]));
     let b_w = bbox.width();
     let b_h = bbox.height();
     let px_dsitance = b_h.max(b_w) / txe_size as f32;
 
-    let px_num = (sigma + sigma * 5.0).ceil();
+    // let px_num = (sigma + sigma * 5.0).ceil();
+    let px_num = (pxrange * 0.5).ceil();
+    let sigma = px_num / 6.0;
     let dsitance = px_dsitance * px_num;
     println!("{:?}", (b_w, b_h, px_dsitance, px_num, dsitance));
     let p_w = (b_w / px_dsitance).ceil() + px_num * 2.0;
@@ -95,4 +96,66 @@ pub fn blur_box(bbox: &[f32], sigma: f32, txe_size: usize) -> BlurInfo {
         height: p_h as usize,
         bbox: vec![px_num, px_num, p_w - px_num, p_h - px_num],
     }
+}
+
+pub fn gaussian_blur(sdf_tex: Vec<u8>, width: u32, height: u32, radius: u32) -> Vec<u8> {
+    // let (width, height) = img.dimensions();
+    let mut output = Vec::with_capacity(sdf_tex.len());
+
+    let kernel = create_gaussian_kernel(radius);
+    let kernel_size = kernel.len() as u32;
+
+    for y in 0..height {
+        for x in 0..width {
+            let mut a = 0.0;
+            let mut weight_sum = 0.0;
+
+            for ky in 0..kernel_size {
+                for kx in 0..kernel_size {
+                    let px =
+                        (x as i32 + kx as i32 - radius as i32).clamp(0, width as i32 - 1) as u32;
+                    let py =
+                        (y as i32 + ky as i32 - radius as i32).clamp(0, height as i32 - 1) as u32;
+
+                    let pixel = sdf_tex[(px + py * width) as usize];
+                    let weight = kernel[ky as usize][kx as usize];
+
+                    a += pixel as f32 * weight;
+                    weight_sum += weight;
+                }
+            }
+
+            let pixel = (a / weight_sum) as u8;
+
+            output.push(pixel);
+        }
+    }
+
+    output
+}
+
+fn create_gaussian_kernel(radius: u32) -> Vec<Vec<f32>> {
+    let sigma = radius as f32 / 2.0;
+    let size = radius * 2 + 1;
+    let mut kernel = vec![vec![0.0; size as usize]; size as usize];
+    let mut sum = 0.0;
+
+    for y in 0..size {
+        for x in 0..size {
+            let dx = x as f32 - radius as f32;
+            let dy = y as f32 - radius as f32;
+            let value = (-((dx * dx + dy * dy) / (2.0 * sigma * sigma))).exp()
+                / (2.0 * std::f32::consts::PI * sigma * sigma);
+            kernel[y as usize][x as usize] = value;
+            sum += value;
+        }
+    }
+
+    for y in 0..size {
+        for x in 0..size {
+            kernel[y as usize][x as usize] /= sum;
+        }
+    }
+
+    kernel
 }

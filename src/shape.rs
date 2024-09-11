@@ -13,13 +13,17 @@ use parry2d::{
 };
 use serde::{Deserialize, Serialize};
 // use usvg::tiny_skia_path::PathSegment;
-use crate::glyphy::blob::TexInfo2;
 use crate::{
     font::SdfInfo,
-    glyphy::geometry::aabb::{Aabb, AabbEXT},
+    glyphy::geometry::aabb::{Aabb},
     utils::{compute_layout, Attribute, GlyphInfo},
 };
 use crate::{font::SdfInfo2, Vector2};
+use crate::{
+    glyphy::{blob::TexInfo2, geometry::arc::Arc},
+    svg::compute_near_arcs,
+    utils::encode_sdf2,
+};
 use crate::{
     glyphy::{
         blob::{EncodeError, TexData, TexInfo},
@@ -863,6 +867,7 @@ impl SvgInfo {
         }
     }
 }
+
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub fn computer_svg_sdf2(info: SvgInfo) -> Vec<u8> {
     bincode::serialize(&computer_svg_sdf(info)).unwrap()
@@ -974,7 +979,8 @@ impl SvgScenes {
         {
             let binding_box = extents(binding_box);
             // println!("binding_box: {:?}", binding_box);
-            let (mut blob_arc, map) = encode_uint_arc_impl(binding_box, arc_endpoints, is_area);
+            let (mut blob_arc, map) =
+                encode_uint_arc_impl(binding_box, arc_endpoints, is_area);
             let size = blob_arc.encode_data_tex(&map, data_tex, width0, offset_x0, offset_y0)?;
             // println!("data_map: {}", map.len());
             let mut info = blob_arc.encode_index_tex(
@@ -1186,25 +1192,31 @@ fn compute_outline<'a>(
                 for p in path {
                     match p {
                         kurbo::PathEl::MoveTo(to) => {
-                            sink.move_to(Vector2F::new(to.x as f32, to.y as f32));
+                            let to = Vector2F::new(to.x as f32, to.y as f32);
+                            sink.move_to(to);
+                            prev_to = to;
                         }
                         kurbo::PathEl::LineTo(to) => {
-                            sink.line_to(Vector2F::new(to.x as f32, to.y as f32));
+                            let to = Vector2F::new(to.x as f32, to.y as f32);
+                            sink.line_to(to);
+                            prev_to = to;
                         }
                         kurbo::PathEl::QuadTo(c, to) => {
-                            sink.quadratic_curve_to(
-                                Vector2F::new(c.x as f32, c.y as f32),
-                                Vector2F::new(to.x as f32, to.y as f32),
-                            );
+                            let ctrl = Vector2F::new(c.x as f32, c.x as f32);
+                            let to = Vector2F::new(to.x as f32, to.y as f32);
+
+                            sink.quadratic_curve_to(ctrl, to);
+                            prev_to = to;
                         }
                         kurbo::PathEl::CurveTo(c1, c2, to) => {
-                            sink.cubic_curve_to(
-                                LineSegment2F::new(
-                                    Vector2F::new(c1.x as f32, c1.y as f32),
-                                    Vector2F::new(c2.x as f32, c2.y as f32),
-                                ),
-                                Vector2F::new(to.x as f32, to.y as f32),
+                            let ctrl = LineSegment2F::new(
+                                Vector2F::new(c1.x as f32, c1.x as f32),
+                                Vector2F::new(c2.x as f32, c2.x as f32),
                             );
+                            let to = Vector2F::new(to.x as f32, to.y as f32);
+
+                            sink.cubic_curve_to(ctrl, to);
+                            prev_to = to;
                         }
                         kurbo::PathEl::ClosePath => {
                             sink.close();
@@ -1263,8 +1275,8 @@ pub fn compute_arcs_sdf_tex(
     let mut extents = bbox;
     let (plane_bounds, atlas_bounds, distance, tex_size) =
         compute_layout(&mut extents, tex_size, pxrange, 1);
-    let (result_arcs, _, _, near_arcs) = crate::svg::compute_near_arcs(extents, &mut endpoints);
-    log::trace!("near_arcs: {}", near_arcs.len());
+    let (result_arcs, _, _) = crate::svg::compute_near_arcs(extents, &mut endpoints);
+    // log::trace!("near_arcs: {}", near_arcs.len());
 
     let pixmap = crate::utils::encode_sdf(
         result_arcs,

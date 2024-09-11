@@ -112,7 +112,7 @@ pub fn glyphy_sdf_from_arc_list(endpoints: &Vec<ArcEndpoint>, p: Point) -> (f32,
  *
  * 返回：[sdf, 影响sdf的圆弧起点在-endpoints-中的索引]
  */
-pub fn glyphy_sdf_from_arc_list2(arcs: &Vec<&Arc>, p: Point) -> (f32, usize) {
+pub fn glyphy_sdf_from_arc_list2(arcs: &Vec<Arc>, p: Point) -> (f32, usize) {
     // let num_endpoints = endpoints.len();
 
     let c = p.clone();
@@ -135,7 +135,7 @@ pub fn glyphy_sdf_from_arc_list2(arcs: &Vec<&Arc>, p: Point) -> (f32, usize) {
         // }
 
         // 当 d = 0 时候，代表线段
-        let arc = arcs[i];
+        let arc = &arcs[i];
 
         if arc.wedge_contains_point(&c) {
             // 在 扇形夹角范围内
@@ -172,7 +172,7 @@ pub fn glyphy_sdf_from_arc_list2(arcs: &Vec<&Arc>, p: Point) -> (f32, usize) {
 
                 // 但 此时 符号 未知
                 side = 0; /* unsure */
-                closest_arc = arc;
+                closest_arc = &arc;
             } else if side == 0 && udist == min_dist {
                 // 如果 更换了 端点 之后，距离和原来相同，但符号未知
                 // 则：拿此次 的 符号 作为 原来的符号。

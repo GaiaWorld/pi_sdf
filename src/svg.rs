@@ -14,12 +14,12 @@ use crate::{
     glyphy::{
         blob::{recursion_near_arcs_of_cell, travel_data, BlobArc},
         geometry::{
-            aabb::{Aabb, AabbEXT},
+            aabb::{Aabb},
             arc::{Arc, ArcEndpoint},
         },
         util::GLYPHY_INFINITY,
     },
-    utils::encode_uint_arc_data,
+    utils::{compute_cell_range, encode_uint_arc_data},
     Point,
 };
 
@@ -291,9 +291,9 @@ pub fn encode_uint_arc_impl(
     is_area: bool,
 ) -> (BlobArc, HashMap<u64, u64>) {
     let extents = view_box;
-    let (result_arcs, min_width, min_height, near_arcs) =
+    let (result_arcs, min_width, min_height) =
         compute_near_arcs(extents, &mut endpoints);
-    log::trace!("near_arcs: {}", near_arcs.len());
+    // log::trace!("near_arcs: {}", near_arcs.len());
 
     let (unit_arcs, map) =
         encode_uint_arc_data(result_arcs, &extents, min_width, min_height, Some(is_area));
@@ -318,9 +318,10 @@ pub fn encode_uint_arc_impl(
 pub fn compute_near_arcs<'a>(
     view_box: Aabb,
     endpoints: &mut Vec<ArcEndpoint>,
-) -> (Vec<(Vec<&'a Arc>, Aabb)>, f32, f32, Vec<Arc>) {
+) -> (Vec<(Vec< Arc>, Aabb)>, f32, f32) {
     let extents = view_box;
     // println!("extents: {:?}", extents);
+    // let extents = compute_cell_range(extents, scale);
     let mut min_width = f32::INFINITY;
     let mut min_height = f32::INFINITY;
 
@@ -359,5 +360,6 @@ pub fn compute_near_arcs<'a>(
         &mut temp,
     );
 
-    (result_arcs, min_width, min_height, near_arcs)
+    (result_arcs, min_width, min_height)
+
 }

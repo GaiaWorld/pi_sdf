@@ -1,6 +1,9 @@
 // use image::EncodableLayout;
 use parry2d::{math::Vector, shape::Segment};
+use serde::de::{self, MapAccess, SeqAccess, Visitor};
+use serde::ser::SerializeStruct;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use std::hash::Hasher;
 use std::sync::atomic::AtomicU64;
 use std::{ops::Range, sync::atomic::Ordering};
@@ -10,7 +13,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use crate::glyphy::util::{float_equals, xor};
 use crate::Point;
 
-use super::aabb::{Aabb, AabbEXT};
+use super::aabb::Aabb;
 use super::{
     bezier::Bezier, line::Line, point::PointExt, segment::SegmentEXT, signed_vector::SignedVector,
     vector::VectorEXT,
@@ -95,15 +98,140 @@ impl ArcEndpoint {
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 #[derive(Debug, Clone)]
 pub struct Arc {
-    pub id: u64,
-
     pub(crate) p0: Point,
     pub(crate) p1: Point,
     pub d: f32,
 
+    pub id: u64,
     pub radius: f32,
     pub(crate) center: Point,
     pub(crate) aabb: Aabb,
+}
+
+impl Serialize for Arc {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut s = serializer.serialize_struct("Arc", 5)?;
+        s.serialize_field("P0X", &self.p0.x)?;
+        s.serialize_field("P0Y", &self.p0.y)?;
+        s.serialize_field("P1X", &self.p1.x)?;
+        s.serialize_field("P1Y", &self.p1.y)?;
+        s.serialize_field("D", &self.d)?;
+        s.end()
+    }
+}
+
+impl<'de> Deserialize<'de> for Arc {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        enum Field {
+            P0X,
+            P0Y,
+            P1X,
+            P1Y,
+            D,
+        }
+
+        struct AabbVisitor;
+
+        impl<'de> Visitor<'de> for AabbVisitor {
+            type Value = Arc;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("struct Arc")
+            }
+
+            // fn visit_map<V>(self, mut map: V) -> Result<Arc, V::Error>
+            // where
+            //     V: MapAccess<'de>,
+            // {
+            //     let mut p0x = None;
+            //     let mut p0y = None;
+            //     let mut p1x = None;
+            //     let mut p1y = None;
+            //     let mut d = None;
+            //     while let Some(key) = map.next_key()? {
+            //         match key {
+            //             Field::P0X => {
+            //                 if p0x.is_some() {
+            //                     return Err(de::Error::duplicate_field("min_x"));
+            //                 }
+            //                 p0x = Some(map.next_value()?);
+            //             }
+            //             Field::P0Y => {
+            //                 if p0y.is_some() {
+            //                     return Err(de::Error::duplicate_field("min_y"));
+            //                 }
+            //                 p0y = Some(map.next_value()?);
+            //             }
+
+            //             Field::P1X => {
+            //                 if p1x.is_some() {
+            //                     return Err(de::Error::duplicate_field("max_x"));
+            //                 }
+            //                 p1x = Some(map.next_value()?);
+            //             }
+
+            //             Field::P1Y => {
+            //                 if p1y.is_some() {
+            //                     return Err(de::Error::duplicate_field("max_y"));
+            //                 }
+            //                 p1y = Some(map.next_value()?);
+            //             }
+            //             Field::D => {
+            //                 if d.is_some() {
+            //                     return Err(de::Error::duplicate_field("max_y"));
+            //                 }
+            //                 d = Some(map.next_value()?);
+            //             }
+            //         }
+            //     }
+            //     let p0x = p0x.ok_or_else(|| de::Error::missing_field("p0x"))?;
+            //     let p0y = p0y.ok_or_else(|| de::Error::missing_field("p0y"))?;
+            //     let p1x = p1x.ok_or_else(|| de::Error::missing_field("p1x"))?;
+            //     let p1y = p1y.ok_or_else(|| de::Error::missing_field("p1y"))?;
+            //     let d = d.ok_or_else(|| de::Error::missing_field("d"))?;
+            //     Ok(Arc::new(Point::new(p0x, p0y), Point::new(p1x, p1y), d))
+            // }
+
+            fn visit_seq<V>(self, mut seq: V) -> Result<Arc, V::Error>
+            where
+                V: SeqAccess<'de>,
+            {
+                let p0x = seq
+                    .next_element()?
+                    .ok_or_else(|| de::Error::invalid_length(0, &self))?;
+                let p0y = seq
+                    .next_element()?
+                    .ok_or_else(|| de::Error::invalid_length(1, &self))?;
+                let p1x = seq
+                    .next_element()?
+                    .ok_or_else(|| de::Error::invalid_length(2, &self))?;
+                let p1y = seq
+                    .next_element()?
+                    .ok_or_else(|| de::Error::invalid_length(3, &self))?;
+                let d = seq
+                    .next_element()?
+                    .ok_or_else(|| de::Error::invalid_length(4, &self))?;
+
+                Ok(Arc::new(Point::new(p0x, p0y), Point::new(p1x, p1y), d))
+            }
+        }
+
+        const FIELDS: &'static [&'static str] = &["P0X", "P0Y", "P1X", "P1Y", "D"];
+        deserializer.deserialize_struct("Point", FIELDS, AabbVisitor)
+    }
+    //     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    //     where
+    //         D: serde::Deserializer<'de> {
+
+    //         deserializer.deserialize_struct("Aabb", &["mins_x", "mins_y", "maxs_x", "maxs_y"], visitor)
+    //     }
 }
 
 impl Arc {

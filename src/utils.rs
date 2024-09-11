@@ -16,16 +16,15 @@ use usvg::{Color, Fill, NonZeroPositiveF64, Paint, Stroke};
 use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::{
+    font::SdfInfo2,
     glyphy::{
-        geometry::{
-            aabb::{Aabb, AabbEXT},
-            arcs::GlyphyArcAccumulator,
-        },
+        blob::TexInfo2,
+        geometry::{aabb::Aabb, arcs::GlyphyArcAccumulator},
         sdf::glyphy_sdf_from_arc_list2,
         util::float2_equals,
     },
     shape::{Rect, SvgScenes},
-    Point,
+    Point, Vector2,
 };
 use parry2d::{math::Vector, na::ComplexField};
 use std::hash::Hasher;
@@ -242,7 +241,7 @@ impl OutlineSink for GlyphVisitor {
 }
 
 pub fn encode_uint_arc_data(
-    result_arcs: Vec<(Vec<&Arc>, Aabb)>,
+    result_arcs: Vec<(Vec<Arc>, Aabb)>,
     extents: &Aabb,
     _min_width: f32,
     _min_height: f32,
@@ -308,7 +307,7 @@ pub fn encode_uint_arc_data(
         let mut _p1 = Point::new(0.0, 0.0);
 
         for i in 0..near_arcs.len() {
-            let arc = near_arcs[i];
+            let arc = &near_arcs[i];
 
             if i == 0 || !_p1.equals(&arc.p0) {
                 let endpoint = ArcEndpoint::new(arc.p0.x, arc.p0.y, GLYPHY_INFINITY);
@@ -433,14 +432,14 @@ pub fn encode_uint_arc_data(
 }
 
 pub fn encode_sdf(
-    result_arcs: Vec<(Vec<&Arc>, Aabb)>,
+    result_arcs: Vec<(Vec<Arc>, Aabb)>,
     extents: &Aabb,
     width_cells: usize,
     height_cells: usize,
     distance: f32, // sdf在这个值上alpha 衰减为 0
     width: Option<f32>,
     is_outer_glow: bool,
-    is_svg: bool
+    is_svg: bool,
 ) -> Vec<u8> {
     // // todo 为了兼容阴影minimip先强制索引纹理为32 * 32
     // let mut width_cells = 32 as usize;
@@ -460,6 +459,7 @@ pub fn encode_sdf(
     for (near_arcs, cell) in result_arcs {
         // println!("near_endpoints: {:?}", near_endpoints.len());
 
+        // if cell.
         let begin = cell.mins - extents.mins;
         let end = cell.maxs - extents.mins;
         let begin_x = (begin.x / min_width).round() as usize;
@@ -475,25 +475,72 @@ pub fn encode_sdf(
                     (i as f32 + 0.5) * min_width + extents.mins.x,
                     (j as f32 + 0.5) * min_height + extents.mins.y,
                 );
-                // if i == 4{
-                //     // println!("=====")
-                // }
-                let r = compute_sdf2(p, &near_arcs, distance, width, is_outer_glow,);
-                // println!("{:?}", (i, j));
-                if is_svg{
+
+                let r = compute_sdf2(p, &near_arcs, distance, width, is_outer_glow);
+                // svg 不需要颠倒纹理
+                if is_svg {
                     data[j * width_cells + i] = r;
-                }else{
+                } else {
                     data[(height_cells - j - 1) * width_cells + i] = r;
                 }
-                
-                // 
             }
         }
     }
     data
 }
 
-fn compute_sdf(p: Point, near_arcs: &Vec<&Arc>, is_area: Option<bool>) -> u8 {
+pub fn encode_sdf2(
+    result_arcs: Vec<(Vec<Arc>, Aabb)>,
+    extents: &Aabb,
+    tex_size: usize,
+    distance: f32, // sdf在这个值上alpha 衰减为 0
+    width: Option<f32>,
+    is_outer_glow: bool,
+    is_svg: bool,
+) -> Vec<u8> {
+    let glyph_width = extents.width();
+    // let glyph_height = extents.height();
+
+    let unit_d = glyph_width / tex_size as f32;
+
+    let mut data = vec![0; tex_size * tex_size];
+
+    for (near_arcs, cell) in result_arcs {
+        if let Some(ab) = cell.collision(extents) {
+            // println!("cell: {:?}, extents: {:?}, ab: {:?}", cell, extents, ab);
+            let begin = ab.mins - extents.mins;
+            let end = ab.maxs - extents.mins;
+
+            let begin_x = (begin.x / unit_d).round() as usize;
+            let begin_y = (begin.y / unit_d).round() as usize;
+
+            let end_x = (end.x / unit_d).round() as usize;
+            let end_y = (end.y / unit_d).round() as usize;
+            // println!("{:?}", (begin_x, begin_y, end_x, end_y));
+            // If the arclist is two arcs that can be combined in encoding if reordered, do that.
+            for i in begin_x..end_x {
+                for j in begin_y..end_y {
+                    let p = Point::new(
+                        (i as f32 + 0.5) * unit_d + extents.mins.x,
+                        (j as f32 + 0.5) * unit_d + extents.mins.y,
+                    );
+
+                    let r = compute_sdf2(p, &near_arcs, distance, width, is_outer_glow);
+                    // svg 不需要颠倒纹理
+                    if is_svg {
+                        data[j * tex_size + i] = r;
+                    } else {
+                        // println!("{:?}", (tex_size, j, i));
+                        data[(tex_size - j - 1) * tex_size + i] = r;
+                    }
+                }
+            }
+        }
+    }
+    data
+}
+
+fn compute_sdf(p: Point, near_arcs: &Vec<Arc>, is_area: Option<bool>) -> u8 {
     let sdf = glyphy_sdf_from_arc_list2(near_arcs, p).0;
     let a = if let Some(is_area) = is_area {
         let sdf1 = if !is_area {
@@ -514,7 +561,7 @@ fn compute_sdf(p: Point, near_arcs: &Vec<&Arc>, is_area: Option<bool>) -> u8 {
 
 fn compute_sdf2(
     p: Point,
-    near_arcs: &Vec<&Arc>,
+    near_arcs: &Vec<Arc>,
     distance: f32,
     width: Option<f32>,
     is_outer_glow: bool,
@@ -533,7 +580,7 @@ fn compute_sdf2(
         // println!("{:?}", (radius, sdf));
     } else {
         sdf = sdf / distance;
-        return  ((1.0 - sdf) * 128.0) as u8
+        return ((1.0 - sdf) * 128.0) as u8;
     }
 }
 
@@ -550,7 +597,7 @@ pub fn compute_layout(
 
     let px_distance = extents_w.max(extents_h) / tex_size as f32;
     let distance = px_distance * (pxrange >> 1) as f32;
-    println!("distance: {}", distance);
+    // println!("distance: {}", distance);
     extents.mins.x -= distance;
     extents.mins.y -= distance;
     extents.maxs.x += distance;
@@ -570,11 +617,10 @@ pub fn compute_layout(
     let temp = extents_w - extents_h;
     if temp > 0.0 {
         extents.maxs.y += temp;
-        atlas_bounds.mins.y +=  (temp / extents.height() * tex_size as f32 - 1.0).ceil();
+        atlas_bounds.mins.y += (temp / extents.height() * tex_size as f32 - 1.0).ceil();
         // atlas_bounds.maxs.y -= (temp / extents.height() * tex_size as f32).round();
     } else {
         extents.maxs.x -= temp;
-     
         atlas_bounds.maxs.x -= (temp.abs() / extents.width() * tex_size as f32).trunc();
     }
 
@@ -582,11 +628,35 @@ pub fn compute_layout(
     //     atlas_bounds.width() / 32.0 / plane_bounds.width(),
     //     atlas_bounds.height() / 32.0 / plane_bounds.width(),
     // );
-    println!(
-        "plane_bounds: {:?}, atlas_bounds: {:?}, tex_size: {}",
-        plane_bounds, atlas_bounds, tex_size
-    );
-    (plane_bounds, atlas_bounds, distance, tex_size)
+    // println!(
+    //     "plane_bounds: {:?}, atlas_bounds: {:?}, tex_size: {}",
+    //     plane_bounds, atlas_bounds, tex_size
+    // );
+    (Aabb(plane_bounds), atlas_bounds, distance, tex_size)
+}
+
+pub fn compute_cell_range(mut bbox: Aabb, scale: f32) -> Aabb {
+    let scale = scale * 0.5;
+    let w = bbox.width();
+    let h = bbox.height();
+
+    let temp = w - h;
+    if temp > 0.0 {
+        bbox.maxs.y += temp;
+        // atlas_bounds.maxs.y -= (temp / extents.height() * tex_size as f32).round();
+    } else {
+        bbox.maxs.x -= temp;
+    }
+
+    let w = bbox.width();
+    let extents = scale * w;
+
+    bbox.mins.x -= extents;
+    bbox.mins.y -= extents;
+    bbox.maxs.x += extents;
+    bbox.maxs.y += extents;
+
+    bbox
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
@@ -807,4 +877,48 @@ pub struct OutlineInfo {
     pub(crate) units_per_em: u16,
 }
 
+impl OutlineInfo {
+    pub fn compute_near_arcs(&mut self, scale: f32) -> Vec<(Vec<Arc>, Aabb)> {
+        FontFace::compute_near_arcs(self.bbox, scale, &mut self.endpoints).0
+    }
 
+    pub fn compute_sdf_tex(
+        &mut self,
+        result_arcs: Vec<(Vec<Arc>, Aabb)>,
+        tex_size: usize,
+        pxrange: u32,
+        is_outer_glow: bool,
+    ) -> SdfInfo2 {
+        let mut extents = self.bbox;
+        let (plane_bounds, atlas_bounds, distance, tex_size) =
+            compute_layout(&mut extents, tex_size, pxrange, self.units_per_em);
+        let pixmap = encode_sdf2(
+            result_arcs,
+            &extents,
+            tex_size,
+            distance,
+            None,
+            is_outer_glow,
+            false,
+        );
+
+        SdfInfo2 {
+            tex_info: TexInfo2 {
+                char: self.char,
+                advance: self.advance as f32 / self.units_per_em as f32,
+                sdf_offset_x: 0,
+                sdf_offset_y: 0,
+                plane_min_x: plane_bounds.mins.x,
+                plane_min_y: plane_bounds.mins.y,
+                plane_max_x: plane_bounds.maxs.x,
+                plane_max_y: plane_bounds.maxs.y,
+                atlas_min_x: atlas_bounds.mins.x,
+                atlas_min_y: atlas_bounds.mins.y,
+                atlas_max_x: atlas_bounds.maxs.x,
+                atlas_max_y: atlas_bounds.maxs.y,
+            },
+            sdf_tex: pixmap,
+            tex_size,
+        }
+    }
+}

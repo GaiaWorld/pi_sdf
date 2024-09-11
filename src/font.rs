@@ -1,6 +1,6 @@
 use std::{char, collections::HashMap};
 
-use crate::glyphy::blob::TexInfo2;
+use crate::{glyphy::blob::TexInfo2, utils::compute_cell_range};
 use allsorts::{
     binary::read::ReadScope,
     font::MatchingPresentation,
@@ -18,7 +18,7 @@ use crate::{
     glyphy::{
         blob::{recursion_near_arcs_of_cell, travel_data, BlobArc, EncodeError, TexData, TexInfo},
         geometry::{
-            aabb::{Aabb, AabbEXT, Direction},
+            aabb::{Aabb, Direction},
             arc::{Arc, ArcEndpoint},
             arcs::GlyphyArcAccumulator,
         },
@@ -141,9 +141,9 @@ impl FontFace {
         // let width_cells = (extents.width() / min_width).floor();
         // let height_cells = (extents.height() / min_height).floor();
         // 根据最小格子大小计算每个格子的圆弧数据
-        let (result_arcs, min_width, min_height, near_arcs) =
-            Self::compute_near_arcs(extents, &mut endpoints);
-        log::trace!("near_arcs: {}", near_arcs.len());
+        let (result_arcs, min_width, min_height) =
+            Self::compute_near_arcs(extents, 0.0, &mut endpoints);
+        // log::trace!("near_arcs: {}", near_arcs.len());
         let (unit_arcs, map) =
             encode_uint_arc_data(result_arcs, &extents, min_width, min_height, None);
         // println!("unit_arcs[14][5]: {:?}", unit_arcs[14][5]);
@@ -173,8 +173,11 @@ impl FontFace {
 
     pub fn compute_near_arcs<'a>(
         extents: Aabb,
-        endpoints: &mut Vec<ArcEndpoint>,
-    ) -> (Vec<(Vec<&'a Arc>, Aabb)>, f32, f32, Vec<Arc>) {
+        scale: f32,
+        endpoints: &Vec<ArcEndpoint>,
+    ) -> (Vec<(Vec<Arc>, Aabb)>, f32, f32) {
+        let extents = compute_cell_range(extents, scale);
+        println!("extents: {:?}", extents);
         // log::error!("get_char_arc: {:?}", char);
         // let extents = self.max_box.clone();
         // let endpoints = &mut endpoints;
@@ -237,7 +240,7 @@ impl FontFace {
             &mut result_arcs,
             &mut temp,
         );
-        (result_arcs, min_width, min_height, near_arcs)
+        (result_arcs, min_width, min_height)
     }
 
     pub fn out_tex_data(
@@ -563,16 +566,20 @@ impl FontFace {
             advance,
             units_per_em,
         } = outline_info;
-        let mut extents = bbox;
+        println!("bbox: {:?}", bbox);
+        let (result_arcs, _, _, ) = Self::compute_near_arcs(bbox, 2.0, &mut endpoints);
 
+        let mut extents = bbox;
         let (plane_bounds, atlas_bounds, distance, tex_size) =
             compute_layout(&mut extents, tex_size, pxrange, units_per_em);
-        // println!("pxrange: {}, tex_size: {}", pxrange, tex_size);
-        let (result_arcs, _, _, near_arcs) = Self::compute_near_arcs(extents, &mut endpoints);
-        log::trace!("near_arcs: {}", near_arcs.len());
+        // println!("cell aabb: {:?}, sdf aabb: {:?}", extents1, extents);
+        let time = std::time::Instant::now();
+        // let pixmap =
+        //     crate::utils::encode_sdf(result_arcs, &extents, tex_size, tex_size,distance, None, is_outer_glow, false);
 
-        let pixmap =
-            crate::utils::encode_sdf(result_arcs, &extents, tex_size, tex_size, distance, None, is_outer_glow, false);
+            let pixmap =
+            crate::utils::encode_sdf2(result_arcs, &extents, tex_size,distance, None, is_outer_glow, false);
+        println!("time: {:?}",time.elapsed());
         SdfInfo2 {
             tex_info: TexInfo2 {
                 char,

@@ -11,7 +11,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 
 use super::{
     geometry::{
-        aabb::{Aabb, AabbEXT, Direction},
+        aabb::{Aabb, Direction},
         arc::{Arc, ArcEndpoint},
         line::Line,
         segment::SegmentEXT,
@@ -1141,7 +1141,7 @@ pub fn recursion_near_arcs_of_cell<'a>(
     bottom_near: Option<(Vec<&'static Arc>, bool)>,
     left_near: Option<(Vec<&'static Arc>, bool)>,
     right_near: Option<(Vec<&'static Arc>, bool)>,
-    result_arcs: &mut Vec<(Vec<&'a Arc>, Aabb)>,
+    result_arcs: &mut Vec<(Vec<Arc>, Aabb)>,
     temps: &mut Vec<(Point, f32, Vec<Range<f32>>)>,
 ) {
     // let time = std::time::Instant::now();
@@ -1183,6 +1183,7 @@ pub fn recursion_near_arcs_of_cell<'a>(
     ) || (cell_width * 32.0 - glyph_width).abs() < 0.1
         && (cell_height * 32.0 - glyph_height).abs() < 0.1
     {
+        let arcs = arcs.iter().map(|item|(*item).clone()).collect();
         result_arcs.push((arcs, cell.clone()));
     } else {
         let (

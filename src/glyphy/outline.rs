@@ -301,7 +301,7 @@ pub fn process_contour(
  * @returns 如果修改了轮廓，则返回true
  */
 pub fn glyphy_outline_winding_from_even_odd(
-    endpoints: &mut Vec<ArcEndpoint>,
+    endpoints: &Vec<ArcEndpoint>,
     inverse: bool,
 ) -> bool {
     /*

@@ -25,7 +25,6 @@ brotli-decompressor = "2.5"
 bincode = "1.3"
 web-sys = {version = "0.3", features = ["Window", "Performance"]}
 pi_share = "0.4"
-lyon_geom = "1.0"
 
 [target."cfg(target_arch = \"wasm32\")".dependencies]
 getrandom = {version = "0.2", features = ["js"]}
