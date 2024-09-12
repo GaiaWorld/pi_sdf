@@ -230,28 +230,28 @@
 //     }
 // }
 
-// #[test]
-// fn test() {
-//     let mut sink = GlyphVisitor::new(0.1);
-//     let flags = ArcFlags {
-//         large_arc: false,
-//         sweep: true,
-//     };
-//     let arc = lyon_geom::SvgArc {
-//         from: point(172.55, 152.45),
-//         to: point(215.1, 109.9),
-//         radii: vector(30.0, 50.0),
-//         x_rotation: Angle::radians(-45.0),
-//         flags,
-//     };
+#[test]
+fn test() {
+    // let mut sink = GlyphVisitor::new(0.1);
+    // let flags = ArcFlags {
+    //     large_arc: false,
+    //     sweep: true,
+    // };
+    // let arc = lyon_geom::SvgArc {
+    //     from: point(172.55, 152.45),
+    //     to: point(215.1, 109.9),
+    //     radii: vector(30.0, 50.0),
+    //     x_rotation: Angle::radians(-45.0),
+    //     flags,
+    // };
 
-//     arc.for_each_cubic_bezier(&mut |s| {
-//         sink.cubic_curve_to(
-//             LineSegment2F::new(
-//                 Vector2F::new(s.ctrl1.x as f32, s.ctrl1.y as f32),
-//                 Vector2F::new(s.ctrl2.x as f32, s.ctrl2.y as f32),
-//             ),
-//             Vector2F::new(s.to.x as f32, s.to.y as f32),
-//         )
-//     });
-// }
+    // arc.for_each_cubic_bezier(&mut |s| {
+    //     sink.cubic_curve_to(
+    //         LineSegment2F::new(
+    //             Vector2F::new(s.ctrl1.x as f32, s.ctrl1.y as f32),
+    //             Vector2F::new(s.ctrl2.x as f32, s.ctrl2.y as f32),
+    //         ),
+    //         Vector2F::new(s.to.x as f32, s.to.y as f32),
+    //     )
+    // });
+}

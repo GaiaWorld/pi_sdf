@@ -5,7 +5,8 @@ use allsorts::{
 };
 // use erased_serde::serialize_trait_object;
 // use image::EncodableLayout;
-use kurbo::{Shape, SvgArc};
+use kurbo::{BezPath, Shape, SvgArc};
+use lyon_geom::{point, vector, Angle, ArcFlags};
 // use lyon_geom::{point, vector, Angle, ArcFlags,};
 use parry2d::{
     // na::{Matrix, Matrix3},
@@ -767,7 +768,7 @@ impl Path {
             is_reverse,
         };
         r.attribute.is_close = r.is_close();
-
+        println!("attribute.is_close: {:?}", r.attribute.is_close);
         r
     }
 
@@ -895,10 +896,10 @@ impl SvgInfo {
         }
     }
 
-    pub fn compute_layout(&self, tex_size: usize, pxrange: u32) -> Vec<f32> {
+    pub fn compute_layout(&self, tex_size: usize, pxrange: u32, cur_off: u32) -> Vec<f32> {
         let mut extents = self.binding_box;
         let (plane_bounds, atlas_bounds, _, tex_size) =
-            compute_layout(&mut extents, tex_size, pxrange, 1);
+            compute_layout(&mut extents, tex_size, pxrange, 1, cur_off);
         vec![
             plane_bounds.mins.x,
             plane_bounds.mins.y,
@@ -1107,8 +1108,8 @@ fn compute_outline<'a>(
 ) {
     // println!("p: {:?}", points);
     let mut prev_to = Vector2F::default();
-    for p in verbs {
-        match p {
+    for path_verb in verbs {
+        match path_verb {
             PathVerb::MoveTo => {
                 let to = points.next().unwrap().into_vec2f();
                 sink.move_to(to);
@@ -1175,76 +1176,34 @@ fn compute_outline<'a>(
                 sink.line_to(to);
                 prev_to = to;
             }
-            PathVerb::EllipticalArcTo => {
-                let center = points.next().unwrap();
-                let radii = kurbo::Vec2 {
-                    x: center.x as f64,
-                    y: center.y as f64,
-                };
+            PathVerb::EllipticalArcTo | PathVerb::EllipticalArcToRelative => {
+                let radii = points.next().unwrap();
 
                 let p = points.next().unwrap();
 
-                let to = points.next().unwrap();
-                let to = kurbo::Point {
-                    x: to.x as f64,
-                    y: to.y as f64,
-                };
+                let mut to = *points.next().unwrap();
+                if let PathVerb::EllipticalArcToRelative = path_verb {
+                    to = Point::new(to.x + prev_to.x(), to.y + prev_to.y());
+                }
 
                 let (large_arc, sweep) = to_arc_flags(p.y);
-                let arc = SvgArc {
-                    from: kurbo::Point {
-                        x: prev_to.x() as f64,
-                        y: prev_to.y() as f64,
-                    },
-                    radii,
-                    x_rotation: p.x as f64,
-                    to,
-                    large_arc,
-                    sweep,
+                let arc = lyon_geom::SvgArc {
+                    from: point(prev_to.x(), prev_to.y()),
+                    to: point(to.x, to.y),
+                    radii: vector(radii.x, radii.y),
+                    x_rotation: Angle::radians(p.x),
+                    flags: ArcFlags { large_arc, sweep },
                 };
-                // };
-                let arc = kurbo::Arc::from_svg_arc(&arc).unwrap();
-                let path = arc.into_path(0.1);
 
-                for p in path {
-                    match p {
-                        kurbo::PathEl::MoveTo(to) => {
-                            let to = Vector2F::new(to.x as f32, to.y as f32);
-                            sink.move_to(to);
-                            // prev_to = to;
-                        }
-                        kurbo::PathEl::LineTo(to) => {
-                            let to = Vector2F::new(to.x as f32, to.y as f32);
-                            sink.line_to(to);
-                            // prev_to = to;
-                        }
-                        kurbo::PathEl::QuadTo(c, to) => {
-                            let ctrl = Vector2F::new(c.x as f32, c.x as f32);
-                            let to = Vector2F::new(to.x as f32, to.y as f32);
-
-                            sink.quadratic_curve_to(ctrl, to);
-                            prev_to = to;
-                        }
-                        kurbo::PathEl::CurveTo(c1, c2, to) => {
-                            let ctrl = LineSegment2F::new(
-                                Vector2F::new(c1.x as f32, c1.x as f32),
-                                Vector2F::new(c2.x as f32, c2.x as f32),
-                            );
-                            let to = Vector2F::new(to.x as f32, to.y as f32);
-
-                            sink.cubic_curve_to(ctrl, to);
-                            prev_to = to;
-                        }
-                        kurbo::PathEl::ClosePath => {
-                            sink.close();
-                        }
-                    }
-                }
+                arc.for_each_quadratic_bezier(&mut |s| {
+                    sink.quadratic_curve_to(
+                        Vector2F::new(s.ctrl.x as f32, s.ctrl.y as f32),
+                        Vector2F::new(s.to.x as f32, s.to.y as f32),
+                    )
+                });
 
                 prev_to = Vector2F::new(to.x as f32, to.y as f32);
             }
-            PathVerb::EllipticalArcToRelative => {}
-
             PathVerb::Close => {
                 sink.close();
             }
@@ -1288,12 +1247,13 @@ pub fn compute_arcs_sdf_tex(
     pxrange: u32,
     width: Option<f32>,
     is_outer_glow: bool,
+    cur_off: u32,
 ) -> SdfInfo2 {
     // log::error!("endpoints.len(): {}", endpoints.len());
 
     let mut extents = bbox;
     let (plane_bounds, atlas_bounds, distance, tex_size) =
-        compute_layout(&mut extents, tex_size, pxrange, 1);
+        compute_layout(&mut extents, tex_size, pxrange, 1, cur_off);
     let (result_arcs, _, _) = crate::svg::compute_near_arcs(extents, &mut endpoints);
     // log::trace!("near_arcs: {}", near_arcs.len());
 
@@ -1373,6 +1333,7 @@ pub fn compute_shape_sdf_tex(
     tex_size: usize, // 需要计算纹理的宽高，默认正方形，像素为单位
     pxrange: u32,
     is_outer_glow: bool,
+    cur_off: u32,
 ) -> SdfInfo2 {
     let SvgInfo {
         binding_box,
@@ -1386,6 +1347,7 @@ pub fn compute_shape_sdf_tex(
         pxrange,
         if is_area { None } else { Some(1.0) },
         is_outer_glow,
+        cur_off,
     )
 }
 

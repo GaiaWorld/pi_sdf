@@ -573,7 +573,7 @@ impl FontFace {
 
         let mut extents = bbox;
         let (plane_bounds, atlas_bounds, distance, tex_size) =
-            compute_layout(&mut extents, tex_size, pxrange, units_per_em);
+            compute_layout(&mut extents, tex_size, pxrange, units_per_em, 4);
         // println!("cell aabb: {:?}, sdf aabb: {:?}", extents1, extents);
         let time = std::time::Instant::now();
         // let pixmap =
@@ -581,7 +581,7 @@ impl FontFace {
 
             let pixmap =
             crate::utils::encode_sdf2(result_arcs, &extents, tex_size,distance, None, is_outer_glow, false);
-        println!("time: {:?}",time.elapsed());
+
         SdfInfo2 {
             tex_info: TexInfo2 {
                 char,

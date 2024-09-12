@@ -589,6 +589,7 @@ pub fn compute_layout(
     tex_size: usize,
     pxrange: u32,
     units_per_em: u16,
+    cur_off: u32
 ) -> (Aabb, Aabb, f32, usize) {
     // map 无序导致每次计算的数据不一样
     // let bbox = extents.clone();
@@ -597,22 +598,23 @@ pub fn compute_layout(
 
     let px_distance = extents_w.max(extents_h) / tex_size as f32;
     let distance = px_distance * (pxrange >> 1) as f32;
+    let expand = px_distance * (cur_off >> 1) as f32;
     // println!("distance: {}", distance);
-    extents.mins.x -= distance;
-    extents.mins.y -= distance;
-    extents.maxs.x += distance;
-    extents.maxs.y += distance;
+    extents.mins.x -= expand;
+    extents.mins.y -= expand;
+    extents.maxs.x += expand;
+    extents.maxs.y += expand;
 
     let scale = 1.0 / units_per_em as f32;
     let plane_bounds = extents.scaled(&Vector::new(scale, scale));
 
     let pxrange = (pxrange >> 2 << 2) + 4;
-    let tex_size = tex_size + pxrange as usize;
+    let tex_size = tex_size + cur_off as usize;
     let mut atlas_bounds = Aabb::new_invalid();
-    atlas_bounds.mins.x = pxrange as f32 * 0.5;
-    atlas_bounds.mins.y = pxrange as f32 * 0.5;
-    atlas_bounds.maxs.x = tex_size as f32 - pxrange as f32 * 0.5;
-    atlas_bounds.maxs.y = tex_size as f32 - pxrange as f32 * 0.5;
+    atlas_bounds.mins.x = cur_off as f32 * 0.5;
+    atlas_bounds.mins.y = cur_off as f32 * 0.5;
+    atlas_bounds.maxs.x = tex_size as f32 - cur_off as f32 * 0.5;
+    atlas_bounds.maxs.y = tex_size as f32 - cur_off as f32 * 0.5;
 
     let temp = extents_w - extents_h;
     if temp > 0.0 {
@@ -900,7 +902,7 @@ impl OutlineInfo {
     ) -> SdfInfo2 {
         let mut extents = self.bbox;
         let (plane_bounds, atlas_bounds, distance, tex_size) =
-            compute_layout(&mut extents, tex_size, pxrange, self.units_per_em);
+            compute_layout(&mut extents, tex_size, pxrange, self.units_per_em, pxrange);
         let pixmap = encode_sdf2(
             result_arcs,
             &extents,
