@@ -13,16 +13,12 @@ use parry2d::{
 };
 use serde::{Deserialize, Serialize};
 // use usvg::tiny_skia_path::PathSegment;
+use crate::font::SdfInfo2;
+use crate::glyphy::blob::TexInfo2;
 use crate::{
     font::SdfInfo,
-    glyphy::geometry::aabb::{Aabb},
-    utils::{compute_layout, Attribute, GlyphInfo},
-};
-use crate::{font::SdfInfo2, Vector2};
-use crate::{
-    glyphy::{blob::TexInfo2, geometry::arc::Arc},
-    svg::compute_near_arcs,
-    utils::encode_sdf2,
+    glyphy::geometry::aabb::Aabb,
+    utils::{compute_layout, Attribute},
 };
 use crate::{
     glyphy::{
@@ -866,6 +862,23 @@ impl SvgInfo {
             is_area: true,
         }
     }
+
+    pub fn compute_layout(&self, tex_size: usize, pxrange: u32) -> Vec<f32> {
+        let mut extents = self.binding_box;
+        let (plane_bounds, atlas_bounds, _, tex_size) =
+            compute_layout(&mut extents, tex_size, pxrange, 1);
+        vec![
+            plane_bounds.mins.x,
+            plane_bounds.mins.y,
+            plane_bounds.maxs.x,
+            plane_bounds.maxs.y,
+            atlas_bounds.mins.x,
+            atlas_bounds.mins.y,
+            atlas_bounds.maxs.x,
+            atlas_bounds.maxs.y,
+            tex_size as f32,
+        ]
+    }
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
@@ -979,8 +992,7 @@ impl SvgScenes {
         {
             let binding_box = extents(binding_box);
             // println!("binding_box: {:?}", binding_box);
-            let (mut blob_arc, map) =
-                encode_uint_arc_impl(binding_box, arc_endpoints, is_area);
+            let (mut blob_arc, map) = encode_uint_arc_impl(binding_box, arc_endpoints, is_area);
             let size = blob_arc.encode_data_tex(&map, data_tex, width0, offset_x0, offset_y0)?;
             // println!("data_map: {}", map.len());
             let mut info = blob_arc.encode_index_tex(
@@ -1132,33 +1144,6 @@ fn compute_outline<'a>(
                 prev_to = to;
             }
             PathVerb::EllipticalArcTo => {
-                // let arc = if is_reverse {
-                //     let center = points.next().unwrap();
-                //     let radii = kurbo::Vec2 {
-                //         x: center.x as f64,
-                //         y: center.y as f64,
-                //     };
-
-                //     let p = points.next().unwrap();
-
-                //     let to = points.next().unwrap();
-                //     let to = kurbo::Point {
-                //         x: to.x as f64,
-                //         y: to.y as f64,
-                //     };
-                //     let (large_arc, sweep) = to_arc_flags(p.y);
-                //     SvgArc {
-                //         from: kurbo::Point {
-                //             x: prev_to.x() as f64,
-                //             y: prev_to.y() as f64,
-                //         },
-                //         radii,
-                //         x_rotation: p.x as f64,
-                //         to,
-                //         large_arc,
-                //         sweep: !sweep,
-                //     }
-                // } else {
                 let center = points.next().unwrap();
                 let radii = kurbo::Vec2 {
                     x: center.x as f64,
@@ -1194,12 +1179,12 @@ fn compute_outline<'a>(
                         kurbo::PathEl::MoveTo(to) => {
                             let to = Vector2F::new(to.x as f32, to.y as f32);
                             sink.move_to(to);
-                            prev_to = to;
+                            // prev_to = to;
                         }
                         kurbo::PathEl::LineTo(to) => {
                             let to = Vector2F::new(to.x as f32, to.y as f32);
                             sink.line_to(to);
-                            prev_to = to;
+                            // prev_to = to;
                         }
                         kurbo::PathEl::QuadTo(c, to) => {
                             let ctrl = Vector2F::new(c.x as f32, c.x as f32);
@@ -1223,6 +1208,8 @@ fn compute_outline<'a>(
                         }
                     }
                 }
+
+                prev_to = Vector2F::new(to.x as f32, to.y as f32);
             }
             PathVerb::EllipticalArcToRelative => {}
 

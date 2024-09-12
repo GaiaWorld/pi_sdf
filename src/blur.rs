@@ -98,7 +98,7 @@ pub fn blur_box(bbox: &[f32], pxrange: f32, txe_size: usize) -> BlurInfo {
     }
 }
 
-pub fn gaussian_blur(sdf_tex: Vec<u8>, width: u32, height: u32, radius: u32) -> Vec<u8> {
+pub fn gaussian_blur(sdf_tex: Vec<u8>, width: u32, height: u32, radius: u32, weight: f32) -> Vec<u8> {
     // let (width, height) = img.dimensions();
     let mut output = Vec::with_capacity(sdf_tex.len());
 
@@ -107,27 +107,34 @@ pub fn gaussian_blur(sdf_tex: Vec<u8>, width: u32, height: u32, radius: u32) -> 
 
     for y in 0..height {
         for x in 0..width {
+            // let mut r = 0.0;
+            // let mut g = 0.0;
+            // let mut b = 0.0;
             let mut a = 0.0;
             let mut weight_sum = 0.0;
 
             for ky in 0..kernel_size {
                 for kx in 0..kernel_size {
-                    let px =
-                        (x as i32 + kx as i32 - radius as i32).clamp(0, width as i32 - 1) as u32;
-                    let py =
-                        (y as i32 + ky as i32 - radius as i32).clamp(0, height as i32 - 1) as u32;
+                    let px = (x as i32 + kx as i32 - radius as i32).clamp(0, width as i32 - 1) as u32;
+                    let py = (y as i32 + ky as i32 - radius as i32).clamp(0, height as i32 - 1) as u32;
 
-                    let pixel = sdf_tex[(px + py * width) as usize];
+                    let sdf = sdf_tex[(px + py * width) as usize] as f32 / 255.0;
+                    let fill_sd_px = sdf - weight;
+                    let pixel = (fill_sd_px + 0.5).clamp(0.0, 1.0);
+
                     let weight = kernel[ky as usize][kx as usize];
 
+                    // r += pixel[0] as f32 * weight;
+                    // g += pixel[1] as f32 * weight;
+                    // b += pixel[2] as f32 * weight;
                     a += pixel as f32 * weight;
                     weight_sum += weight;
                 }
             }
 
-            let pixel = (a / weight_sum) as u8;
+            let pixel = (a / weight_sum * 255.0) as u8;
 
-            output.push(pixel);
+            output.push( pixel);
         }
     }
 

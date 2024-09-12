@@ -93,7 +93,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     println!("glpyh_info: {:?}", glpyh_info);
     let tex_size = glpyh_info.tex_size;
     let _ = image::save_buffer("image.png", &glpyh_info.sdf_tex, tex_size as u32, tex_size as u32, ColorType::L8);
-    let gaussian_blur = gaussian_blur(glpyh_info.sdf_tex.clone(), tex_size as u32, tex_size as u32, pxrange);
+    let gaussian_blur = gaussian_blur(glpyh_info.sdf_tex.clone(), tex_size as u32, tex_size as u32, 2, 0.5);
     let _ = image::save_buffer("gaussian_blur.png", &gaussian_blur, tex_size as u32, tex_size as u32, ColorType::L8);
     // let buffer = include_bytes!("../source/sdf.png").to_vec();
     // let image_buf = image::load_from_memory(&buffer).unwrap();
