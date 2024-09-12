@@ -160,6 +160,7 @@ impl Circle {
             binding_box: self.binding_box(),
             arc_endpoints: self.get_arc_endpoints(),
             is_area: self.is_area(),
+            is_reverse: None,
         }
     }
 
@@ -246,6 +247,7 @@ impl Rect {
             binding_box: self.binding_box(),
             arc_endpoints: self.get_arc_endpoints(),
             is_area: self.is_area(),
+            is_reverse: None,
         }
     }
 
@@ -361,6 +363,7 @@ impl Segment {
             binding_box: self.binding_box(),
             arc_endpoints: self.get_arc_endpoints(),
             is_area: self.is_area(),
+            is_reverse: None,
         }
     }
 
@@ -472,6 +475,7 @@ impl Ellipse {
             binding_box: self.binding_box(),
             arc_endpoints: self.get_arc_endpoints(),
             is_area: self.is_area(),
+            is_reverse: None,
         }
     }
 
@@ -564,6 +568,7 @@ impl Polygon {
             binding_box: self.binding_box(),
             arc_endpoints: self.get_arc_endpoints(),
             is_area: self.is_area(),
+            is_reverse: None,
         }
     }
 
@@ -677,6 +682,8 @@ impl Polyline {
             binding_box: self.binding_box(),
             arc_endpoints: self.get_arc_endpoints(),
             is_area: self.is_area(),
+            is_reverse: None,
+            
         }
     }
 
@@ -745,15 +752,16 @@ impl Path {
             .map(|v| Point::new(v[0], v[1]))
             .collect::<Vec<Point>>();
         let mut is_reverse = false;
+        // if verbs.
         // if points.len() > 2 && !compute_direction(&points) {
         //     points.reverse();
-        //     verbs.reverse();
+        //     // verbs.reverse();
         //     is_reverse = true;
 
         //     let temp = verbs[0];
         //     let len = verbs.len();
-        //     verbs[0] = verbs[len - 1];
-        //     verbs[len - 1] = temp;
+        //     // verbs[0] = verbs[len - 1];
+        //     // verbs[len - 1] = temp;
         // };
 
         // println!("{:?}", (&points, &verbs));
@@ -768,6 +776,11 @@ impl Path {
             is_reverse,
         };
         r.attribute.is_close = r.is_close();
+
+        if r.attribute.is_close {
+            r.is_reverse = compute_direction(&r.points);
+        }
+
         println!("attribute.is_close: {:?}", r.attribute.is_close);
         r
     }
@@ -790,7 +803,7 @@ impl Path {
         false
     }
 
-    pub fn get_arc_endpoints(&self) -> (Vec<ArcEndpoint>, Aabb) {
+    pub fn get_arc_endpoints(&self) -> (Vec<ArcEndpoint>, Aabb, usize) {
         let mut sink = GlyphVisitor::new(1.0);
         // 圆弧拟合贝塞尔曲线的精度，值越小越精确
         sink.accumulate.tolerance = 0.01;
@@ -811,9 +824,9 @@ impl Path {
         //     );
         // }
         let GlyphVisitor {
-            accumulate, bbox, ..
+            accumulate, bbox,arcs, ..
         } = sink;
-        (accumulate.result, bbox)
+        (accumulate.result, bbox, arcs)
     }
 
     pub fn get_hash(&self) -> u64 {
@@ -846,11 +859,12 @@ impl Path {
     }
 
     pub fn get_svg_info(&self) -> SvgInfo {
-        let (arc_endpoints, binding_box) = self.get_arc_endpoints();
+        let (arc_endpoints, binding_box, arcs) = self.get_arc_endpoints();
         SvgInfo {
             binding_box,
             arc_endpoints,
             is_area: self.is_area(),
+            is_reverse: if arcs ==1 {Some(!self.is_reverse)}  else{None}
         }
     }
 
@@ -870,6 +884,7 @@ pub struct SvgInfo {
     binding_box: Aabb,
     arc_endpoints: Vec<ArcEndpoint>,
     is_area: bool,
+    is_reverse: Option<bool>
 }
 
 // #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
@@ -893,6 +908,7 @@ impl SvgInfo {
             binding_box,
             arc_endpoints,
             is_area: true,
+            is_reverse: None
         }
     }
 
@@ -924,6 +940,7 @@ pub fn computer_svg_sdf(info: SvgInfo) -> SdfInfo {
         binding_box,
         arc_endpoints,
         is_area,
+        ..
     } = info;
     let extents = extents(binding_box);
 
@@ -1018,6 +1035,7 @@ impl SvgScenes {
                     binding_box,
                     arc_endpoints,
                     is_area,
+                    ..
                 },
                 attr,
             ),
@@ -1108,10 +1126,12 @@ fn compute_outline<'a>(
 ) {
     // println!("p: {:?}", points);
     let mut prev_to = Vector2F::default();
+    let mut move_to = 0;
     for path_verb in verbs {
         match path_verb {
             PathVerb::MoveTo => {
                 let to = points.next().unwrap().into_vec2f();
+                move_to += 1;
                 sink.move_to(to);
                 prev_to = to;
             }
@@ -1248,6 +1268,7 @@ pub fn compute_arcs_sdf_tex(
     width: Option<f32>,
     is_outer_glow: bool,
     cur_off: u32,
+    is_reverse: Option<bool>
 ) -> SdfInfo2 {
     // log::error!("endpoints.len(): {}", endpoints.len());
 
@@ -1266,6 +1287,7 @@ pub fn compute_arcs_sdf_tex(
         width,
         is_outer_glow,
         true,
+        is_reverse
     );
 
     SdfInfo2 {
@@ -1339,6 +1361,7 @@ pub fn compute_shape_sdf_tex(
         binding_box,
         arc_endpoints,
         is_area,
+        is_reverse,
     } = svginfo;
     compute_arcs_sdf_tex(
         arc_endpoints,
@@ -1348,6 +1371,7 @@ pub fn compute_shape_sdf_tex(
         if is_area { None } else { Some(1.0) },
         is_outer_glow,
         cur_off,
+        is_reverse
     )
 }
 

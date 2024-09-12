@@ -75,6 +75,7 @@ pub struct GlyphVisitor {
     pub(crate) previous: Point,
     pub index: usize,
     pub(crate) bbox: Aabb,
+    pub(crate) arcs: usize
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
@@ -99,6 +100,7 @@ impl GlyphVisitor {
                 Point::new(core::f32::MAX, core::f32::MAX),
                 Point::new(core::f32::MIN, core::f32::MIN),
             ),
+            arcs: 0
         }
     }
 }
@@ -118,6 +120,7 @@ impl GlyphVisitor {
 
 impl OutlineSink for GlyphVisitor {
     fn move_to(&mut self, to: Vector2F) {
+        self.arcs += 1;
         let to = Point::new(to.x(), to.y()) * self.scale;
         log::info!("M {} {} ", to.x, to.y);
 
@@ -440,6 +443,7 @@ pub fn encode_sdf(
     width: Option<f32>,
     is_outer_glow: bool,
     is_svg: bool,
+    is_reverse: Option<bool>
 ) -> Vec<u8> {
     // // todo 为了兼容阴影minimip先强制索引纹理为32 * 32
     // let mut width_cells = 32 as usize;
@@ -476,7 +480,7 @@ pub fn encode_sdf(
                     (j as f32 + 0.5) * min_height + extents.mins.y,
                 );
 
-                let r = compute_sdf2(p, &near_arcs, distance, width, is_outer_glow);
+                let r = compute_sdf2(p, &near_arcs, distance, width, is_outer_glow, is_reverse);
                 // svg 不需要颠倒纹理
                 if is_svg {
                     data[j * width_cells + i] = r;
@@ -497,6 +501,7 @@ pub fn encode_sdf2(
     width: Option<f32>,
     is_outer_glow: bool,
     is_svg: bool,
+    is_reverse: Option<bool>
 ) -> Vec<u8> {
     let glyph_width = extents.width();
     // let glyph_height = extents.height();
@@ -525,7 +530,7 @@ pub fn encode_sdf2(
                         (j as f32 + 0.5) * unit_d + extents.mins.y,
                     );
 
-                    let r = compute_sdf2(p, &near_arcs, distance, width, is_outer_glow);
+                    let r = compute_sdf2(p, &near_arcs, distance, width, is_outer_glow, is_reverse);
                     // svg 不需要颠倒纹理
                     if is_svg {
                         data[j * tex_size + i] = r;
@@ -565,8 +570,14 @@ fn compute_sdf2(
     distance: f32,
     width: Option<f32>,
     is_outer_glow: bool,
+    is_reverse: Option<bool>
 ) -> u8 {
     let mut sdf = glyphy_sdf_from_arc_list2(near_arcs, p.clone()).0;
+    if let Some(is_reverse) = is_reverse {
+        if is_reverse{
+            sdf = -sdf;
+        }
+    }
     if let Some(_) = width {
         sdf = sdf.abs(); // - (width * 0.5);
     }
@@ -911,6 +922,7 @@ impl OutlineInfo {
             None,
             is_outer_glow,
             false,
+            None
         );
 
         SdfInfo2 {

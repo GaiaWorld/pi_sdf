@@ -544,7 +544,7 @@ impl FontFace {
         } = sink;
 
         let GlyphyArcAccumulator { result, .. } = accumulate;
-
+        println!("arc size: {}", result.len());
         OutlineInfo {
             endpoints: result,
             bbox,
@@ -580,7 +580,7 @@ impl FontFace {
         //     crate::utils::encode_sdf(result_arcs, &extents, tex_size, tex_size,distance, None, is_outer_glow, false);
 
             let pixmap =
-            crate::utils::encode_sdf2(result_arcs, &extents, tex_size,distance, None, is_outer_glow, false);
+            crate::utils::encode_sdf2(result_arcs, &extents, tex_size,distance, None, is_outer_glow, false, None);
 
         SdfInfo2 {
             tex_info: TexInfo2 {
