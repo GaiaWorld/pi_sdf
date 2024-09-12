@@ -702,10 +702,42 @@ pub struct Path {
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 impl Path {
     pub fn new(verbs: Vec<u8>, points: Vec<f32>) -> Self {
-        let mut verbs = verbs
-            .into_iter()
-            .map(|v| unsafe { transmute(v) })
-            .collect::<Vec<PathVerb>>();
+        let mut verbs: Vec<PathVerb> = unsafe { transmute(verbs) };
+
+        let mut points = points
+            .chunks(2)
+            .map(|v| Point::new(v[0], v[1]))
+            .collect::<Vec<Point>>();
+        let mut is_reverse = false;
+        // if points.len() > 2 && !compute_direction(&points) {
+        //     points.reverse();
+        //     verbs.reverse();
+        //     is_reverse = true;
+
+        //     let temp = verbs[0];
+        //     let len = verbs.len();
+        //     verbs[0] = verbs[len - 1];
+        //     verbs[len - 1] = temp;
+        // };
+
+        // println!("{:?}", (&points, &verbs));
+
+        let mut attribute = Attribute::default();
+        attribute.start = points[0];
+
+        let mut r = Self {
+            verbs,
+            points,
+            attribute,
+            is_reverse,
+        };
+        r.attribute.is_close = r.is_close();
+
+        r
+    }
+
+    pub fn new1(verbs: Vec<PathVerb>, points: Vec<f32>) -> Self {
+        // let mut verbs: Vec<PathVerb> = unsafe { transmute(verbs) };
 
         let mut points = points
             .chunks(2)
@@ -839,7 +871,7 @@ pub struct SvgInfo {
     is_area: bool,
 }
 
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
+// #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 impl SvgInfo {
     #[cfg(target_arch = "wasm32")]
     pub fn new(binding_box: &[f32], arc_endpoints: &Vec<u8>) -> SvgInfo {

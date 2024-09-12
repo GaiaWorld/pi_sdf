@@ -877,11 +877,20 @@ pub struct OutlineInfo {
     pub(crate) units_per_em: u16,
 }
 
+// #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 impl OutlineInfo {
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn compute_near_arcs(&mut self, scale: f32) -> Vec<(Vec<Arc>, Aabb)> {
         FontFace::compute_near_arcs(self.bbox, scale, &mut self.endpoints).0
     }
 
+    #[cfg(target_arch = "wasm32")]
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen(js_name = compute_near_arcs))]
+    pub fn compute_near_arcs2(&mut self, scale: f32) -> Vec<u8> {
+        bincode::serialize(&FontFace::compute_near_arcs(self.bbox, scale, &mut self.endpoints).0).unwrap()
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn compute_sdf_tex(
         &mut self,
         result_arcs: Vec<(Vec<Arc>, Aabb)>,
@@ -920,5 +929,18 @@ impl OutlineInfo {
             sdf_tex: pixmap,
             tex_size,
         }
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen(js_name = compute_sdf_tex))]
+    pub fn compute_sdf_tex2(
+        &mut self,
+        result_arcs: &Vec<u8>,
+        tex_size: usize,
+        pxrange: u32,
+        is_outer_glow: bool,
+    ) -> Vec<u8> {
+        let result_arcs: Vec<(Vec<Arc>, Aabb)> = bincode::deserialize(result_arcs).unwrap();
+        bincode::serialize(&self.compute_sdf_tex(result_arcs, tex_size, pxrange, is_outer_glow)).unwrap()
     }
 }

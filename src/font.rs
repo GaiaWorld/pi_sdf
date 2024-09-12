@@ -331,6 +331,8 @@ pub struct SdfInfo {
     pub sdf_tex4: Vec<u8>,
     pub grid_size: Vec<f32>,
 }
+
+// #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SdfInfo2 {
     pub tex_info: TexInfo2,
