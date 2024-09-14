@@ -1132,6 +1132,7 @@ pub fn line_decode(encoded: [f32; 4], nominal_size: [f32; 2]) -> Line {
 
 // 判断 每个 格子 最近的 圆弧
 pub fn recursion_near_arcs_of_cell<'a>(
+    global_arcs: &Vec<Arc>,
     extents: &Aabb,
     cell: &Aabb,
     arcs: &Vec<&'static Arc>,
@@ -1141,7 +1142,7 @@ pub fn recursion_near_arcs_of_cell<'a>(
     bottom_near: Option<(Vec<&'static Arc>, bool)>,
     left_near: Option<(Vec<&'static Arc>, bool)>,
     right_near: Option<(Vec<&'static Arc>, bool)>,
-    result_arcs: &mut Vec<(Vec<Arc>, Aabb)>,
+    result_arcs: &mut Vec<(Vec<usize>, Aabb)>,
     temps: &mut Vec<(Point, f32, Vec<Range<f32>>)>,
 ) {
     // let time = std::time::Instant::now();
@@ -1183,8 +1184,13 @@ pub fn recursion_near_arcs_of_cell<'a>(
     ) || (cell_width * 32.0 - glyph_width).abs() < 0.1
         && (cell_height * 32.0 - glyph_height).abs() < 0.1
     {
-        let arcs = arcs.iter().map(|item|(*item).clone()).collect();
-        result_arcs.push((arcs, cell.clone()));
+        let mut arcs_index = Vec::with_capacity(arcs.len());
+        for arc in arcs{
+            let index = global_arcs.iter().position(|a| a.id == arc.id).unwrap();
+            // println!("arc: {:?}, global_arcs: {:?}", arc, global_arcs[index]);
+            arcs_index.push(index);
+        } 
+        result_arcs.push((arcs_index, cell.clone()));
     } else {
         let (
             (cell1, cell2),
@@ -1241,6 +1247,7 @@ pub fn recursion_near_arcs_of_cell<'a>(
         };
         // println!("cell1: {:?}, cell2: {:?}, cell: {:?}", cell1, cell2, cell);
         recursion_near_arcs_of_cell(
+            global_arcs,
             extents,
             &cell1,
             &near_arcs,
@@ -1254,6 +1261,7 @@ pub fn recursion_near_arcs_of_cell<'a>(
             temps,
         );
         recursion_near_arcs_of_cell(
+            global_arcs,
             extents,
             &cell2,
             &near_arcs,

@@ -1,6 +1,9 @@
 use std::{char, collections::HashMap};
 
-use crate::{glyphy::blob::TexInfo2, utils::compute_cell_range};
+use crate::{
+    glyphy::blob::TexInfo2,
+    utils::{compute_cell_range, CellInfo},
+};
 use allsorts::{
     binary::read::ReadScope,
     font::MatchingPresentation,
@@ -132,62 +135,57 @@ impl FontFace {
         extents
     }
 
-    pub fn encode_uint_arc(
-        extents: Aabb,
-        mut endpoints: Vec<ArcEndpoint>,
-    ) -> (BlobArc, HashMap<u64, u64>) {
-        // println!("result_arcs: {:?}", result_arcs.len());
+    // pub fn encode_uint_arc(
+    //     extents: Aabb,
+    //     mut endpoints: Vec<ArcEndpoint>,
+    // ) -> (BlobArc, HashMap<u64, u64>) {
+    //     // println!("result_arcs: {:?}", result_arcs.len());
 
-        // let width_cells = (extents.width() / min_width).floor();
-        // let height_cells = (extents.height() / min_height).floor();
-        // 根据最小格子大小计算每个格子的圆弧数据
-        let (result_arcs, min_width, min_height) =
-            Self::compute_near_arcs(extents, 0.0, &mut endpoints);
-        // log::trace!("near_arcs: {}", near_arcs.len());
-        let (unit_arcs, map) =
-            encode_uint_arc_data(result_arcs, &extents, min_width, min_height, None);
-        // println!("unit_arcs[14][5]: {:?}", unit_arcs[14][5]);
+    //     // let width_cells = (extents.width() / min_width).floor();
+    //     // let height_cells = (extents.height() / min_height).floor();
+    //     // 根据最小格子大小计算每个格子的圆弧数据
+    //     let CellInfo{info, min_width, min_height, ..} =
+    //         Self::compute_near_arcs(extents, 0.0, &mut endpoints);
+    //     // log::trace!("near_arcs: {}", near_arcs.len());
+    //     let (unit_arcs, map) =
+    //         encode_uint_arc_data(info, &extents, min_width, min_height, None);
+    //     // println!("unit_arcs[14][5]: {:?}", unit_arcs[14][5]);
 
-        let [min_sdf, max_sdf] = travel_data(&unit_arcs);
-        let blob_arc = BlobArc {
-            min_sdf,
-            max_sdf,
-            cell_size: min_width,
-            #[cfg(feature = "debug")]
-            show: format!("<br> 格子数：宽 = {}, 高 = {} <br>", min_width, min_height),
-            extents,
-            data: unit_arcs,
-            avg_fetch_achieved: 0.0,
-            endpoints,
-        };
+    //     let [min_sdf, max_sdf] = travel_data(&unit_arcs);
+    //     let blob_arc = BlobArc {
+    //         min_sdf,
+    //         max_sdf,
+    //         cell_size: min_width,
+    //         #[cfg(feature = "debug")]
+    //         show: format!("<br> 格子数：宽 = {}, 高 = {} <br>", min_width, min_height),
+    //         extents,
+    //         data: unit_arcs,
+    //         avg_fetch_achieved: 0.0,
+    //         endpoints,
+    //     };
 
-        // extents.scale(1.0 / upem, 1.0 / upem);
+    //     // extents.scale(1.0 / upem, 1.0 / upem);
 
-        // gi.nominal_w = width_cells;
-        // gi.nominal_h = height_cells;
+    //     // gi.nominal_w = width_cells;
+    //     // gi.nominal_h = height_cells;
 
-        // gi.extents.set(&extents);
+    //     // gi.extents.set(&extents);
 
-        (blob_arc, map)
-    }
+    //     (blob_arc, map)
+    // }
 
     pub fn compute_near_arcs<'a>(
         extents: Aabb,
         scale: f32,
         endpoints: &Vec<ArcEndpoint>,
-    ) -> (Vec<(Vec<Arc>, Aabb)>, f32, f32) {
+    ) -> CellInfo {
         let extents = compute_cell_range(extents, scale);
         println!("extents: {:?}", extents);
-        // log::error!("get_char_arc: {:?}", char);
-        // let extents = self.max_box.clone();
-        // let endpoints = &mut endpoints;
-        // let r = endpoints.len();
-        // println!("endpoints: {}",  endpoints.len());
+
         if endpoints.len() > 0 {
             // 用奇偶规则，计算 每个圆弧的 环绕数
             glyphy_outline_winding_from_even_odd(endpoints, false);
         }
-        // println!("extents: {:?}", extents);
 
         let mut min_width = f32::INFINITY;
         let mut min_height = f32::INFINITY;
@@ -215,6 +213,7 @@ impl FontFace {
         let (ab1, ab2) = extents.half(Direction::Col);
         // 二分法递归细分格子，知道格子周围的圆弧数量小于二或者小于32/1停止
         recursion_near_arcs_of_cell(
+            &near_arcs,
             &extents,
             &ab1,
             &arcs,
@@ -228,6 +227,7 @@ impl FontFace {
             &mut temp,
         );
         recursion_near_arcs_of_cell(
+            &near_arcs,
             &extents,
             &ab2,
             &arcs,
@@ -240,83 +240,89 @@ impl FontFace {
             &mut result_arcs,
             &mut temp,
         );
-        (result_arcs, min_width, min_height)
-    }
-
-    pub fn out_tex_data(
-        &mut self,
-        text: &str,
-        tex_data: &mut TexData,
-    ) -> Result<Vec<TexInfo>, EncodeError> {
-        let mut infos = Vec::with_capacity(text.len());
-        let text = text.chars();
-
-        let data_tex = &mut tex_data.data_tex;
-        let width0 = tex_data.data_tex_width;
-        let offset_x0 = &mut tex_data.data_offset_x;
-        let offset_y0 = &mut tex_data.data_offset_y;
-
-        let index_tex = &mut tex_data.index_tex;
-        let width1 = tex_data.index_tex_width;
-        let offset_x1 = &mut tex_data.index_offset_x;
-        let offset_y1 = &mut tex_data.index_offset_y;
-        let mut last_offset1 = (*offset_x1, *offset_x1);
-
-        let sdf_tex = &mut tex_data.sdf_tex;
-        let sdf_tex1 = &mut tex_data.sdf_tex1;
-        let sdf_tex2 = &mut tex_data.sdf_tex2;
-        let sdf_tex3 = &mut tex_data.sdf_tex3;
-
-        for char in text {
-            // println!("char: {}", char);
-            let result = self.to_outline(char);
-            let (mut blod_arc, map) = Self::encode_uint_arc(self.max_box.clone(), result);
-            let size = blod_arc.encode_data_tex(&map, data_tex, width0, offset_x0, offset_y0)?;
-            // println!("data_map: {}", map.len());
-            let mut info = blod_arc.encode_index_tex(
-                index_tex, width1, offset_x1, offset_y1, map, size, sdf_tex, sdf_tex1, sdf_tex2,
-                sdf_tex3,
-            )?;
-
-            info.index_offset_x = last_offset1.0;
-            info.index_offset_y = last_offset1.1;
-            info.data_offset_x = *offset_x0;
-            info.data_offset_y = *offset_y0;
-
-            *offset_x0 += size / 8;
-            if size % 8 != 0 {
-                *offset_x0 += 1;
-            }
-            // println!("info.index_offset: {:?}", info.index_offset);
-            last_offset1 = (*offset_x1, *offset_y1);
-
-            infos.push(info);
-        }
-
-        Ok(infos)
-    }
-
-    pub fn compute_sdf(max_box: Aabb, endpoints: Vec<ArcEndpoint>) -> SdfInfo {
-        // log::error!("endpoints.len(): {}", endpoints.len());
-        // map 无序导致每次计算的数据不一样
-        let (mut blod_arc, map) = Self::encode_uint_arc(max_box, endpoints);
-        // println!("data_map: {}", map.len());
-        let data_tex = blod_arc.encode_data_tex1(&map);
-        let (tex_info, index_tex, sdf_tex1, sdf_tex2, sdf_tex3, sdf_tex4) =
-            blod_arc.encode_index_tex1(map, data_tex.len() / 4);
-        let grid_size = blod_arc.grid_size();
-
-        SdfInfo {
-            tex_info,
-            data_tex,
-            index_tex,
-            sdf_tex1,
-            sdf_tex2,
-            sdf_tex3,
-            sdf_tex4,
-            grid_size: vec![grid_size.0, grid_size.1],
+        CellInfo {
+            extents,
+            arcs: near_arcs,
+            info: result_arcs,
+            min_width,
+            min_height,
         }
     }
+
+    // pub fn out_tex_data(
+    //     &mut self,
+    //     text: &str,
+    //     tex_data: &mut TexData,
+    // ) -> Result<Vec<TexInfo>, EncodeError> {
+    //     let mut infos = Vec::with_capacity(text.len());
+    //     let text = text.chars();
+
+    //     let data_tex = &mut tex_data.data_tex;
+    //     let width0 = tex_data.data_tex_width;
+    //     let offset_x0 = &mut tex_data.data_offset_x;
+    //     let offset_y0 = &mut tex_data.data_offset_y;
+
+    //     let index_tex = &mut tex_data.index_tex;
+    //     let width1 = tex_data.index_tex_width;
+    //     let offset_x1 = &mut tex_data.index_offset_x;
+    //     let offset_y1 = &mut tex_data.index_offset_y;
+    //     let mut last_offset1 = (*offset_x1, *offset_x1);
+
+    //     let sdf_tex = &mut tex_data.sdf_tex;
+    //     let sdf_tex1 = &mut tex_data.sdf_tex1;
+    //     let sdf_tex2 = &mut tex_data.sdf_tex2;
+    //     let sdf_tex3 = &mut tex_data.sdf_tex3;
+
+    //     for char in text {
+    //         // println!("char: {}", char);
+    //         let result = self.to_outline(char);
+    //         let (mut blod_arc, map) = Self::encode_uint_arc(self.max_box.clone(), result);
+    //         let size = blod_arc.encode_data_tex(&map, data_tex, width0, offset_x0, offset_y0)?;
+    //         // println!("data_map: {}", map.len());
+    //         let mut info = blod_arc.encode_index_tex(
+    //             index_tex, width1, offset_x1, offset_y1, map, size, sdf_tex, sdf_tex1, sdf_tex2,
+    //             sdf_tex3,
+    //         )?;
+
+    //         info.index_offset_x = last_offset1.0;
+    //         info.index_offset_y = last_offset1.1;
+    //         info.data_offset_x = *offset_x0;
+    //         info.data_offset_y = *offset_y0;
+
+    //         *offset_x0 += size / 8;
+    //         if size % 8 != 0 {
+    //             *offset_x0 += 1;
+    //         }
+    //         // println!("info.index_offset: {:?}", info.index_offset);
+    //         last_offset1 = (*offset_x1, *offset_y1);
+
+    //         infos.push(info);
+    //     }
+
+    //     Ok(infos)
+    // }
+
+    // pub fn compute_sdf(max_box: Aabb, endpoints: Vec<ArcEndpoint>) -> SdfInfo {
+    //     // log::error!("endpoints.len(): {}", endpoints.len());
+    //     // map 无序导致每次计算的数据不一样
+    //     let (mut blod_arc, map) = Self::encode_uint_arc(max_box, endpoints);
+    //     // println!("data_map: {}", map.len());
+    //     let data_tex = blod_arc.encode_data_tex1(&map);
+    //     let (tex_info, index_tex, sdf_tex1, sdf_tex2, sdf_tex3, sdf_tex4) =
+    //         blod_arc.encode_index_tex1(map, data_tex.len() / 4);
+    //     let grid_size = blod_arc.grid_size();
+
+    //     SdfInfo {
+    //         tex_info,
+    //         data_tex,
+    //         index_tex,
+    //         sdf_tex1,
+    //         sdf_tex2,
+    //         sdf_tex3,
+    //         sdf_tex4,
+    //         grid_size: vec![grid_size.0, grid_size.1],
+    //     }
+    // }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -332,7 +338,7 @@ pub struct SdfInfo {
     pub grid_size: Vec<f32>,
 }
 
-// #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SdfInfo2 {
     pub tex_info: TexInfo2,
@@ -429,25 +435,25 @@ impl FontFace {
         Self::new_inner(data)
     }
 
-    pub fn compute_text_sdf(&mut self, text: &str) -> Vec<SdfInfo> {
-        let mut info = Vec::with_capacity(text.len());
-        for char in text.chars() {
-            let result = self.to_outline(char);
-            let mut v = Self::compute_sdf(self.max_box.clone(), result);
-            v.tex_info.char = char;
-            info.push(v);
-        }
-        info
-    }
+    // pub fn compute_text_sdf(&mut self, text: &str) -> Vec<SdfInfo> {
+    //     let mut info = Vec::with_capacity(text.len());
+    //     for char in text.chars() {
+    //         let result = self.to_outline(char);
+    //         let mut v = Self::compute_sdf(self.max_box.clone(), result);
+    //         v.tex_info.char = char;
+    //         info.push(v);
+    //     }
+    //     info
+    // }
 
-    pub fn compute_sdf2(max_box: Vec<f32>, endpoints: Vec<u8>) -> Vec<u8> {
-        let max_box = Aabb::new(
-            Point::new(max_box[0], max_box[1]),
-            Point::new(max_box[2], max_box[3]),
-        );
-        let endpoints: Vec<ArcEndpoint> = bincode::deserialize(&endpoints).unwrap();
-        bincode::serialize(&Self::compute_sdf(max_box, endpoints)).unwrap()
-    }
+    // pub fn compute_sdf2(max_box: Vec<f32>, endpoints: Vec<u8>) -> Vec<u8> {
+    //     let max_box = Aabb::new(
+    //         Point::new(max_box[0], max_box[1]),
+    //         Point::new(max_box[2], max_box[3]),
+    //     );
+    //     let endpoints: Vec<ArcEndpoint> = bincode::deserialize(&endpoints).unwrap();
+    //     bincode::serialize(&Self::compute_sdf(max_box, endpoints)).unwrap()
+    // }
 
     /// 水平宽度
     pub fn horizontal_advance(&mut self, char: char) -> f32 {
@@ -514,7 +520,7 @@ impl FontFace {
 
     pub fn to_outline2(&mut self, ch: char) -> Vec<u8> {
         let OutlineInfo { endpoints, .. } = self.to_outline3(ch);
-        bincode::serialize(&endpoints).unwrap()
+        bitcode::serialize(&endpoints).unwrap()
     }
 
     pub fn glyph_index(&mut self, ch: char) -> u16 {
@@ -563,24 +569,33 @@ impl FontFace {
     ) -> SdfInfo2 {
         let OutlineInfo {
             char,
-            mut endpoints,
+            endpoints,
             bbox,
             advance,
             units_per_em,
         } = outline_info;
         println!("bbox: {:?}", bbox);
-        let (result_arcs, _, _, ) = Self::compute_near_arcs(bbox, 2.0, &mut endpoints);
-
+        let CellInfo { arcs, info, .. } = Self::compute_near_arcs(bbox, 2.0, &endpoints);
+        println!("cell tex_size: {:?}, sdf pxrange: {:?}: is_outer_glow: {:?}", tex_size, pxrange, is_outer_glow);
         let mut extents = bbox;
         let (plane_bounds, atlas_bounds, distance, tex_size) =
             compute_layout(&mut extents, tex_size, pxrange, units_per_em, 4);
-        // println!("cell aabb: {:?}, sdf aabb: {:?}", extents1, extents);
+        println!("cell tex_size: {:?}, sdf aabb: {:?}", tex_size, (extents, distance));
         let time = std::time::Instant::now();
         // let pixmap =
         //     crate::utils::encode_sdf(result_arcs, &extents, tex_size, tex_size,distance, None, is_outer_glow, false);
 
-            let pixmap =
-            crate::utils::encode_sdf2(result_arcs, &extents, tex_size,distance, None, is_outer_glow, false, None);
+        let pixmap = crate::utils::encode_sdf2(
+            &arcs,
+            info,
+            &extents,
+            tex_size,
+            distance,
+            None,
+            is_outer_glow,
+            false,
+            None,
+        );
 
         SdfInfo2 {
             tex_info: TexInfo2 {

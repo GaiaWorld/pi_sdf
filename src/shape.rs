@@ -27,7 +27,7 @@ use crate::{
         geometry::{arc::ArcEndpoint, point::PointExt},
         util::float_equals,
     },
-    svg::encode_uint_arc_impl,
+    // svg::encode_uint_arc_impl,
     utils::GlyphVisitor,
     Point,
 };
@@ -291,7 +291,7 @@ impl Segment {
         ]
     }
 
-    pub fn get_stroke_dasharray_arc_endpoints(&self, step: [f32; 2]) -> Vec<ArcEndpoint> {
+    fn get_stroke_dasharray_arc_endpoints(&self, step: [f32; 2]) -> Vec<ArcEndpoint> {
         let length = self.segment.length();
         let part = step[0] + step[1];
         let num = length / part;
@@ -683,7 +683,6 @@ impl Polyline {
             arc_endpoints: self.get_arc_endpoints(),
             is_area: self.is_area(),
             is_reverse: None,
-            
         }
     }
 
@@ -803,7 +802,7 @@ impl Path {
         false
     }
 
-    pub fn get_arc_endpoints(&self) -> (Vec<ArcEndpoint>, Aabb, usize) {
+    fn get_arc_endpoints(&self) -> (Vec<ArcEndpoint>, Aabb, usize) {
         let mut sink = GlyphVisitor::new(1.0);
         // 圆弧拟合贝塞尔曲线的精度，值越小越精确
         sink.accumulate.tolerance = 0.01;
@@ -824,7 +823,10 @@ impl Path {
         //     );
         // }
         let GlyphVisitor {
-            accumulate, bbox,arcs, ..
+            accumulate,
+            bbox,
+            arcs,
+            ..
         } = sink;
         (accumulate.result, bbox, arcs)
     }
@@ -864,7 +866,11 @@ impl Path {
             binding_box,
             arc_endpoints,
             is_area: self.is_area(),
-            is_reverse: if arcs ==1 {Some(!self.is_reverse)}  else{None}
+            is_reverse: if arcs == 1 {
+                Some(!self.is_reverse)
+            } else {
+                None
+            },
         }
     }
 
@@ -884,7 +890,7 @@ pub struct SvgInfo {
     binding_box: Aabb,
     arc_endpoints: Vec<ArcEndpoint>,
     is_area: bool,
-    is_reverse: Option<bool>
+    is_reverse: Option<bool>,
 }
 
 // #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
@@ -908,7 +914,7 @@ impl SvgInfo {
             binding_box,
             arc_endpoints,
             is_area: true,
-            is_reverse: None
+            is_reverse: None,
         }
     }
 
@@ -930,47 +936,47 @@ impl SvgInfo {
     }
 }
 
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
-pub fn computer_svg_sdf2(info: SvgInfo) -> Vec<u8> {
-    bincode::serialize(&computer_svg_sdf(info)).unwrap()
-}
+// #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
+// pub fn computer_svg_sdf2(info: SvgInfo) -> Vec<u8> {
+//     bincode::serialize(&computer_svg_sdf(info)).unwrap()
+// }
 
-pub fn computer_svg_sdf(info: SvgInfo) -> SdfInfo {
-    let SvgInfo {
-        binding_box,
-        arc_endpoints,
-        is_area,
-        ..
-    } = info;
-    let extents = extents(binding_box);
+// pub fn computer_svg_sdf(info: SvgInfo) -> SdfInfo {
+//     let SvgInfo {
+//         binding_box,
+//         arc_endpoints,
+//         is_area,
+//         ..
+//     } = info;
+//     let extents = extents(binding_box);
 
-    let (mut blob_arc, map) = encode_uint_arc_impl(extents, arc_endpoints, is_area);
-    let data_tex = blob_arc.encode_data_tex1(&map);
-    let (mut tex_info, index_tex, sdf_tex1, sdf_tex2, sdf_tex3, sdf_tex4) =
-        blob_arc.encode_index_tex1(map, data_tex.len() / 4);
-    let grid_size = blob_arc.grid_size();
+//     let (mut blob_arc, map) = encode_uint_arc_impl(extents, arc_endpoints, is_area);
+//     let data_tex = blob_arc.encode_data_tex1(&map);
+//     let (mut tex_info, index_tex, sdf_tex1, sdf_tex2, sdf_tex3, sdf_tex4) =
+//         blob_arc.encode_index_tex1(map, data_tex.len() / 4);
+//     let grid_size = blob_arc.grid_size();
 
-    tex_info.binding_box_min_x = binding_box.mins.x;
-    tex_info.binding_box_min_y = binding_box.mins.y;
-    tex_info.binding_box_max_x = binding_box.maxs.x;
-    tex_info.binding_box_max_y = binding_box.maxs.y;
+//     tex_info.binding_box_min_x = binding_box.mins.x;
+//     tex_info.binding_box_min_y = binding_box.mins.y;
+//     tex_info.binding_box_max_x = binding_box.maxs.x;
+//     tex_info.binding_box_max_y = binding_box.maxs.y;
 
-    tex_info.extents_min_x = extents.mins.x;
-    tex_info.extents_min_y = extents.mins.y;
-    tex_info.extents_max_x = extents.maxs.x;
-    tex_info.extents_max_y = extents.maxs.y;
+//     tex_info.extents_min_x = extents.mins.x;
+//     tex_info.extents_min_y = extents.mins.y;
+//     tex_info.extents_max_x = extents.maxs.x;
+//     tex_info.extents_max_y = extents.maxs.y;
 
-    SdfInfo {
-        tex_info,
-        data_tex,
-        index_tex,
-        sdf_tex1,
-        sdf_tex2,
-        sdf_tex3,
-        sdf_tex4,
-        grid_size: vec![grid_size.0, grid_size.1],
-    }
-}
+//     SdfInfo {
+//         tex_info,
+//         data_tex,
+//         index_tex,
+//         sdf_tex1,
+//         sdf_tex2,
+//         sdf_tex3,
+//         sdf_tex4,
+//         grid_size: vec![grid_size.0, grid_size.1],
+//     }
+// }
 
 pub struct SvgScenes {
     shapes: HashMap<u64, (SvgInfo, Attribute)>,
@@ -1004,87 +1010,87 @@ impl SvgScenes {
 }
 
 impl SvgScenes {
-    pub fn out_tex_data(
-        &mut self,
-        tex_data: &mut TexData,
-    ) -> Result<(Vec<TexInfo>, Vec<Attribute>, Vec<[f32; 4]>), EncodeError> {
-        let mut infos = vec![];
-        let mut attributes = vec![];
-        let mut transform = vec![];
+    // pub fn out_tex_data(
+    //     &mut self,
+    //     tex_data: &mut TexData,
+    // ) -> Result<(Vec<TexInfo>, Vec<Attribute>, Vec<[f32; 4]>), EncodeError> {
+    //     let mut infos = vec![];
+    //     let mut attributes = vec![];
+    //     let mut transform = vec![];
 
-        let data_tex = &mut tex_data.data_tex;
-        let width0 = tex_data.data_tex_width;
-        let offset_x0 = &mut tex_data.data_offset_x;
-        let offset_y0 = &mut tex_data.data_offset_y;
+    //     let data_tex = &mut tex_data.data_tex;
+    //     let width0 = tex_data.data_tex_width;
+    //     let offset_x0 = &mut tex_data.data_offset_x;
+    //     let offset_y0 = &mut tex_data.data_offset_y;
 
-        let index_tex = &mut tex_data.index_tex;
-        let width1 = tex_data.index_tex_width;
-        let offset_x1 = &mut tex_data.index_offset_x;
-        let offset_y1 = &mut tex_data.index_offset_y;
-        let mut last_offset1 = (*offset_x1, *offset_x1);
+    //     let index_tex = &mut tex_data.index_tex;
+    //     let width1 = tex_data.index_tex_width;
+    //     let offset_x1 = &mut tex_data.index_offset_x;
+    //     let offset_y1 = &mut tex_data.index_offset_y;
+    //     let mut last_offset1 = (*offset_x1, *offset_x1);
 
-        let sdf_tex = &mut tex_data.sdf_tex;
-        let sdf_tex1 = &mut tex_data.sdf_tex1;
-        let sdf_tex2 = &mut tex_data.sdf_tex2;
-        let sdf_tex3 = &mut tex_data.sdf_tex3;
+    //     let sdf_tex = &mut tex_data.sdf_tex;
+    //     let sdf_tex1 = &mut tex_data.sdf_tex1;
+    //     let sdf_tex2 = &mut tex_data.sdf_tex2;
+    //     let sdf_tex3 = &mut tex_data.sdf_tex3;
 
-        for (
-            _,
-            (
-                SvgInfo {
-                    binding_box,
-                    arc_endpoints,
-                    is_area,
-                    ..
-                },
-                attr,
-            ),
-        ) in self.shapes.drain()
-        {
-            let binding_box = extents(binding_box);
-            // println!("binding_box: {:?}", binding_box);
-            let (mut blob_arc, map) = encode_uint_arc_impl(binding_box, arc_endpoints, is_area);
-            let size = blob_arc.encode_data_tex(&map, data_tex, width0, offset_x0, offset_y0)?;
-            // println!("data_map: {}", map.len());
-            let mut info = blob_arc.encode_index_tex(
-                index_tex, width1, offset_x1, offset_y1, map, size, sdf_tex, sdf_tex1, sdf_tex2,
-                sdf_tex3,
-            )?;
+    //     for (
+    //         _,
+    //         (
+    //             SvgInfo {
+    //                 binding_box,
+    //                 arc_endpoints,
+    //                 is_area,
+    //                 ..
+    //             },
+    //             attr,
+    //         ),
+    //     ) in self.shapes.drain()
+    //     {
+    //         let binding_box = extents(binding_box);
+    //         // println!("binding_box: {:?}", binding_box);
+    //         let (mut blob_arc, map) = encode_uint_arc_impl(binding_box, arc_endpoints, is_area);
+    //         let size = blob_arc.encode_data_tex(&map, data_tex, width0, offset_x0, offset_y0)?;
+    //         // println!("data_map: {}", map.len());
+    //         let mut info = blob_arc.encode_index_tex(
+    //             index_tex, width1, offset_x1, offset_y1, map, size, sdf_tex, sdf_tex1, sdf_tex2,
+    //             sdf_tex3,
+    //         )?;
 
-            info.index_offset_x = last_offset1.0;
-            info.index_offset_y = last_offset1.1;
-            info.data_offset_x = *offset_x0;
-            info.data_offset_y = *offset_y0;
-            // println!(
-            //     "info.index_offset: {:?}, info.data_offset: {:?}",
-            //     (info.index_offset_x, info.index_offset_y),
-            //     (info.data_offset_x, info.data_offset_y)
-            // );
-            *offset_x0 += size / 8;
-            if size % 8 != 0 {
-                *offset_x0 += 1;
-            }
+    //         info.index_offset_x = last_offset1.0;
+    //         info.index_offset_y = last_offset1.1;
+    //         info.data_offset_x = *offset_x0;
+    //         info.data_offset_y = *offset_y0;
+    //         // println!(
+    //         //     "info.index_offset: {:?}, info.data_offset: {:?}",
+    //         //     (info.index_offset_x, info.index_offset_y),
+    //         //     (info.data_offset_x, info.data_offset_y)
+    //         // );
+    //         *offset_x0 += size / 8;
+    //         if size % 8 != 0 {
+    //             *offset_x0 += 1;
+    //         }
 
-            last_offset1 = (*offset_x1, *offset_y1);
+    //         last_offset1 = (*offset_x1, *offset_y1);
 
-            infos.push(info);
-            attributes.push(attr);
-            transform.push([
-                binding_box.width(),
-                binding_box.height(),
-                binding_box.mins.x + FARWAY,
-                binding_box.mins.y + FARWAY,
-            ]);
-        }
+    //         infos.push(info);
+    //         attributes.push(attr);
+    //         transform.push([
+    //             binding_box.width(),
+    //             binding_box.height(),
+    //             binding_box.mins.x + FARWAY,
+    //             binding_box.mins.y + FARWAY,
+    //         ]);
+    //     }
 
-        Ok((infos, attributes, transform))
-    }
+    //     Ok((infos, attributes, transform))
+    // }
 
-    pub fn verties(&self) -> [f32; 16] {
-        [
-            0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0,
-        ]
-    }
+    // pub fn verties(&self) -> [f32; 16] {
+    //     [
+    //         0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0,
+    //     ]
+    // }
 }
 
 fn compute_direction(path: &Vec<Point>) -> bool {
@@ -1259,7 +1265,7 @@ pub fn extents(mut binding_box: Aabb) -> Aabb {
     binding_box
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+// #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub fn compute_arcs_sdf_tex(
     mut endpoints: Vec<ArcEndpoint>,
     bbox: Aabb,
@@ -1268,18 +1274,21 @@ pub fn compute_arcs_sdf_tex(
     width: Option<f32>,
     is_outer_glow: bool,
     cur_off: u32,
-    is_reverse: Option<bool>
+    is_reverse: Option<bool>,
 ) -> SdfInfo2 {
     // log::error!("endpoints.len(): {}", endpoints.len());
+
+    use crate::utils::CellInfo;
 
     let mut extents = bbox;
     let (plane_bounds, atlas_bounds, distance, tex_size) =
         compute_layout(&mut extents, tex_size, pxrange, 1, cur_off);
-    let (result_arcs, _, _) = crate::svg::compute_near_arcs(extents, &mut endpoints);
+    let CellInfo { arcs, info, .. } = crate::svg::compute_near_arcs(extents, &mut endpoints);
     // log::trace!("near_arcs: {}", near_arcs.len());
 
     let pixmap = crate::utils::encode_sdf(
-        result_arcs,
+        &arcs,
+        info,
         &extents,
         tex_size,
         tex_size,
@@ -1287,7 +1296,7 @@ pub fn compute_arcs_sdf_tex(
         width,
         is_outer_glow,
         true,
-        is_reverse
+        is_reverse,
     );
 
     SdfInfo2 {
@@ -1309,47 +1318,48 @@ pub fn compute_arcs_sdf_tex(
         },
     }
 }
-#[cfg(target_arch = "wasm32")]
+// // #[cfg(target_arch = "wasm32")]
+// #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
+// pub fn compute_arcs_sdf_tex2(
+//     mut endpoints: Vec<ArcEndpoint>,
+//     bbox: &[f32],
+//     tex_size: usize, // 需要计算纹理的宽高，默认正方形，像素为单位
+//     pxrange: u32,
+// ) -> Vec<u8> {
+//     // log::error!("endpoints.len(): {}", endpoints.len());
+//     let bbox = Aabb::new(Point::new(bbox[0], bbox[1]), Point::new(bbox[2], bbox[3]));
+//     let mut extents = bbox;
+//     let (plane_bounds, atlas_bounds, distance, tex_size) =
+//         compute_layout(&mut extents, tex_size, pxrange, 1);
+//     let (result_arcs, _, _, near_arcs) = crate::svg::compute_near_arcs(extents, &mut endpoints);
+//     log::trace!("near_arcs: {}", near_arcs.len());
+
+//     let pixmap =
+//         crate::utils::encode_sdf(result_arcs, &extents, tex_size, tex_size, distance, None);
+
+//     let info = GlyphInfo {
+//         char: ' ',
+//         advance: bbox.width(),
+//         plane_bounds: [
+//             plane_bounds.mins.x,
+//             plane_bounds.mins.y,
+//             plane_bounds.maxs.x,
+//             plane_bounds.maxs.y,
+//         ],
+//         atlas_bounds: [
+//             atlas_bounds.mins.x,
+//             atlas_bounds.mins.y,
+//             atlas_bounds.maxs.x,
+//             atlas_bounds.maxs.y,
+//         ],
+//         sdf_tex: pixmap,
+//         tex_size: tex_size as u32,
+//     };
+//     bincode::serialize(&info).unwrap()
+// }
+
+// #[cfg(not(target_arch = "wasm32"))]
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
-pub fn compute_arcs_sdf_tex(
-    mut endpoints: Vec<ArcEndpoint>,
-    bbox: &[f32],
-    tex_size: usize, // 需要计算纹理的宽高，默认正方形，像素为单位
-    pxrange: u32,
-) -> Vec<u8> {
-    // log::error!("endpoints.len(): {}", endpoints.len());
-    let bbox = Aabb::new(Point::new(bbox[0], bbox[1]), Point::new(bbox[2], bbox[3]));
-    let mut extents = bbox;
-    let (plane_bounds, atlas_bounds, distance, tex_size) =
-        compute_layout(&mut extents, tex_size, pxrange, 1);
-    let (result_arcs, _, _, near_arcs) = crate::svg::compute_near_arcs(extents, &mut endpoints);
-    log::trace!("near_arcs: {}", near_arcs.len());
-
-    let pixmap =
-        crate::utils::encode_sdf(result_arcs, &extents, tex_size, tex_size, distance, None);
-
-    let info = GlyphInfo {
-        char: ' ',
-        advance: bbox.width(),
-        plane_bounds: [
-            plane_bounds.mins.x,
-            plane_bounds.mins.y,
-            plane_bounds.maxs.x,
-            plane_bounds.maxs.y,
-        ],
-        atlas_bounds: [
-            atlas_bounds.mins.x,
-            atlas_bounds.mins.y,
-            atlas_bounds.maxs.x,
-            atlas_bounds.maxs.y,
-        ],
-        sdf_tex: pixmap,
-        tex_size: tex_size as u32,
-    };
-    bincode::serialize(&info).unwrap()
-}
-
-#[cfg(not(target_arch = "wasm32"))]
 pub fn compute_shape_sdf_tex(
     svginfo: SvgInfo,
     tex_size: usize, // 需要计算纹理的宽高，默认正方形，像素为单位
@@ -1371,28 +1381,28 @@ pub fn compute_shape_sdf_tex(
         if is_area { None } else { Some(1.0) },
         is_outer_glow,
         cur_off,
-        is_reverse
+        is_reverse,
     )
 }
 
-#[cfg(target_arch = "wasm32")]
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
-pub fn compute_shape_sdf_tex(
-    svginfo: SvgInfo,
-    tex_size: usize, // 需要计算纹理的宽高，默认正方形，像素为单位
-    pxrange: u32,
-) -> Vec<u8> {
-    let SvgInfo {
-        binding_box,
-        arc_endpoints,
-        ..
-    } = svginfo;
-    let binding_box = [
-        binding_box.mins.x,
-        binding_box.mins.y,
-        binding_box.maxs.x,
-        binding_box.maxs.y,
-    ];
-    let info = compute_arcs_sdf_tex(arc_endpoints, &binding_box, tex_size, pxrange);
-    bincode::serialize(&info).unwrap()
-}
+// #[cfg(target_arch = "wasm32")]
+// #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
+// pub fn compute_shape_sdf_tex2(
+//     svginfo: SvgInfo,
+//     tex_size: usize, // 需要计算纹理的宽高，默认正方形，像素为单位
+//     pxrange: u32,
+// ) -> Vec<u8> {
+//     let SvgInfo {
+//         binding_box,
+//         arc_endpoints,
+//         ..
+//     } = svginfo;
+//     let binding_box = [
+//         binding_box.mins.x,
+//         binding_box.mins.y,
+//         binding_box.maxs.x,
+//         binding_box.maxs.y,
+//     ];
+//     let info = compute_arcs_sdf_tex(arc_endpoints, &binding_box, tex_size, pxrange);
+//     bincode::serialize(&info).unwrap()
+// }

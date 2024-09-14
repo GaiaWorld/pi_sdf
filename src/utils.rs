@@ -1,3 +1,4 @@
+use core::fmt;
 use std::collections::HashMap;
 
 use ab_glyph_rasterizer::{point, Rasterizer};
@@ -7,9 +8,13 @@ use allsorts::{
 };
 
 // use image::{EncodableLayout, ImageBuffer, Rgba};
-
+use bitcode::{Encode, Decode};
 use pi_share::Share;
-use serde::{Deserialize, Serialize};
+use serde::{
+    de::{self, MapAccess, SeqAccess, Visitor},
+    ser::SerializeStruct,
+    Deserialize, Serialize,
+};
 // use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
 use usvg::{Color, Fill, NonZeroPositiveF64, Paint, Stroke};
 #[cfg(target_arch = "wasm32")]
@@ -20,7 +25,7 @@ use crate::{
     glyphy::{
         blob::TexInfo2,
         geometry::{aabb::Aabb, arcs::GlyphyArcAccumulator},
-        sdf::glyphy_sdf_from_arc_list2,
+        sdf::{glyphy_sdf_from_arc_list2, glyphy_sdf_from_arc_list3},
         util::float2_equals,
     },
     shape::{Rect, SvgScenes},
@@ -75,7 +80,7 @@ pub struct GlyphVisitor {
     pub(crate) previous: Point,
     pub index: usize,
     pub(crate) bbox: Aabb,
-    pub(crate) arcs: usize
+    pub(crate) arcs: usize,
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
@@ -100,7 +105,7 @@ impl GlyphVisitor {
                 Point::new(core::f32::MAX, core::f32::MAX),
                 Point::new(core::f32::MIN, core::f32::MIN),
             ),
-            arcs: 0
+            arcs: 0,
         }
     }
 }
@@ -435,7 +440,8 @@ pub fn encode_uint_arc_data(
 }
 
 pub fn encode_sdf(
-    result_arcs: Vec<(Vec<Arc>, Aabb)>,
+    global_arcs: &Vec<Arc>,
+    result_arcs: Vec<(Vec<usize>, Aabb)>,
     extents: &Aabb,
     width_cells: usize,
     height_cells: usize,
@@ -443,7 +449,7 @@ pub fn encode_sdf(
     width: Option<f32>,
     is_outer_glow: bool,
     is_svg: bool,
-    is_reverse: Option<bool>
+    is_reverse: Option<bool>,
 ) -> Vec<u8> {
     // // todo 为了兼容阴影minimip先强制索引纹理为32 * 32
     // let mut width_cells = 32 as usize;
@@ -479,8 +485,15 @@ pub fn encode_sdf(
                     (i as f32 + 0.5) * min_width + extents.mins.x,
                     (j as f32 + 0.5) * min_height + extents.mins.y,
                 );
-
-                let r = compute_sdf2(p, &near_arcs, distance, width, is_outer_glow, is_reverse);
+                let r = compute_sdf2(
+                    global_arcs,
+                    p,
+                    &near_arcs,
+                    distance,
+                    width,
+                    is_outer_glow,
+                    is_reverse,
+                );
                 // svg 不需要颠倒纹理
                 if is_svg {
                     data[j * width_cells + i] = r;
@@ -494,14 +507,15 @@ pub fn encode_sdf(
 }
 
 pub fn encode_sdf2(
-    result_arcs: Vec<(Vec<Arc>, Aabb)>,
+    global_arcs: &Vec<Arc>,
+    arcs_info: Vec<(Vec<usize>, Aabb)>,
     extents: &Aabb,
     tex_size: usize,
     distance: f32, // sdf在这个值上alpha 衰减为 0
     width: Option<f32>,
     is_outer_glow: bool,
     is_svg: bool,
-    is_reverse: Option<bool>
+    is_reverse: Option<bool>,
 ) -> Vec<u8> {
     let glyph_width = extents.width();
     // let glyph_height = extents.height();
@@ -510,7 +524,7 @@ pub fn encode_sdf2(
 
     let mut data = vec![0; tex_size * tex_size];
 
-    for (near_arcs, cell) in result_arcs {
+    for (near_arcs, cell) in arcs_info {
         if let Some(ab) = cell.collision(extents) {
             // println!("cell: {:?}, extents: {:?}, ab: {:?}", cell, extents, ab);
             let begin = ab.mins - extents.mins;
@@ -530,7 +544,15 @@ pub fn encode_sdf2(
                         (j as f32 + 0.5) * unit_d + extents.mins.y,
                     );
 
-                    let r = compute_sdf2(p, &near_arcs, distance, width, is_outer_glow, is_reverse);
+                    let r = compute_sdf2(
+                        global_arcs,
+                        p,
+                        &near_arcs,
+                        distance,
+                        width,
+                        is_outer_glow,
+                        is_reverse,
+                    );
                     // svg 不需要颠倒纹理
                     if is_svg {
                         data[j * tex_size + i] = r;
@@ -565,16 +587,18 @@ fn compute_sdf(p: Point, near_arcs: &Vec<Arc>, is_area: Option<bool>) -> u8 {
 }
 
 fn compute_sdf2(
+    global_arcs: &Vec<Arc>,
     p: Point,
-    near_arcs: &Vec<Arc>,
+    near_arcs: &Vec<usize>,
     distance: f32,
     width: Option<f32>,
     is_outer_glow: bool,
-    is_reverse: Option<bool>
+    is_reverse: Option<bool>,
 ) -> u8 {
-    let mut sdf = glyphy_sdf_from_arc_list2(near_arcs, p.clone()).0;
+    let mut sdf = glyphy_sdf_from_arc_list3(near_arcs, p.clone(), global_arcs).0;
+    
     if let Some(is_reverse) = is_reverse {
-        if is_reverse{
+        if is_reverse {
             sdf = -sdf;
         }
     }
@@ -600,7 +624,7 @@ pub fn compute_layout(
     tex_size: usize,
     pxrange: u32,
     units_per_em: u16,
-    cur_off: u32
+    cur_off: u32,
 ) -> (Aabb, Aabb, f32, usize) {
     // map 无序导致每次计算的数据不一样
     // let bbox = extents.clone();
@@ -672,38 +696,38 @@ pub fn compute_cell_range(mut bbox: Aabb, scale: f32) -> Aabb {
     bbox
 }
 
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
-pub fn get_char_arc_debug(char: String) -> BlobArc {
-    // console_error_panic_hook::set_once();
+// #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
+// pub fn get_char_arc_debug(char: String) -> BlobArc {
+//     // console_error_panic_hook::set_once();
 
-    let _ = console_log::init_with_level(log::Level::Debug);
-    // let buffer = include_bytes!("../source/msyh.ttf").to_vec();
-    let buffer: Vec<u8> = vec![];
-    // log::debug!("1111111111");
-    #[cfg(not(target_arch = "wasm32"))]
-    let mut ft_face = FontFace::new(Share::new(buffer));
-    #[cfg(target_arch = "wasm32")]
-    let mut ft_face = FontFace::new(buffer);
+//     let _ = console_log::init_with_level(log::Level::Debug);
+//     // let buffer = include_bytes!("../source/msyh.ttf").to_vec();
+//     let buffer: Vec<u8> = vec![];
+//     // log::debug!("1111111111");
+//     #[cfg(not(target_arch = "wasm32"))]
+//     let mut ft_face = FontFace::new(Share::new(buffer));
+//     #[cfg(target_arch = "wasm32")]
+//     let mut ft_face = FontFace::new(buffer);
 
-    // log::debug!("22222222char: {}", char);
-    let char = char.chars().next().unwrap();
-    // log::debug!("13333333");
-    let result = ft_face.to_outline(char);
-    let (arcs, _map) = FontFace::encode_uint_arc(ft_face.max_box.clone(), result);
-    // log::debug!("44444444444");
+//     // log::debug!("22222222char: {}", char);
+//     let char = char.chars().next().unwrap();
+//     // log::debug!("13333333");
+//     let result = ft_face.to_outline(char);
+//     let (arcs, _map) = FontFace::encode_uint_arc(ft_face.max_box.clone(), result);
+//     // log::debug!("44444444444");
 
-    let mut shapes = SvgScenes::new(Aabb::new(Point::new(0.0, 0.0), Point::new(400.0, 400.0)));
-    // 矩形
-    let mut rect = Rect::new(120.0, 70.0, 100.0, 50.0);
-    // 填充颜色 默认0. 0. 0. 0.
-    rect.attribute.set_fill_color(0, 0, 255);
-    // 描边颜色 默认 0. 0. 0.
-    rect.attribute.set_stroke_color(0, 0, 0);
-    // 描边宽度，默认0.0
-    rect.attribute.set_stroke_width(2.0);
-    shapes.add_shape(rect.get_hash(), rect.get_svg_info(), rect.get_attribute());
-    arcs
-}
+//     let mut shapes = SvgScenes::new(Aabb::new(Point::new(0.0, 0.0), Point::new(400.0, 400.0)));
+//     // 矩形
+//     let mut rect = Rect::new(120.0, 70.0, 100.0, 50.0);
+//     // 填充颜色 默认0. 0. 0. 0.
+//     rect.attribute.set_fill_color(0, 0, 255);
+//     // 描边颜色 默认 0. 0. 0.
+//     rect.attribute.set_stroke_color(0, 0, 0);
+//     // 描边宽度，默认0.0
+//     rect.attribute.set_stroke_width(2.0);
+//     shapes.add_shape(rect.get_hash(), rect.get_svg_info(), rect.get_attribute());
+//     arcs
+// }
 
 // #[cfg_attr(target_arch="wasm32", wasm_bindgen)]
 // pub fn compute_svg_debug() -> BlobArc {
@@ -893,20 +917,21 @@ pub struct OutlineInfo {
 // #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 impl OutlineInfo {
     #[cfg(not(target_arch = "wasm32"))]
-    pub fn compute_near_arcs(&mut self, scale: f32) -> Vec<(Vec<Arc>, Aabb)> {
-        FontFace::compute_near_arcs(self.bbox, scale, &mut self.endpoints).0
+    pub fn compute_near_arcs(&mut self, scale: f32) -> CellInfo {
+        FontFace::compute_near_arcs(self.bbox, scale, &mut self.endpoints)
     }
 
     #[cfg(target_arch = "wasm32")]
     #[cfg_attr(target_arch = "wasm32", wasm_bindgen(js_name = compute_near_arcs))]
     pub fn compute_near_arcs2(&mut self, scale: f32) -> Vec<u8> {
-        bincode::serialize(&FontFace::compute_near_arcs(self.bbox, scale, &mut self.endpoints).0).unwrap()
+        bincode::serialize(&FontFace::compute_near_arcs(self.bbox, scale, &mut self.endpoints).0)
+            .unwrap()
     }
 
     #[cfg(not(target_arch = "wasm32"))]
     pub fn compute_sdf_tex(
         &mut self,
-        result_arcs: Vec<(Vec<Arc>, Aabb)>,
+        result_arcs: CellInfo,
         tex_size: usize,
         pxrange: u32,
         is_outer_glow: bool,
@@ -914,15 +939,17 @@ impl OutlineInfo {
         let mut extents = self.bbox;
         let (plane_bounds, atlas_bounds, distance, tex_size) =
             compute_layout(&mut extents, tex_size, pxrange, self.units_per_em, pxrange);
+        let CellInfo { arcs, info, .. } = result_arcs;
         let pixmap = encode_sdf2(
-            result_arcs,
+            &arcs,
+            info,
             &extents,
             tex_size,
             distance,
             None,
             is_outer_glow,
             false,
-            None
+            None,
         );
 
         SdfInfo2 {
@@ -955,6 +982,161 @@ impl OutlineInfo {
         is_outer_glow: bool,
     ) -> Vec<u8> {
         let result_arcs: Vec<(Vec<Arc>, Aabb)> = bincode::deserialize(result_arcs).unwrap();
-        bincode::serialize(&self.compute_sdf_tex(result_arcs, tex_size, pxrange, is_outer_glow)).unwrap()
+        bincode::serialize(&self.compute_sdf_tex(result_arcs, tex_size, pxrange, is_outer_glow))
+            .unwrap()
+    }
+}
+
+pub fn arc_to_point(arcs: Vec<Arc>) -> Vec<ArcEndpoint> {
+    let mut arc_endpoints = Vec::with_capacity(arcs.len());
+    let mut _p1 = Point::new(0.0, 0.0);
+
+    for i in 0..arcs.len() {
+        let arc = &arcs[i];
+
+        if i == 0 || !_p1.equals(&arc.p0) {
+            let endpoint = ArcEndpoint::new(arc.p0.x, arc.p0.y, GLYPHY_INFINITY);
+            arc_endpoints.push(endpoint);
+            _p1 = arc.p0;
+        }
+
+        let endpoint = ArcEndpoint::new(arc.p1.x, arc.p1.y, arc.d);
+        arc_endpoints.push(endpoint);
+        _p1 = arc.p1;
+    }
+    arc_endpoints
+}
+
+pub fn point_to_arc(endpoints: Vec<ArcEndpoint>) -> Vec<Arc> {
+    let mut p0 = Point::new(0., 0.);
+    let mut arcs = Vec::with_capacity(endpoints.len());
+    for endpoint in endpoints {
+        // let endpoint = &result[i];
+        if endpoint.d == GLYPHY_INFINITY {
+            p0 = Point::new(endpoint.p[0], endpoint.p[1]);
+            continue;
+        }
+        let arc = Arc::new(p0, Point::new(endpoint.p[0], endpoint.p[1]), endpoint.d);
+        p0 = Point::new(endpoint.p[0], endpoint.p[1]);
+
+        arcs.push(arc);
+    }
+    arcs
+}
+
+#[derive(Debug)]
+pub struct CellInfo {
+    pub(crate) extents: Aabb,
+    pub arcs: Vec<Arc>,
+    pub info: Vec<(Vec<usize>, Aabb)>,
+    pub(crate) min_width: f32,
+    pub(crate) min_height: f32,
+}
+
+impl Serialize for CellInfo {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let unit_size = self.extents.width() / 32.0;
+        let start_point = self.extents.mins;
+
+        let mut s = serializer.serialize_struct("CellInfo", 6)?;
+        s.serialize_field("mins_x", &self.extents.mins.x)?;
+        s.serialize_field("mins_y", &self.extents.mins.y)?;
+        s.serialize_field("maxs_x", &self.extents.maxs.x)?;
+        s.serialize_field("maxs_y", &self.extents.maxs.y)?;
+        s.serialize_field("arcs", &self.arcs)?;
+
+        let mut info = Vec::with_capacity(self.info.len());
+        for (arcs, ab) in &self.info {
+            let offset = (ab.mins - start_point) / unit_size;
+            let w = ab.width() / unit_size;
+            let h = ab.height() / unit_size;
+            let mut temp = Vec::with_capacity(arcs.len());
+            for arc in arcs {
+                temp.push(*arc as u8);
+            }
+
+            info.push((
+                temp,
+                offset.x.round() as u8,
+                offset.y.round() as u8,
+                w.round() as u8,
+                h.round() as u8,
+            ));
+        }
+        // println!("CellInfo: {}", info.len() )
+        s.serialize_field("info", &info)?;
+        s.end()
+    }
+}
+
+impl<'de> Deserialize<'de> for CellInfo {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct CellInfoVisitor;
+
+        impl<'de> Visitor<'de> for CellInfoVisitor {
+            type Value = CellInfo;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("struct CellInfo")
+            }
+
+            fn visit_seq<V>(self, mut seq: V) -> Result<CellInfo, V::Error>
+            where
+                V: SeqAccess<'de>,
+            {
+                let mins_x = seq
+                    .next_element()?
+                    .ok_or_else(|| de::Error::invalid_length(0, &self))?;
+                let mins_y = seq
+                    .next_element()?
+                    .ok_or_else(|| de::Error::invalid_length(1, &self))?;
+                let maxs_x = seq
+                    .next_element()?
+                    .ok_or_else(|| de::Error::invalid_length(2, &self))?;
+                let maxs_y1 = seq
+                    .next_element()?
+                    .ok_or_else(|| de::Error::invalid_length(3, &self))?;
+                let arcs = seq
+                    .next_element()?
+                    .ok_or_else(|| de::Error::invalid_length(4, &self))?;
+                let src_info: Vec<(Vec<u8>, u8, u8, u8, u8)> = seq
+                    .next_element()?
+                    .ok_or_else(|| de::Error::invalid_length(5, &self))?;
+
+                let extents = Aabb::new(Point::new(mins_x, mins_y), Point::new(maxs_x, maxs_y1));
+                let unit_size = extents.width() / 32.0;
+
+                let mut info = Vec::with_capacity(src_info.len());
+                for (indexs, offset_x, offset_y, w, h) in src_info {
+                    let min = Point::new(
+                        extents.mins.x + unit_size * offset_x as f32,
+                        extents.mins.y + unit_size * offset_y as f32,
+                    );
+                    let max =
+                        Point::new(min.x + unit_size * w as f32, min.y + unit_size * h as f32);
+                    let mut arc_index = Vec::with_capacity(indexs.len());
+                    for i in indexs {
+                        arc_index.push(i as usize);
+                    }
+                    info.push((arc_index, Aabb::new(min, max)));
+                }
+                Ok(CellInfo {
+                    extents,
+                    arcs,
+                    info,
+                    min_width: 0.0,
+                    min_height: 0.0,
+                })
+            }
+        }
+
+        const FIELDS: &'static [&'static str] = &["arcs", "mins_x", "mins_y", "maxs_x", "maxs_y", "info"];
+        deserializer.deserialize_struct("Point", FIELDS, CellInfoVisitor)
     }
 }

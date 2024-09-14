@@ -146,59 +146,6 @@ impl<'de> Deserialize<'de> for Arc {
                 formatter.write_str("struct Arc")
             }
 
-            // fn visit_map<V>(self, mut map: V) -> Result<Arc, V::Error>
-            // where
-            //     V: MapAccess<'de>,
-            // {
-            //     let mut p0x = None;
-            //     let mut p0y = None;
-            //     let mut p1x = None;
-            //     let mut p1y = None;
-            //     let mut d = None;
-            //     while let Some(key) = map.next_key()? {
-            //         match key {
-            //             Field::P0X => {
-            //                 if p0x.is_some() {
-            //                     return Err(de::Error::duplicate_field("min_x"));
-            //                 }
-            //                 p0x = Some(map.next_value()?);
-            //             }
-            //             Field::P0Y => {
-            //                 if p0y.is_some() {
-            //                     return Err(de::Error::duplicate_field("min_y"));
-            //                 }
-            //                 p0y = Some(map.next_value()?);
-            //             }
-
-            //             Field::P1X => {
-            //                 if p1x.is_some() {
-            //                     return Err(de::Error::duplicate_field("max_x"));
-            //                 }
-            //                 p1x = Some(map.next_value()?);
-            //             }
-
-            //             Field::P1Y => {
-            //                 if p1y.is_some() {
-            //                     return Err(de::Error::duplicate_field("max_y"));
-            //                 }
-            //                 p1y = Some(map.next_value()?);
-            //             }
-            //             Field::D => {
-            //                 if d.is_some() {
-            //                     return Err(de::Error::duplicate_field("max_y"));
-            //                 }
-            //                 d = Some(map.next_value()?);
-            //             }
-            //         }
-            //     }
-            //     let p0x = p0x.ok_or_else(|| de::Error::missing_field("p0x"))?;
-            //     let p0y = p0y.ok_or_else(|| de::Error::missing_field("p0y"))?;
-            //     let p1x = p1x.ok_or_else(|| de::Error::missing_field("p1x"))?;
-            //     let p1y = p1y.ok_or_else(|| de::Error::missing_field("p1y"))?;
-            //     let d = d.ok_or_else(|| de::Error::missing_field("d"))?;
-            //     Ok(Arc::new(Point::new(p0x, p0y), Point::new(p1x, p1y), d))
-            // }
-
             fn visit_seq<V>(self, mut seq: V) -> Result<Arc, V::Error>
             where
                 V: SeqAccess<'de>,
