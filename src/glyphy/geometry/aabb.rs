@@ -1,8 +1,8 @@
 use derive_deref_rs::Deref;
 use parry2d::{bounding_volume::Aabb as AabbInner, shape::Segment};
 use serde::{
-    de::{self, Error, MapAccess, SeqAccess, Visitor},
-    ser::{SerializeStruct, SerializeTuple},
+    de::{self, MapAccess, SeqAccess, Visitor},
+    ser::SerializeStruct,
     Deserialize, Serialize,
 };
 use std::{fmt, ops::Range};
@@ -31,10 +31,10 @@ impl Serialize for Aabb {
         S: serde::Serializer,
     {
         let mut s = serializer.serialize_struct("Aabb", 4)?;
-        s.serialize_field("mins_x", &self.mins.x)?;
-        s.serialize_field("mins_y", &self.mins.y)?;
-        s.serialize_field("maxs_x", &self.maxs.x)?;
-        s.serialize_field("maxs_y", &self.maxs.y)?;
+        s.serialize_field("MinX", &self.mins.x)?;
+        s.serialize_field("MinY", &self.mins.y)?;
+        s.serialize_field("MaxX", &self.maxs.x)?;
+        s.serialize_field("MaxY", &self.maxs.y)?;
         s.end()
     }
 }
@@ -46,10 +46,10 @@ impl<'de> Deserialize<'de> for Aabb {
     {
         #[derive(Deserialize)]
         enum Field {
-            min_x,
-            min_y,
-            max_x,
-            max_y,
+            MinX,
+            MinY,
+            MaxX,
+            MaxY,
         }
 
         struct AabbVisitor;
@@ -71,27 +71,27 @@ impl<'de> Deserialize<'de> for Aabb {
                 let mut max_y = None;
                 while let Some(key) = map.next_key()? {
                     match key {
-                        Field::min_x => {
+                        Field::MinX => {
                             if min_x.is_some() {
                                 return Err(de::Error::duplicate_field("min_x"));
                             }
                             min_x = Some(map.next_value()?);
                         }
-                        Field::min_y => {
+                        Field::MinY => {
                             if min_y.is_some() {
                                 return Err(de::Error::duplicate_field("min_y"));
                             }
                             min_y = Some(map.next_value()?);
                         }
 
-                        Field::max_x => {
+                        Field::MaxX => {
                             if max_x.is_some() {
                                 return Err(de::Error::duplicate_field("max_x"));
                             }
                             max_x = Some(map.next_value()?);
                         }
 
-                        Field::max_y => {
+                        Field::MaxY => {
                             if max_y.is_some() {
                                 return Err(de::Error::duplicate_field("max_y"));
                             }
@@ -133,7 +133,7 @@ impl<'de> Deserialize<'de> for Aabb {
             }
         }
 
-        const FIELDS: &'static [&'static str] = &["min_x", "min_y", "max_x", "max_y"];
+        const FIELDS: &'static [&'static str] = &["MinX", "MinY", "MaxX", "MaxY"];
         deserializer.deserialize_struct("Point", FIELDS, AabbVisitor)
     }
     //     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>

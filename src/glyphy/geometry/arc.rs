@@ -1,6 +1,6 @@
 // use image::EncodableLayout;
 use parry2d::{math::Vector, shape::Segment};
-use serde::de::{self, MapAccess, SeqAccess, Visitor};
+use serde::de::{self, SeqAccess, Visitor};
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Serialize};
 use std::fmt;

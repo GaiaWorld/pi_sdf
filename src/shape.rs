@@ -5,7 +5,7 @@ use allsorts::{
 };
 // use erased_serde::serialize_trait_object;
 // use image::EncodableLayout;
-use kurbo::{BezPath, Shape, SvgArc};
+use kurbo::Shape;
 use lyon_geom::{point, vector, Angle, ArcFlags};
 // use lyon_geom::{point, vector, Angle, ArcFlags,};
 use parry2d::{
@@ -17,13 +17,11 @@ use serde::{Deserialize, Serialize};
 use crate::font::SdfInfo2;
 use crate::glyphy::blob::TexInfo2;
 use crate::{
-    font::SdfInfo,
     glyphy::geometry::aabb::Aabb,
     utils::{compute_layout, Attribute},
 };
 use crate::{
     glyphy::{
-        blob::{EncodeError, TexData, TexInfo},
         geometry::{arc::ArcEndpoint, point::PointExt},
         util::float_equals,
     },
@@ -291,7 +289,7 @@ impl Segment {
         ]
     }
 
-    fn get_stroke_dasharray_arc_endpoints(&self, step: [f32; 2]) -> Vec<ArcEndpoint> {
+    fn _get_stroke_dasharray_arc_endpoints(&self, step: [f32; 2]) -> Vec<ArcEndpoint> {
         let length = self.segment.length();
         let part = step[0] + step[1];
         let num = length / part;
@@ -709,13 +707,13 @@ pub struct Path {
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 impl Path {
     pub fn new(verbs: Vec<u8>, points: Vec<f32>) -> Self {
-        let mut verbs: Vec<PathVerb> = unsafe { transmute(verbs) };
+        let verbs: Vec<PathVerb> = unsafe { transmute(verbs) };
 
-        let mut points = points
+        let points = points
             .chunks(2)
             .map(|v| Point::new(v[0], v[1]))
             .collect::<Vec<Point>>();
-        let mut is_reverse = false;
+        let is_reverse = false;
         // if points.len() > 2 && !compute_direction(&points) {
         //     points.reverse();
         //     verbs.reverse();
@@ -746,11 +744,11 @@ impl Path {
     pub fn new1(verbs: Vec<PathVerb>, points: Vec<f32>) -> Self {
         // let mut verbs: Vec<PathVerb> = unsafe { transmute(verbs) };
 
-        let mut points = points
+        let points = points
             .chunks(2)
             .map(|v| Point::new(v[0], v[1]))
             .collect::<Vec<Point>>();
-        let mut is_reverse = false;
+        let is_reverse = false;
         // if verbs.
         // if points.len() > 2 && !compute_direction(&points) {
         //     points.reverse();
@@ -807,7 +805,7 @@ impl Path {
         // 圆弧拟合贝塞尔曲线的精度，值越小越精确
         sink.accumulate.tolerance = 0.01;
 
-        let is_close = self.is_close();
+        // let is_close = self.is_close();
         compute_outline(
             self.points.iter(),
             self.verbs.iter(),
@@ -844,7 +842,7 @@ impl Path {
         hasher.finish()
     }
 
-    fn binding_box(&self) -> Aabb {
+    fn _binding_box(&self) -> Aabb {
         let mut min_x = f32::INFINITY;
         let mut max_x = f32::NEG_INFINITY;
         let mut min_y = f32::INFINITY;
@@ -893,25 +891,26 @@ pub struct SvgInfo {
     is_reverse: Option<bool>,
 }
 
-// #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
-impl SvgInfo {
-    #[cfg(target_arch = "wasm32")]
-    pub fn new(binding_box: &[f32], arc_endpoints: &Vec<u8>) -> SvgInfo {
-        let arc_endpoints: Vec<ArcEndpoint> = bincode::deserialize(arc_endpoints).unwrap();
-        SvgInfo {
-            binding_box: Aabb {
-                mins: Point::new(binding_box[0], binding_box[1]),
-                maxs: Point::new(binding_box[2], binding_box[3]),
-            },
-            arc_endpoints,
-            is_area: true,
-        }
-    }
-
-    #[cfg(not(target_arch = "wasm32"))]
+impl SvgInfo{
     pub fn new(binding_box: Aabb, arc_endpoints: Vec<ArcEndpoint>) -> SvgInfo {
         SvgInfo {
             binding_box,
+            arc_endpoints,
+            is_area: true,
+            is_reverse: None,
+        }
+    }
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
+impl SvgInfo {
+    pub fn new_wasm(binding_box: &[f32], arc_endpoints: &[u8]) -> SvgInfo {
+        let arc_endpoints: Vec<ArcEndpoint> = bitcode::deserialize(arc_endpoints).unwrap();
+        SvgInfo {
+            binding_box: Aabb::new(
+                Point::new(binding_box[0], binding_box[1]),
+                Point::new(binding_box[2], binding_box[3]),
+            ),
             arc_endpoints,
             is_area: true,
             is_reverse: None,
@@ -1128,16 +1127,14 @@ fn compute_outline<'a>(
     mut points: impl Iterator<Item = &'a Point>,
     verbs: impl Iterator<Item = &'a PathVerb>,
     sink: &mut impl OutlineSink,
-    is_reverse: bool,
+    _is_reverse: bool,
 ) {
     // println!("p: {:?}", points);
     let mut prev_to = Vector2F::default();
-    let mut move_to = 0;
     for path_verb in verbs {
         match path_verb {
             PathVerb::MoveTo => {
                 let to = points.next().unwrap().into_vec2f();
-                move_to += 1;
                 sink.move_to(to);
                 prev_to = to;
             }
@@ -1276,15 +1273,12 @@ pub fn compute_arcs_sdf_tex(
     cur_off: u32,
     is_reverse: Option<bool>,
 ) -> SdfInfo2 {
-    // log::error!("endpoints.len(): {}", endpoints.len());
-
     use crate::utils::CellInfo;
 
     let mut extents = bbox;
     let (plane_bounds, atlas_bounds, distance, tex_size) =
         compute_layout(&mut extents, tex_size, pxrange, 1, cur_off);
     let CellInfo { arcs, info, .. } = crate::svg::compute_near_arcs(extents, &mut endpoints);
-    // log::trace!("near_arcs: {}", near_arcs.len());
 
     let pixmap = crate::utils::encode_sdf(
         &arcs,
@@ -1318,47 +1312,7 @@ pub fn compute_arcs_sdf_tex(
         },
     }
 }
-// // #[cfg(target_arch = "wasm32")]
-// #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
-// pub fn compute_arcs_sdf_tex2(
-//     mut endpoints: Vec<ArcEndpoint>,
-//     bbox: &[f32],
-//     tex_size: usize, // 需要计算纹理的宽高，默认正方形，像素为单位
-//     pxrange: u32,
-// ) -> Vec<u8> {
-//     // log::error!("endpoints.len(): {}", endpoints.len());
-//     let bbox = Aabb::new(Point::new(bbox[0], bbox[1]), Point::new(bbox[2], bbox[3]));
-//     let mut extents = bbox;
-//     let (plane_bounds, atlas_bounds, distance, tex_size) =
-//         compute_layout(&mut extents, tex_size, pxrange, 1);
-//     let (result_arcs, _, _, near_arcs) = crate::svg::compute_near_arcs(extents, &mut endpoints);
-//     log::trace!("near_arcs: {}", near_arcs.len());
 
-//     let pixmap =
-//         crate::utils::encode_sdf(result_arcs, &extents, tex_size, tex_size, distance, None);
-
-//     let info = GlyphInfo {
-//         char: ' ',
-//         advance: bbox.width(),
-//         plane_bounds: [
-//             plane_bounds.mins.x,
-//             plane_bounds.mins.y,
-//             plane_bounds.maxs.x,
-//             plane_bounds.maxs.y,
-//         ],
-//         atlas_bounds: [
-//             atlas_bounds.mins.x,
-//             atlas_bounds.mins.y,
-//             atlas_bounds.maxs.x,
-//             atlas_bounds.maxs.y,
-//         ],
-//         sdf_tex: pixmap,
-//         tex_size: tex_size as u32,
-//     };
-//     bincode::serialize(&info).unwrap()
-// }
-
-// #[cfg(not(target_arch = "wasm32"))]
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub fn compute_shape_sdf_tex(
     svginfo: SvgInfo,
@@ -1385,24 +1339,3 @@ pub fn compute_shape_sdf_tex(
     )
 }
 
-// #[cfg(target_arch = "wasm32")]
-// #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
-// pub fn compute_shape_sdf_tex2(
-//     svginfo: SvgInfo,
-//     tex_size: usize, // 需要计算纹理的宽高，默认正方形，像素为单位
-//     pxrange: u32,
-// ) -> Vec<u8> {
-//     let SvgInfo {
-//         binding_box,
-//         arc_endpoints,
-//         ..
-//     } = svginfo;
-//     let binding_box = [
-//         binding_box.mins.x,
-//         binding_box.mins.y,
-//         binding_box.maxs.x,
-//         binding_box.maxs.y,
-//     ];
-//     let info = compute_arcs_sdf_tex(arc_endpoints, &binding_box, tex_size, pxrange);
-//     bincode::serialize(&info).unwrap()
-// }

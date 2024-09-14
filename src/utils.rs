@@ -1,17 +1,13 @@
 use core::fmt;
 use std::collections::HashMap;
 
-use ab_glyph_rasterizer::{point, Rasterizer};
+use ab_glyph_rasterizer::Rasterizer;
 use allsorts::{
     outline::OutlineSink,
     pathfinder_geometry::{line_segment::LineSegment2F, vector::Vector2F},
 };
-
-// use image::{EncodableLayout, ImageBuffer, Rgba};
-use bitcode::{Encode, Decode};
-use pi_share::Share;
 use serde::{
-    de::{self, MapAccess, SeqAccess, Visitor},
+    de::{self, SeqAccess, Visitor},
     ser::SerializeStruct,
     Deserialize, Serialize,
 };
@@ -28,16 +24,15 @@ use crate::{
         sdf::{glyphy_sdf_from_arc_list2, glyphy_sdf_from_arc_list3},
         util::float2_equals,
     },
-    shape::{Rect, SvgScenes},
-    Point, Vector2,
+    Point,
 };
-use parry2d::{math::Vector, na::ComplexField};
+use parry2d::math::Vector;
 use std::hash::Hasher;
 
 use crate::{
     font::FontFace,
     glyphy::{
-        blob::{line_encode, snap, BlobArc, Extents, UnitArc},
+        blob::{line_encode, snap, Extents, UnitArc},
         geometry::{
             arc::{Arc, ArcEndpoint},
             line::Line,
@@ -66,7 +61,7 @@ pub struct User {
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub struct GlyphVisitor {
-    rasterizer: Rasterizer,
+    _rasterizer: Rasterizer,
     pub(crate) accumulate: GlyphyArcAccumulator,
     #[cfg(feature = "debug")]
     pub(crate) path_str: String,
@@ -87,9 +82,9 @@ pub struct GlyphVisitor {
 impl GlyphVisitor {
     pub fn new(scale: f32) -> Self {
         let accumulate = GlyphyArcAccumulator::new();
-        let rasterizer = ab_glyph_rasterizer::Rasterizer::new(512, 512);
+        let _rasterizer = ab_glyph_rasterizer::Rasterizer::new(512, 512);
         Self {
-            rasterizer,
+            _rasterizer,
             accumulate,
             #[cfg(feature = "debug")]
             path_str: "".to_string(),
@@ -596,7 +591,7 @@ fn compute_sdf2(
     is_reverse: Option<bool>,
 ) -> u8 {
     let mut sdf = glyphy_sdf_from_arc_list3(near_arcs, p.clone(), global_arcs).0;
-    
+
     if let Some(is_reverse) = is_reverse {
         if is_reverse {
             sdf = -sdf;
@@ -643,7 +638,7 @@ pub fn compute_layout(
     let scale = 1.0 / units_per_em as f32;
     let plane_bounds = extents.scaled(&Vector::new(scale, scale));
 
-    let pxrange = (pxrange >> 2 << 2) + 4;
+    // let pxrange = (pxrange >> 2 << 2) + 4;
     let tex_size = tex_size + cur_off as usize;
     let mut atlas_bounds = Aabb::new_invalid();
     atlas_bounds.mins.x = cur_off as f32 * 0.5;
@@ -914,21 +909,11 @@ pub struct OutlineInfo {
     pub(crate) units_per_em: u16,
 }
 
-// #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
-impl OutlineInfo {
-    #[cfg(not(target_arch = "wasm32"))]
+impl OutlineInfo{
     pub fn compute_near_arcs(&mut self, scale: f32) -> CellInfo {
         FontFace::compute_near_arcs(self.bbox, scale, &mut self.endpoints)
     }
 
-    #[cfg(target_arch = "wasm32")]
-    #[cfg_attr(target_arch = "wasm32", wasm_bindgen(js_name = compute_near_arcs))]
-    pub fn compute_near_arcs2(&mut self, scale: f32) -> Vec<u8> {
-        bincode::serialize(&FontFace::compute_near_arcs(self.bbox, scale, &mut self.endpoints).0)
-            .unwrap()
-    }
-
-    #[cfg(not(target_arch = "wasm32"))]
     pub fn compute_sdf_tex(
         &mut self,
         result_arcs: CellInfo,
@@ -971,18 +956,24 @@ impl OutlineInfo {
             tex_size,
         }
     }
+}
 
-    #[cfg(target_arch = "wasm32")]
-    #[cfg_attr(target_arch = "wasm32", wasm_bindgen(js_name = compute_sdf_tex))]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
+impl OutlineInfo {
+    pub fn compute_near_arcs2(&mut self, scale: f32) -> Vec<u8> {
+        bitcode::serialize(&FontFace::compute_near_arcs(self.bbox, scale, &mut self.endpoints))
+            .unwrap()
+    }
+
     pub fn compute_sdf_tex2(
         &mut self,
-        result_arcs: &Vec<u8>,
+        result_arcs: &[u8],
         tex_size: usize,
         pxrange: u32,
         is_outer_glow: bool,
     ) -> Vec<u8> {
-        let result_arcs: Vec<(Vec<Arc>, Aabb)> = bincode::deserialize(result_arcs).unwrap();
-        bincode::serialize(&self.compute_sdf_tex(result_arcs, tex_size, pxrange, is_outer_glow))
+        let info :CellInfo  = bitcode::deserialize(result_arcs).unwrap();
+        bitcode::serialize(&self.compute_sdf_tex(info, tex_size, pxrange, is_outer_glow))
             .unwrap()
     }
 }
@@ -1029,8 +1020,8 @@ pub struct CellInfo {
     pub(crate) extents: Aabb,
     pub arcs: Vec<Arc>,
     pub info: Vec<(Vec<usize>, Aabb)>,
-    pub(crate) min_width: f32,
-    pub(crate) min_height: f32,
+    // pub(crate) _min_width: f32,
+    // pub(crate) _min_height: f32,
 }
 
 impl Serialize for CellInfo {
@@ -1130,13 +1121,14 @@ impl<'de> Deserialize<'de> for CellInfo {
                     extents,
                     arcs,
                     info,
-                    min_width: 0.0,
-                    min_height: 0.0,
+                    // min_width: 0.0,
+                    // min_height: 0.0,
                 })
             }
         }
 
-        const FIELDS: &'static [&'static str] = &["arcs", "mins_x", "mins_y", "maxs_x", "maxs_y", "info"];
+        const FIELDS: &'static [&'static str] =
+            &["arcs", "mins_x", "mins_y", "maxs_x", "maxs_y", "info"];
         deserializer.deserialize_struct("Point", FIELDS, CellInfoVisitor)
     }
 }

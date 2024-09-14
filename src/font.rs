@@ -1,5 +1,4 @@
-use std::{char, collections::HashMap};
-
+use std::char;
 use crate::{
     glyphy::blob::TexInfo2,
     utils::{compute_cell_range, CellInfo},
@@ -19,17 +18,17 @@ use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::{
     glyphy::{
-        blob::{recursion_near_arcs_of_cell, travel_data, BlobArc, EncodeError, TexData, TexInfo},
+        blob::{recursion_near_arcs_of_cell, TexInfo},
         geometry::{
             aabb::{Aabb, Direction},
             arc::{Arc, ArcEndpoint},
             arcs::GlyphyArcAccumulator,
         },
-        outline::{self, glyphy_outline_winding_from_even_odd},
+        outline::glyphy_outline_winding_from_even_odd,
         util::GLYPHY_INFINITY,
     },
     utils::{
-        compute_layout, encode_uint_arc_data, GlyphInfo, GlyphVisitor, OutlineInfo, SCALE,
+        compute_layout, GlyphVisitor, OutlineInfo, SCALE,
         TOLERANCE,
     },
     Point,
@@ -244,8 +243,8 @@ impl FontFace {
             extents,
             arcs: near_arcs,
             info: result_arcs,
-            min_width,
-            min_height,
+            // min_width,
+            // min_height,
         }
     }
 
@@ -338,7 +337,7 @@ pub struct SdfInfo {
     pub grid_size: Vec<f32>,
 }
 
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SdfInfo2 {
     pub tex_info: TexInfo2,
@@ -574,16 +573,11 @@ impl FontFace {
             advance,
             units_per_em,
         } = outline_info;
-        println!("bbox: {:?}", bbox);
+
         let CellInfo { arcs, info, .. } = Self::compute_near_arcs(bbox, 2.0, &endpoints);
-        println!("cell tex_size: {:?}, sdf pxrange: {:?}: is_outer_glow: {:?}", tex_size, pxrange, is_outer_glow);
         let mut extents = bbox;
         let (plane_bounds, atlas_bounds, distance, tex_size) =
             compute_layout(&mut extents, tex_size, pxrange, units_per_em, 4);
-        println!("cell tex_size: {:?}, sdf aabb: {:?}", tex_size, (extents, distance));
-        let time = std::time::Instant::now();
-        // let pixmap =
-        //     crate::utils::encode_sdf(result_arcs, &extents, tex_size, tex_size,distance, None, is_outer_glow, false);
 
         let pixmap = crate::utils::encode_sdf2(
             &arcs,
@@ -617,47 +611,47 @@ impl FontFace {
         }
     }
 
-    #[cfg(target_arch = "wasm32")]
-    pub fn compute_sdf_tex(
-        outline_info: OutlineInfo,
-        tex_size: usize, // 需要计算纹理的宽高，默认正方形，像素为单位
-        pxrange: u32,
-    ) -> Vec<u8> {
-        let OutlineInfo {
-            char,
-            mut endpoints,
-            bbox,
-            advance,
-            units_per_em,
-        } = outline_info;
-        let mut extents = bbox;
+    // #[cfg(target_arch = "wasm32")]
+    // pub fn compute_sdf_tex(
+    //     outline_info: OutlineInfo,
+    //     tex_size: usize, // 需要计算纹理的宽高，默认正方形，像素为单位
+    //     pxrange: u32,
+    // ) -> Vec<u8> {
+    //     let OutlineInfo {
+    //         char,
+    //         mut endpoints,
+    //         bbox,
+    //         advance,
+    //         units_per_em,
+    //     } = outline_info;
+    //     let mut extents = bbox;
 
-        let (plane_bounds, atlas_bounds, distance, tex_size) =
-            compute_layout(&mut extents, tex_size, pxrange, units_per_em);
-        // println!("pxrange: {}, tex_size: {}", pxrange, tex_size);
-        let (result_arcs, _, _, near_arcs) = Self::compute_near_arcs(extents, &mut endpoints);
-        log::trace!("near_arcs: {}", near_arcs.len());
+    //     let (plane_bounds, atlas_bounds, distance, tex_size) =
+    //         compute_layout(&mut extents, tex_size, pxrange, units_per_em);
+    //     // println!("pxrange: {}, tex_size: {}", pxrange, tex_size);
+    //     let (result_arcs, _, _, near_arcs) = Self::compute_near_arcs(extents, &mut endpoints);
+    //     log::trace!("near_arcs: {}", near_arcs.len());
 
-        let pixmap =
-            crate::utils::encode_sdf(result_arcs, &extents, tex_size, tex_size, distance, None);
-        let info = GlyphInfo {
-            char,
-            advance: advance as f32 / units_per_em as f32,
-            plane_bounds: [
-                plane_bounds.mins.x,
-                plane_bounds.mins.y,
-                plane_bounds.maxs.x,
-                plane_bounds.maxs.y,
-            ],
-            atlas_bounds: [
-                atlas_bounds.mins.x,
-                atlas_bounds.mins.y,
-                atlas_bounds.maxs.x,
-                atlas_bounds.maxs.y,
-            ],
-            sdf_tex: pixmap,
-            tex_size: tex_size as u32,
-        };
-        bincode::serialize(&info).unwrap()
-    }
+    //     let pixmap =
+    //         crate::utils::encode_sdf(result_arcs, &extents, tex_size, tex_size, distance, None);
+    //     let info = GlyphInfo {
+    //         char,
+    //         advance: advance as f32 / units_per_em as f32,
+    //         plane_bounds: [
+    //             plane_bounds.mins.x,
+    //             plane_bounds.mins.y,
+    //             plane_bounds.maxs.x,
+    //             plane_bounds.maxs.y,
+    //         ],
+    //         atlas_bounds: [
+    //             atlas_bounds.mins.x,
+    //             atlas_bounds.mins.y,
+    //             atlas_bounds.maxs.x,
+    //             atlas_bounds.maxs.y,
+    //         ],
+    //         sdf_tex: pixmap,
+    //         tex_size: tex_size as u32,
+    //     };
+    //     bitcode::serialize(&info).unwrap()
+    // }
 }

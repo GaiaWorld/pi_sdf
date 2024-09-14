@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use allsorts::{
     outline::OutlineSink,
     pathfinder_geometry::{line_segment::LineSegment2F, vector::Vector2F},
@@ -12,14 +10,14 @@ use usvg::{
 
 use crate::{
     glyphy::{
-        blob::{recursion_near_arcs_of_cell, travel_data, BlobArc},
+        blob::recursion_near_arcs_of_cell,
         geometry::{
             aabb::Aabb,
             arc::{Arc, ArcEndpoint},
         },
         util::GLYPHY_INFINITY,
     },
-    utils::{compute_cell_range, encode_uint_arc_data, CellInfo},
+    utils::CellInfo,
     Point,
 };
 
@@ -365,8 +363,8 @@ pub fn compute_near_arcs<'a>(
         extents,
         arcs: near_arcs,
         info: result_arcs,
-        min_width,
-        min_height,
+        // min_width,
+        // min_height,
     }
 
 }

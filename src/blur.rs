@@ -49,7 +49,7 @@ fn get_shadow_alpha(pos: Point, pt_min: &Point, pt_max: &Point, sigma: f32) -> f
     return color_from_rect(d_min, d_max, sigma);
 }
 
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
+// #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub struct BlurInfo {
     pub tex: Vec<u8>,
     pub width: usize,
@@ -57,7 +57,7 @@ pub struct BlurInfo {
     pub bbox: Vec<f32>,
 }
 
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
+// #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub fn blur_box(bbox: &[f32], pxrange: f32, txe_size: usize) -> BlurInfo {
     let bbox = Aabb::new(Point::new(bbox[0], bbox[1]), Point::new(bbox[2], bbox[3]));
     let b_w = bbox.width();

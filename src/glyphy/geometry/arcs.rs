@@ -1,9 +1,7 @@
 /*
  * Approximate outlines with multiple arcs
  */
-
-
-use super::aabb::{Aabb, };
+use super::aabb::Aabb;
 use super::arc::{Arc, ArcEndpoint, ErrorValue};
 use super::bezier::Bezier;
 use super::vector::VectorEXT;
