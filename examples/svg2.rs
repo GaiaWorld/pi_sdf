@@ -71,6 +71,7 @@ fn main() {
     let info = path.get_svg_info();
 
     let sdf = compute_shape_sdf_tex(info, 32, 10, false, 3);
+    println!("sdf.sdf_tex: {}", sdf.sdf_tex[38 * 3 + 4]);
     let _ = image::save_buffer(
         "Rounded_rectangle.png",
         &sdf.sdf_tex,

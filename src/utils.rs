@@ -629,7 +629,7 @@ pub fn compute_layout(
 
     let px_distance = extents_w.max(extents_h) / tex_size as f32;
     let distance = px_distance * (pxrange >> 1) as f32;
-    let expand = px_distance * (cur_off) as f32;
+    let expand = px_distance * (cur_off as f32 + 0.4);
     // println!("distance: {}", distance);
     extents.mins.x -= expand;
     extents.mins.y -= expand;
