@@ -1,9 +1,5 @@
 use std::{collections::HashMap, ops::Range};
-
-// use freetype_sys::FT_New_Face;
-// use parry2d::na::ComplexField;
-// use hashlink::LinkedHashMap;
-use parry2d::{ math::Vector};
+use parry2d::math::Vector;
 
 use serde::{Deserialize, Serialize};
 #[cfg(target_arch = "wasm32")]

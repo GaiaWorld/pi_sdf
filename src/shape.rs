@@ -920,7 +920,7 @@ impl SvgInfo {
     pub fn compute_layout(&self, tex_size: usize, pxrange: u32, cur_off: u32) -> Vec<f32> {
         let mut extents = self.binding_box;
         let (plane_bounds, atlas_bounds, _, tex_size) =
-            compute_layout(&mut extents, tex_size, pxrange, 1, cur_off);
+            compute_layout(&mut extents, tex_size, pxrange, 1, cur_off, true);
         vec![
             plane_bounds.mins.x,
             plane_bounds.mins.y,
@@ -1277,7 +1277,7 @@ pub fn compute_arcs_sdf_tex(
 
     let mut extents = bbox;
     let (plane_bounds, atlas_bounds, distance, tex_size) =
-        compute_layout(&mut extents, tex_size, pxrange, 1, cur_off);
+        compute_layout(&mut extents, tex_size, pxrange, 1, cur_off, true);
     let CellInfo { arcs, info, .. } = crate::svg::compute_near_arcs(extents, &mut endpoints);
 
     let pixmap = crate::utils::encode_sdf(

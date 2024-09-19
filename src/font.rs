@@ -577,7 +577,7 @@ impl FontFace {
         let CellInfo { arcs, info, .. } = Self::compute_near_arcs(bbox, 2.0, &endpoints);
         let mut extents = bbox;
         let (plane_bounds, atlas_bounds, distance, tex_size) =
-            compute_layout(&mut extents, tex_size, pxrange, units_per_em, 4);
+            compute_layout(&mut extents, tex_size, pxrange, units_per_em, 4, false);
 
         let pixmap = crate::utils::encode_sdf2(
             &arcs,

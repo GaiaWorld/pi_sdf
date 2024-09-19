@@ -16,7 +16,7 @@ use pi_sdf::{
     utils::create_indices,
     Point,
 };
-use pi_wgpu as wgpu;
+use pi_wgpu::{self as wgpu, Dx12Compiler};
 use wgpu::{util::DeviceExt, BlendState, ColorTargetState};
 use winit::{
     event::{Event, WindowEvent},
@@ -31,10 +31,10 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
 
     let window_size = window.inner_size();
     let instance = wgpu::Instance::default();
-    // let instance = wgpu::Instance::new(InstanceDescriptor {
-    //     backends: Backend::Gl.into(),
-    //     dx12_shader_compiler: Dx12Compiler::default(),
-    // });
+    let instance = wgpu::Instance::new(InstanceDescriptor {
+        backends: Backend::Gl.into(),
+        dx12_shader_compiler: Dx12Compiler::default(),
+    });
 
     let surface = { instance.create_surface(window.clone()) }.unwrap();
     let adapter = instance

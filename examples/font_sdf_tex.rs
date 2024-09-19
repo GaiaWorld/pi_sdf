@@ -80,7 +80,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     println!("max_box_normaliz: {:?}", ft_face.max_box_normaliz());
     let pxrange = 10;
     let time = std::time::Instant::now();
-    let mut outline_info = ft_face.to_outline3('魔');
+    let mut outline_info = ft_face.to_outline3('l');
     // println!("bbox: {:?}", outline_info.bbox);
     let result_arcs = outline_info.compute_near_arcs(2.0);
     // for (indexs, aabb) in &result_arcs.info{
@@ -101,9 +101,10 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     let arcs: CellInfo  = bitcode::deserialize(&r).unwrap();
     
     println!("time3: {:?}", time2.elapsed());
+    let time4 = std::time::Instant::now();
     let glpyh_info = outline_info.compute_sdf_tex(arcs, 32, pxrange, false);
     // let glpyh_info = FontFace::compute_sdf_tex(outline_info.clone(),  32, pxrange, false);
-    println!("time: {:?}", time.elapsed());
+    println!("time4: {:?}", time4.elapsed());
     // println!("glpyh_info: {:?}", glpyh_info);
     let tex_size = glpyh_info.tex_size;
     let _ = image::save_buffer("image.png", &glpyh_info.sdf_tex, tex_size as u32, tex_size as u32, ColorType::L8);

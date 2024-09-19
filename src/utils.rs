@@ -620,6 +620,7 @@ pub fn compute_layout(
     pxrange: u32,
     units_per_em: u16,
     cur_off: u32,
+    is_svg: bool,
 ) -> (Aabb, Aabb, f32, usize) {
     // map 无序导致每次计算的数据不一样
     // let bbox = extents.clone();
@@ -628,7 +629,7 @@ pub fn compute_layout(
 
     let px_distance = extents_w.max(extents_h) / tex_size as f32;
     let distance = px_distance * (pxrange >> 1) as f32;
-    let expand = px_distance * (cur_off >> 1) as f32;
+    let expand = px_distance * (cur_off) as f32;
     // println!("distance: {}", distance);
     extents.mins.x -= expand;
     extents.mins.y -= expand;
@@ -639,17 +640,24 @@ pub fn compute_layout(
     let plane_bounds = extents.scaled(&Vector::new(scale, scale));
 
     // let pxrange = (pxrange >> 2 << 2) + 4;
-    let tex_size = tex_size + cur_off as usize;
+    let tex_size = tex_size + (cur_off * 2) as usize;
     let mut atlas_bounds = Aabb::new_invalid();
-    atlas_bounds.mins.x = cur_off as f32 * 0.5;
-    atlas_bounds.mins.y = cur_off as f32 * 0.5;
-    atlas_bounds.maxs.x = tex_size as f32 - cur_off as f32 * 0.5;
-    atlas_bounds.maxs.y = tex_size as f32 - cur_off as f32 * 0.5;
+    atlas_bounds.mins.x = cur_off as f32 + 0.5;
+    atlas_bounds.mins.y = cur_off as f32 + 0.5;
+    atlas_bounds.maxs.x = tex_size as f32 - cur_off as f32 + 0.5;
+    atlas_bounds.maxs.y = tex_size as f32 - cur_off as f32 + 0.5;
 
     let temp = extents_w - extents_h;
     if temp > 0.0 {
         extents.maxs.y += temp;
-        atlas_bounds.mins.y += (temp / extents.height() * tex_size as f32 - 1.0).ceil();
+        if is_svg {
+            println!("=============svg");
+            atlas_bounds.maxs.y -= (temp / extents.height() * tex_size as f32 - 1.0).ceil();
+        } else {
+            println!("=============font");
+            atlas_bounds.mins.y += (temp / extents.height() * tex_size as f32 - 1.0).ceil() ;
+        }
+
         // atlas_bounds.maxs.y -= (temp / extents.height() * tex_size as f32).round();
     } else {
         extents.maxs.x -= temp;
@@ -660,10 +668,10 @@ pub fn compute_layout(
     //     atlas_bounds.width() / 32.0 / plane_bounds.width(),
     //     atlas_bounds.height() / 32.0 / plane_bounds.width(),
     // );
-    // println!(
-    //     "plane_bounds: {:?}, atlas_bounds: {:?}, tex_size: {}",
-    //     plane_bounds, atlas_bounds, tex_size
-    // );
+    println!(
+        "plane_bounds: {:?}, atlas_bounds: {:?}, tex_size: {}",
+        plane_bounds, atlas_bounds, tex_size
+    );
     (Aabb(plane_bounds), atlas_bounds, distance, tex_size)
 }
 
@@ -909,7 +917,7 @@ pub struct OutlineInfo {
     pub(crate) units_per_em: u16,
 }
 
-impl OutlineInfo{
+impl OutlineInfo {
     pub fn compute_near_arcs(&mut self, scale: f32) -> CellInfo {
         FontFace::compute_near_arcs(self.bbox, scale, &mut self.endpoints)
     }
@@ -922,8 +930,14 @@ impl OutlineInfo{
         is_outer_glow: bool,
     ) -> SdfInfo2 {
         let mut extents = self.bbox;
-        let (plane_bounds, atlas_bounds, distance, tex_size) =
-            compute_layout(&mut extents, tex_size, pxrange, self.units_per_em, pxrange);
+        let (plane_bounds, atlas_bounds, distance, tex_size) = compute_layout(
+            &mut extents,
+            tex_size,
+            pxrange,
+            self.units_per_em,
+            pxrange >> 1,
+            false,
+        );
         let CellInfo { arcs, info, .. } = result_arcs;
         let pixmap = encode_sdf2(
             &arcs,
@@ -961,8 +975,12 @@ impl OutlineInfo{
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 impl OutlineInfo {
     pub fn compute_near_arcs2(&mut self, scale: f32) -> Vec<u8> {
-        bitcode::serialize(&FontFace::compute_near_arcs(self.bbox, scale, &mut self.endpoints))
-            .unwrap()
+        bitcode::serialize(&FontFace::compute_near_arcs(
+            self.bbox,
+            scale,
+            &mut self.endpoints,
+        ))
+        .unwrap()
     }
 
     pub fn compute_sdf_tex2(
@@ -972,9 +990,8 @@ impl OutlineInfo {
         pxrange: u32,
         is_outer_glow: bool,
     ) -> Vec<u8> {
-        let info :CellInfo  = bitcode::deserialize(result_arcs).unwrap();
-        bitcode::serialize(&self.compute_sdf_tex(info, tex_size, pxrange, is_outer_glow))
-            .unwrap()
+        let info: CellInfo = bitcode::deserialize(result_arcs).unwrap();
+        bitcode::serialize(&self.compute_sdf_tex(info, tex_size, pxrange, is_outer_glow)).unwrap()
     }
 }
 
