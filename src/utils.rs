@@ -644,17 +644,16 @@ pub fn compute_layout(
     let mut atlas_bounds = Aabb::new_invalid();
     atlas_bounds.mins.x = cur_off as f32 + 0.5;
     atlas_bounds.mins.y = cur_off as f32 + 0.5;
-    atlas_bounds.maxs.x = tex_size as f32 - cur_off as f32 + 0.5;
-    atlas_bounds.maxs.y = tex_size as f32 - cur_off as f32 + 0.5;
+    atlas_bounds.maxs.x = tex_size as f32 - cur_off as f32 - 0.5;
+    atlas_bounds.maxs.y = tex_size as f32 - cur_off as f32 - 0.5;
 
     let temp = extents_w - extents_h;
     if temp > 0.0 {
         extents.maxs.y += temp;
         if is_svg {
-            println!("=============svg");
-            atlas_bounds.maxs.y -= (temp / extents.height() * tex_size as f32 - 1.0).ceil();
+            // println!("============= is_svg: {}", (temp / extents.height() * tex_size as f32 - 1.0));
+            atlas_bounds.maxs.y -= (temp / extents.height() * tex_size as f32 - 1.0).trunc();
         } else {
-            println!("=============font");
             atlas_bounds.mins.y += (temp / extents.height() * tex_size as f32 - 1.0).ceil() ;
         }
 
