@@ -33,20 +33,12 @@ fn main() {
     let mut path = Path::new1(
         vec![
             PathVerb::MoveTo,
-            PathVerb::EllipticalArcTo,
             PathVerb::LineTo,
-            PathVerb::EllipticalArcTo,
             PathVerb::LineTo,
-            PathVerb::EllipticalArcTo,
             PathVerb::LineTo,
-            PathVerb::EllipticalArcTo,
             PathVerb::LineTo,
         ],
-        vec![
-            50.0, 40.0, 10.0, 10.0, 0.0, 0.0, 40.0, 50.0, 40.0, 140.0, 10.0, 10.0, 0.0, 0.0, 50.0,
-            150.0, 190.0, 150.0, 10.0, 10.0, 0.0, 0.0, 200.0, 140.0, 200.0, 50.0, 10.0, 10.0, 0.0,
-            0.0, 190.0, 40.0, 50.0, 40.0,
-        ],
+        vec![50.0, 50.0, 100.0, 50.0, 100.0, 100.0, 50.0, 100.0, 50.0, 50.0],
     );
 
 
@@ -71,7 +63,7 @@ fn main() {
     let info = path.get_svg_info();
 
     let sdf = compute_shape_sdf_tex(info, 32, 10, false, 3);
-    println!("sdf.sdf_tex: {}", sdf.sdf_tex[38 * 3 + 4]);
+    println!("sdf.sdf_tex: {}", sdf.sdf_tex[38 * 3 + 3]);
     let _ = image::save_buffer(
         "Rounded_rectangle.png",
         &sdf.sdf_tex,

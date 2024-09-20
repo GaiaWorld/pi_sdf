@@ -563,7 +563,10 @@ pub fn encode_sdf2(
 }
 
 fn compute_sdf(p: Point, near_arcs: &Vec<Arc>, is_area: Option<bool>) -> u8 {
+    
+    
     let sdf = glyphy_sdf_from_arc_list2(near_arcs, p).0;
+
     let a = if let Some(is_area) = is_area {
         let sdf1 = if !is_area {
             (256.0 - (sdf.abs()) * 32.0).clamp(0.0, 255.0)
@@ -591,7 +594,10 @@ fn compute_sdf2(
     is_reverse: Option<bool>,
 ) -> u8 {
     let mut sdf = glyphy_sdf_from_arc_list3(near_arcs, p.clone(), global_arcs).0;
-
+    let p2 = Point::new(50.0, 50.0) - p;
+    if p2.norm_squared() < 0.1{
+        println!("p : {:?}", (p, sdf));
+    }
     if let Some(is_reverse) = is_reverse {
         if is_reverse {
             sdf = -sdf;
@@ -629,7 +635,7 @@ pub fn compute_layout(
 
     let px_distance = extents_w.max(extents_h) / tex_size as f32;
     let distance = px_distance * (pxrange >> 1) as f32;
-    let expand = px_distance * (cur_off as f32 + 0.4);
+    let expand = px_distance * (cur_off as f32 + 0.5);
     // println!("distance: {}", distance);
     extents.mins.x -= expand;
     extents.mins.y -= expand;
@@ -640,7 +646,7 @@ pub fn compute_layout(
     let plane_bounds = extents.scaled(&Vector::new(scale, scale));
 
     // let pxrange = (pxrange >> 2 << 2) + 4;
-    let tex_size = tex_size + (cur_off * 2) as usize;
+    let tex_size = tex_size + (cur_off * 2) as usize + 1;
     let mut atlas_bounds = Aabb::new_invalid();
     atlas_bounds.mins.x = cur_off as f32 + 0.5;
     atlas_bounds.mins.y = cur_off as f32 + 0.5;
