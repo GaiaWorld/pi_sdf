@@ -594,9 +594,12 @@ fn compute_sdf2(
     is_reverse: Option<bool>,
 ) -> u8 {
     let mut sdf = glyphy_sdf_from_arc_list3(near_arcs, p.clone(), global_arcs).0;
-    let p2 = Point::new(50.0, 50.0) - p;
+    let p2 = Point::new(85.0, 82.0) - p;
     if p2.norm_squared() < 0.1{
-        println!("p : {:?}", (p, sdf));
+        println!("p : {:?}", (p, sdf, ));
+        for i in near_arcs{
+            println!("{:?}", global_arcs[*i]);
+        }
     }
     if let Some(is_reverse) = is_reverse {
         if is_reverse {
@@ -612,11 +615,11 @@ fn compute_sdf2(
         // println!("{:?}", (radius, sdf));
         sdf = ((radius - sdf) / radius).clamp(0.0, 1.0).powf(5.0);
         // println!("{:?}", (radius, sdf));
-        return (sdf * 128.0).round() as u8;
+        return (sdf * 127.0).round() as u8;
         // println!("{:?}", (radius, sdf));
     } else {
         sdf = sdf / distance;
-        return ((1.0 - sdf) * 128.0) as u8;
+        return ((1.0 - sdf) * 127.0) as u8;
     }
 }
 
@@ -917,9 +920,9 @@ pub struct GlyphInfo {
 pub struct OutlineInfo {
     pub(crate) char: char,
     pub(crate) endpoints: Vec<ArcEndpoint>,
-    pub(crate) bbox: Aabb,
-    pub(crate) advance: u16,
-    pub(crate) units_per_em: u16,
+    pub bbox: Aabb,
+    pub advance: u16,
+    pub units_per_em: u16,
 }
 
 impl OutlineInfo {
