@@ -78,7 +78,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
 
     let tex_size = (1024, 1024);
     // 需要渲染的字符串
-    let text = "魔".to_string();
+    let text = ".".to_string();
     // 纹理数据
     let mut tex_data = TexData {
         index_tex: vec![0; tex_size.0 * tex_size.1 * 2], // 索引纹理数据

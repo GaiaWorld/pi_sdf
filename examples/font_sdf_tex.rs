@@ -80,7 +80,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     println!("max_box_normaliz: {:?}", ft_face.max_box_normaliz());
     let pxrange = 10;
     let time = std::time::Instant::now();
-    let mut outline_info = ft_face.to_outline3('l');
+    let mut outline_info = ft_face.to_outline3('.');
     // println!("bbox: {:?}", outline_info.bbox);
     let result_arcs = outline_info.compute_near_arcs(2.0);
     // for (indexs, aabb) in &result_arcs.info{
@@ -102,7 +102,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     
     println!("time3: {:?}", time2.elapsed());
     let time4 = std::time::Instant::now();
-    let glpyh_info = outline_info.compute_sdf_tex(arcs, 32, pxrange, false);
+    let glpyh_info = outline_info.compute_sdf_tex(arcs, 32, 2, false);
     // let glpyh_info = FontFace::compute_sdf_tex(outline_info.clone(),  32, pxrange, false);
     println!("time4: {:?}", time4.elapsed());
     // println!("glpyh_info: {:?}", glpyh_info);
@@ -474,7 +474,7 @@ fn main() {
     // let window = winit::window::Window::new(&event_loop).unwrap();
     #[cfg(not(target_arch = "wasm32"))]
     {
-        env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("error")).init();
+        env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
         pollster::block_on(run(event_loop, window));
     }
     #[cfg(target_arch = "wasm32")]

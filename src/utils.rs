@@ -1037,7 +1037,7 @@ pub fn point_to_arc(endpoints: Vec<ArcEndpoint>) -> Vec<Arc> {
     arcs
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CellInfo {
     pub(crate) extents: Aabb,
     pub arcs: Vec<Arc>,

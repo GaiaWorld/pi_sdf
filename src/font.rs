@@ -338,7 +338,7 @@ pub struct SdfInfo {
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SdfInfo2 {
     pub tex_info: TexInfo2,
     pub sdf_tex: Vec<u8>,

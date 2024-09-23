@@ -43,26 +43,26 @@ fn main() {
 
 
     // // M 0.0 25.33333 L 0.0 6.66666 A 6.6666666 6.666666 0 0 1 6.666666 0.0 L 25.3333 0.0  A 6.6666666 6.666666 0 0 1 32.0 6.66666 L 32.0 25.3333 A 6.666666 6.666666 0 0 1 25.333333 32 L 6.6666 32 A 6.66666 6.6666 0 0 1 0 25.3333 
-    // let mut path = Path::new1(
-    //     vec![
-    //         PathVerb::MoveTo,
-    //         PathVerb::LineTo,
-    //         PathVerb::EllipticalArcTo,
-    //         PathVerb::LineTo,
-    //         PathVerb::EllipticalArcTo,
-    //         PathVerb::LineTo,
-    //         PathVerb::EllipticalArcTo,
-    //         PathVerb::LineTo,
-    //         PathVerb::EllipticalArcTo,
-    //     ],
-    //     vec![
-    //         0.0, 25.33333, 0.0, 6.66666, 6.6666666, 6.666666, 0.0, 1.0, 6.666666, 0.0, 25.3333, 0.0, 6.6666666, 6.666666, 0.0, 1.0, 32.0, 6.66666, 32.0, 25.3333, 6.666666, 6.666666, 0.0, 1.0, 25.333333, 32.0, 6.6666, 32.0, 6.66666, 6.6666, 0.0, 1.0, 0.0, 25.3333 
-    //     ],
-    // );
+    let mut path = Path::new1(
+        vec![
+            PathVerb::MoveTo,
+            PathVerb::LineTo,
+            PathVerb::EllipticalArcTo,
+            PathVerb::LineTo,
+            PathVerb::EllipticalArcTo,
+            PathVerb::LineTo,
+            PathVerb::EllipticalArcTo,
+            PathVerb::LineTo,
+            PathVerb::EllipticalArcTo,
+        ],
+        vec![
+            0.0, 25.33333, 0.0, 6.66666, 6.6666666, 6.666666, 0.0, 1.0, 6.666666, 0.0, 25.3333, 0.0, 6.6666666, 6.666666, 0.0, 1.0, 32.0, 6.66666, 32.0, 25.3333, 6.666666, 6.666666, 0.0, 1.0, 25.333333, 32.0, 6.6666, 32.0, 6.66666, 6.6666, 0.0, 1.0, 0.0, 25.3333 
+        ],
+    );
 
     let info = path.get_svg_info();
 
-    let sdf = compute_shape_sdf_tex(info, 32, 10, false, 3);
+    let sdf = compute_shape_sdf_tex(info, 32, 255, false, 3);
     println!("sdf.sdf_tex: {}", sdf.sdf_tex[38 * 3 + 3]);
     let _ = image::save_buffer(
         "Rounded_rectangle.png",

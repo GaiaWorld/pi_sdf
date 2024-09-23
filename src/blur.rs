@@ -62,21 +62,24 @@ pub fn blur_box(bbox: &[f32], pxrange: f32, txe_size: usize) -> BlurInfo {
     let bbox = Aabb::new(Point::new(bbox[0], bbox[1]), Point::new(bbox[2], bbox[3]));
     let b_w = bbox.width();
     let b_h = bbox.height();
-    let px_dsitance = b_h.max(b_w) / txe_size as f32;
+    let px_dsitance = b_h.max(b_w) / (txe_size - 1) as f32; // 两边pxrange + 0.5， 中间应该减一
 
     // let px_num = (sigma + sigma * 5.0).ceil();
-    let px_num = (pxrange * 0.5).ceil();
+    let px_num = pxrange.ceil();
+    let px_num2 = px_num + 0.5;
     let sigma = px_num / 6.0;
-    let dsitance = px_dsitance * px_num;
-    println!("{:?}", (b_w, b_h, px_dsitance, px_num, dsitance));
-    let p_w = (b_w / px_dsitance).ceil() + px_num * 2.0;
-    let p_h = (b_h / px_dsitance).ceil() + px_num * 2.0;
+    let dsitance = px_dsitance * (px_num);
+    println!("{:?}", (b_w, b_h, px_dsitance, px_num, dsitance, bbox));
+    let p_w = (b_w / px_dsitance).ceil() + px_num2 * 2.0;
+    let p_h = (b_h / px_dsitance).ceil() + px_num2 * 2.0;
     let mut pixmap = vec![0; (p_w * p_h) as usize];
     println!("{:?}", (p_w, p_h));
     let start = Point::new(bbox.mins.x - dsitance, bbox.mins.y - dsitance);
+    println!("{:?}", start);
+    let mut pos = Point::default();
     for i in 0..p_w as usize {
         for j in 0..p_h as usize {
-            let pos = Point::new(
+            pos = Point::new(
                 start.x + i as f32 * px_dsitance,
                 start.y + j as f32 * px_dsitance,
             );
@@ -84,9 +87,16 @@ pub fn blur_box(bbox: &[f32], pxrange: f32, txe_size: usize) -> BlurInfo {
             pixmap[j * p_w as usize + i as usize] = (a * 255.0) as u8;
         }
     }
+
+    let maxs = if b_h > b_w{
+        Point::new( b_w / px_dsitance + px_num2, p_h - px_num2)
+    }else{
+        Point::new( p_w - px_num2,  b_h / px_dsitance + px_num2)
+    };
+
     let atlas_bounds = Aabb::new(
-        Point::new(px_num, px_num),
-        Point::new(p_w - px_num, p_h - px_num),
+        Point::new(px_num2, px_num2),
+        maxs,
     );
     println!("atlasBounds: {:?}", atlas_bounds);
 
