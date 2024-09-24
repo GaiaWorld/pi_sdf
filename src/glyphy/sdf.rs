@@ -308,13 +308,13 @@ pub fn glyphy_sdf_from_arc_list3(arcs: &Vec<usize>, p: Point, global_arcs: &Vec<
     return (side as f32 * min_dist, last_index);
 }
 
-// #[test]
-// fn test(){
-//     let arcs = vec![
-//         Arc::new(Point::new(120.0, 180.0), Point::new(20.0, 100.0), 0.0),
-//         Arc::new(Point::new(20.0, 100.0), Point::new(120.0, 180.0), 0.0),
+#[test]
+fn test(){
+    let arcs = vec![
+        Arc::new(Point::new(87.00962, 75.5), Point::new(85.0, 83.00001), -0.13385826),
+        Arc::new(Point::new(85.0, 83.00001), Point::new(85.0, 85.0), 0.0),
         
-//     ];
-//     let sdf = glyphy_sdf_from_arc_list2(&vec![&arcs[0], &arcs[1]], Point::new(115.9375,178.4375));
-//     // println!("sdf: {}", sdf.0);
-// }
+    ];
+    let sdf = glyphy_sdf_from_arc_list3(&vec![0,1], Point::new(84.999985, 82.0), &arcs);
+    println!("sdf: {}", sdf.0);
+}

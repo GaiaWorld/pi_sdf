@@ -259,8 +259,8 @@ impl Arc {
         let start_point = self.p0;
         let end_point = self.p1;
 
-        let radius = self.radius();
-        let center = self.center();
+        let radius = self.radius;
+        let center = self.center;
 
         let start_angle = (start_point.y - center.y).atan2(start_point.x - center.x);
         let end_angle = (end_point.y - center.y).atan2(end_point.x - center.x);
@@ -296,11 +296,11 @@ impl Arc {
         }
 
         if self.wedge_contains_point(&p) {
-            let difference = (self.center() - p)
+            let difference = (self.center - p)
                 .normalize()
-                .scale((p.distance_to_point(&self.center()) - self.radius()).abs());
+                .scale((p.distance_to_point(&self.center) - self.radius).abs());
 
-            let d = xor(self.d < 0., (p - self.center()).norm() < self.radius());
+            let d = xor(self.d < 0., (p - self.center).norm() < self.radius);
             return SignedVector::from_vector(difference, d);
         }
 
@@ -308,7 +308,7 @@ impl Arc {
         let d1 = p.squared_distance_to_point(&self.p1);
 
         let other_arc = Arc::new(self.p0, self.p1, (1.0 + self.d) / (1.0 - self.d));
-        let normal = self.center() - (if d0 < d1 { self.p0 } else { self.p1 });
+        let normal = self.center - (if d0 < d1 { self.p0 } else { self.p1 });
 
         if normal.norm_squared() == 0.0 {
             return SignedVector::from_vector(Vector::new(0., 0.), true);
@@ -429,7 +429,8 @@ impl Arc {
             // 距离的绝对值 就是 |点到圆心的距离 - 半径|
             // 符号，看 difference 的 neggative
             let v = if difference.negative { -1. } else { 1. };
-            return (p.distance_to_point(&self.center()) - self.radius()).abs() * v;
+            // println!("p.distance_to_point(&self.center()): {}, self.radius(): {}", p.distance_to_point(&self.center()), self.radius());
+            return (p.distance_to_point(&self.center) - self.radius).abs() * v;
         }
 
         let d1 = p.squared_distance_to_point(&self.p0);
@@ -453,7 +454,7 @@ impl Arc {
 
         if self.wedge_contains_point(&p) && self.d.abs() > 1e-5 {
             // 在圆弧的 夹角 里面，sdf = 点到圆心的距离 - 半径
-            let answer = p.distance_to_point(&self.center()) - self.radius();
+            let answer = p.distance_to_point(&self.center) - self.radius;
             return answer * answer;
         }
 
@@ -512,8 +513,8 @@ impl Arc {
         e.add(self.p0);
         e.add(self.p1);
 
-        let c = self.center();
-        let r = self.radius();
+        let c = self.center;
+        let r = self.radius;
         let p = [
             c.add_vector(&Vector::new(-1., 0.).scale(r)),
             c.add_vector(&Vector::new(1., 0.).scale(r)),

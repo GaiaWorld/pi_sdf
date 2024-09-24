@@ -80,7 +80,8 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     println!("max_box_normaliz: {:?}", ft_face.max_box_normaliz());
     let pxrange = 10;
     let time = std::time::Instant::now();
-    let mut outline_info = ft_face.to_outline3('.');
+    let mut outline_info = ft_face.to_outline3('A');
+
     // println!("bbox: {:?}", outline_info.bbox);
     let result_arcs = outline_info.compute_near_arcs(2.0);
     // for (indexs, aabb) in &result_arcs.info{

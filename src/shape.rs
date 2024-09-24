@@ -1281,11 +1281,10 @@ pub fn compute_arcs_sdf_tex(
         compute_layout(&mut extents, tex_size, pxrange, 1, cur_off, true);
     let CellInfo { arcs, info, .. } = crate::svg::compute_near_arcs(extents, &mut endpoints);
 
-    let pixmap = crate::utils::encode_sdf(
+    let pixmap = crate::utils::encode_sdf2(
         &arcs,
         info,
         &extents,
-        tex_size,
         tex_size,
         distance,
         width,

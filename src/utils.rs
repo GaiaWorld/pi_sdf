@@ -635,6 +635,8 @@ pub fn compute_layout(
     // let bbox = extents.clone();
     let extents_w = extents.width();
     let extents_h = extents.height();
+    let scale = 1.0 / units_per_em as f32;
+    let plane_bounds = extents.scaled(&Vector::new(scale, scale));
 
     let px_distance = extents_w.max(extents_h) / tex_size as f32;
     let distance = px_distance * (pxrange >> 1) as f32;
@@ -645,8 +647,8 @@ pub fn compute_layout(
     extents.maxs.x += expand;
     extents.maxs.y += expand;
 
-    let scale = 1.0 / units_per_em as f32;
-    let plane_bounds = extents.scaled(&Vector::new(scale, scale));
+    
+   
 
     // let pxrange = (pxrange >> 2 << 2) + 4;
     let tex_size = tex_size + (cur_off * 2) as usize + 1;
