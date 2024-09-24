@@ -559,23 +559,26 @@ impl FontFace {
             if let Some(g) = r {
                 // println!("g.bounding_box:{:?}", g.bounding_box);
                 bbox2.mins.x = g.bounding_box.x_min as f32;
-                bbox2.mins.y = g.bounding_box.y_min as f32 ;
-                bbox2.maxs.x = g.bounding_box.x_max as f32 ;
-                bbox2.maxs.y = g.bounding_box.y_max as f32 ;
+                bbox2.mins.y = g.bounding_box.y_min as f32;
+                bbox2.maxs.x = g.bounding_box.x_max as f32;
+                bbox2.maxs.y = g.bounding_box.y_max as f32;
             }
         }
 
-        let GlyphVisitor { accumulate, bbox, .. } = sink;
+        let GlyphVisitor {
+            accumulate, bbox, ..
+        } = sink;
         // println!("================ bbox: {:?}",  bbox);
 
         let GlyphyArcAccumulator { result, .. } = accumulate;
-        // println!("arc size: {:?}", (result.len(), bbox2));
+        println!("arc size: {:?}", (result.len(), bbox));
         OutlineInfo {
             endpoints: result,
             bbox: bbox2,
             advance,
             units_per_em: self.units_per_em,
             char: ch,
+            extents: bbox
         }
     }
 
@@ -592,10 +595,11 @@ impl FontFace {
             bbox,
             advance,
             units_per_em,
+            extents
         } = outline_info;
 
         let CellInfo { arcs, info, .. } = Self::compute_near_arcs(bbox, 2.0, &endpoints);
-        let mut extents = bbox;
+        let mut extents = extents;
         let (plane_bounds, atlas_bounds, distance, tex_size) =
             compute_layout(&mut extents, tex_size, pxrange, units_per_em, 4, false);
 

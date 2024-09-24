@@ -72,7 +72,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         },
     });
 
-    let buffer = std::fs::read("./source/msyh.ttf").unwrap();
+    let buffer = std::fs::read("./source/SOURCEHANSANSK-MEDIUM.TTF").unwrap();
     // let buffer = std::fs::read("./source/msyh.ttf").unwrap();
     let mut ft_face = FontFace::new(Arc::new(buffer));
     
@@ -80,17 +80,18 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     println!("max_box_normaliz: {:?}", ft_face.max_box_normaliz());
     let pxrange = 10;
     let time = std::time::Instant::now();
-    let mut outline_info = ft_face.to_outline3('a');
-    let (plane_bounds, atlas_bounds, _, tex_size) = compute_layout(
-        &mut outline_info.bbox.clone(),
-        32,
-        5,
-        outline_info.units_per_em,
-        5,
-        false,
-    );
+    let mut outline_info = ft_face.to_outline3('3');
+    // let (plane_bounds, atlas_bounds, _, tex_size) = compute_layout(
+    //     &mut outline_info.extents.clone(),
+    //     outline_info.bbox.clone(),
+    //     32,
+    //     5,
+    //     outline_info.units_per_em,
+    //     5,
+    //     false,
+    // );
 
-    println!("===================plane_bounds: {:?}", plane_bounds);
+    // println!("===================plane_bounds: {:?}", plane_bounds);
     let result_arcs = outline_info.compute_near_arcs(2.0);
     // for (indexs, aabb) in &result_arcs.info{
     //     let mut str = "".to_string();
@@ -108,6 +109,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     let time2 = std::time::Instant::now();
     // let arcs: CellInfo  = bincode::deserialize(&r).unwrap();
     let arcs: CellInfo  = bitcode::deserialize(&r).unwrap();
+    println!("arcs: {:?}", arcs);
     
     println!("time3: {:?}", time2.elapsed());
     let time4 = std::time::Instant::now();

@@ -118,6 +118,30 @@ impl GlyphVisitor {
 //     }
 // }
 
+pub trait OutlineSinkExt: OutlineSink  {
+    fn arc2_to(&mut self, d: f32, to: Vector2F);
+}
+
+impl OutlineSinkExt for GlyphVisitor{
+    fn arc2_to(&mut self, d: f32, to: Vector2F) {
+        let to = Point::new(to.x(), to.y()) * self.scale;
+        log::info!("+ L {} {} ", to.x, to.y);
+        // if self.scale > 0.02 {
+        self.accumulate.arc_to(to, d);
+        #[cfg(feature = "debug")]
+        self.path_str.push_str(&format!("L {} {}", to.x, to.y));
+        self.svg_endpoints.push([to.x, to.y]);
+        // } else {
+        //     self.rasterizer.draw_line(
+        //         point(self.previous.x * self.scale, self.previous.y * self.scale),
+        //         point(to.x, to.y),
+        //     );
+        // }
+        self.bbox.extend_by(to.x, to.y);
+        self.previous = to;
+    }
+}
+
 impl OutlineSink for GlyphVisitor {
     fn move_to(&mut self, to: Vector2F) {
         self.arcs += 1;
@@ -525,11 +549,11 @@ pub fn encode_sdf2(
             let begin = ab.mins - extents.mins;
             let end = ab.maxs - extents.mins;
 
-            let begin_x = (begin.x / unit_d).round() as usize;
-            let begin_y = (begin.y / unit_d).round() as usize;
+            let begin_x = (begin.x / unit_d).trunc() as usize;
+            let begin_y = (begin.y / unit_d).trunc() as usize;
 
-            let end_x = (end.x / unit_d).round() as usize;
-            let end_y = (end.y / unit_d).round() as usize;
+            let end_x = (end.x / unit_d).ceil() as usize;
+            let end_y = (end.y / unit_d).ceil() as usize;
             // println!("{:?}", (begin_x, begin_y, end_x, end_y));
             // If the arclist is two arcs that can be combined in encoding if reordered, do that.
             for i in begin_x..end_x {
@@ -552,7 +576,7 @@ pub fn encode_sdf2(
                     if is_svg {
                         data[j * tex_size + i] = r;
                     } else {
-                        // println!("{:?}", (tex_size, j, i));
+                        // println!("{:?}", (r, j, i));
                         data[(tex_size - j - 1) * tex_size + i] = r;
                     }
                 }
@@ -594,14 +618,21 @@ fn compute_sdf2(
     is_reverse: Option<bool>,
 ) -> u8 {
     let mut sdf = glyphy_sdf_from_arc_list3(near_arcs, p.clone(), global_arcs).0;
-    let p2 = Point::new(85.0, 82.0) - p;
+    // let p2 = Point::new(85.0, 82.0) - p;
+    // if p2.norm_squared() < 0.1{
+    //     println!("p : {:?}", (p, sdf, distance));
+    //     for i in near_arcs{
+    //         println!("{:?}", global_arcs[*i]);
+    //     }
+    // }
+    let p2 = Point::new(85.0, 86.0) - p;
     if p2.norm_squared() < 0.1{
         println!("p : {:?}", (p, sdf, distance));
         for i in near_arcs{
             println!("{:?}", global_arcs[*i]);
         }
     }
-    let p2 = Point::new(85.0, 86.0) - p;
+    let p2 = Point::new(85.0, 87.0) - p;
     if p2.norm_squared() < 0.1{
         println!("p : {:?}", (p, sdf, distance));
         for i in near_arcs{
@@ -626,7 +657,9 @@ fn compute_sdf2(
         // println!("{:?}", (radius, sdf));
     } else {
         sdf = sdf / distance;
-        return ((1.0 - sdf) * 127.0).round() as u8;
+        let a = ((1.0 - sdf) * 127.0).round() as u8;
+        // println!("sdf: {:?}", (sdf, a, distance));
+        return a;
     }
 }
 
@@ -929,11 +962,12 @@ pub struct OutlineInfo {
     pub bbox: Aabb,
     pub advance: u16,
     pub units_per_em: u16,
+    pub extents: Aabb
 }
 
 impl OutlineInfo {
     pub fn compute_near_arcs(&mut self, scale: f32) -> CellInfo {
-        FontFace::compute_near_arcs(self.bbox, scale, &mut self.endpoints)
+        FontFace::compute_near_arcs(self.extents, scale, &mut self.endpoints)
     }
 
     pub fn compute_sdf_tex(
@@ -944,7 +978,7 @@ impl OutlineInfo {
         is_outer_glow: bool,
     ) -> SdfInfo2 {
         // println!("bbox: {:?}", self.bbox);
-        let mut extents = self.bbox;
+        let mut extents = self.extents;
         let (plane_bounds, atlas_bounds, distance, tex_size) = compute_layout(
             &mut extents,
             tex_size,

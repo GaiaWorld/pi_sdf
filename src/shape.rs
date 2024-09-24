@@ -14,8 +14,8 @@ use parry2d::{
 };
 use serde::{Deserialize, Serialize};
 // use usvg::tiny_skia_path::PathSegment;
-use crate::font::SdfInfo2;
 use crate::glyphy::blob::TexInfo2;
+use crate::{font::SdfInfo2, utils::OutlineSinkExt};
 use crate::{
     glyphy::geometry::aabb::Aabb,
     utils::{compute_layout, Attribute},
@@ -29,7 +29,13 @@ use crate::{
     utils::GlyphVisitor,
     Point,
 };
-use std::{collections::HashMap, fmt::Debug, hash::Hasher, mem::transmute};
+use std::{
+    collections::HashMap,
+    f32::consts::{PI, TAU},
+    fmt::Debug,
+    hash::Hasher,
+    mem::transmute,
+};
 pub const FARWAY: f32 = 20.0;
 
 #[cfg(target_arch = "wasm32")]
@@ -893,7 +899,12 @@ pub struct SvgInfo {
 }
 
 impl SvgInfo {
-    pub fn new(binding_box: &[f32], arc_endpoints: Vec<f32>, is_area: bool, is_reverse: Option<bool>) -> SvgInfo {
+    pub fn new(
+        binding_box: &[f32],
+        arc_endpoints: Vec<f32>,
+        is_area: bool,
+        is_reverse: Option<bool>,
+    ) -> SvgInfo {
         assert_eq!(arc_endpoints.len() % 3, 0);
         let mut arc_endpoints2 = Vec::with_capacity(arc_endpoints.len() / 3);
         arc_endpoints
@@ -1144,7 +1155,7 @@ fn compute_direction(path: &Vec<Point>) -> bool {
 fn compute_outline<'a>(
     mut points: impl Iterator<Item = &'a Point>,
     verbs: impl Iterator<Item = &'a PathVerb>,
-    sink: &mut impl OutlineSink,
+    sink: &mut impl OutlineSinkExt,
     _is_reverse: bool,
 ) {
     // println!("p: {:?}", points);
@@ -1226,22 +1237,37 @@ fn compute_outline<'a>(
                 if let PathVerb::EllipticalArcToRelative = path_verb {
                     to = Point::new(to.x + prev_to.x(), to.y + prev_to.y());
                 }
-
+                // large_arc 决定弧线是大于还是小于 180 度，0 表示小角度弧，1 表示大角度弧。
+                // sweep 表示弧线的方向，0 表示从起点到终点沿逆时针画弧，1 表示从起点到终点沿顺时针画弧。
                 let (large_arc, sweep) = to_arc_flags(p.y);
-                let arc = lyon_geom::SvgArc {
-                    from: point(prev_to.x(), prev_to.y()),
-                    to: point(to.x, to.y),
-                    radii: vector(radii.x, radii.y),
-                    x_rotation: Angle::radians(p.x),
-                    flags: ArcFlags { large_arc, sweep },
-                };
+                if float_equals(radii.x, radii.y, None) {
+                    let d = ((to.x - prev_to.x()).powi(2) + (to.y - prev_to.y()).powi(2)).sqrt();
+                    let mut theta = 2.0 * (d / (2.0 * radii.x)).asin();
 
-                arc.for_each_quadratic_bezier(&mut |s| {
-                    sink.quadratic_curve_to(
-                        Vector2F::new(s.ctrl.x as f32, s.ctrl.y as f32),
-                        Vector2F::new(s.to.x as f32, s.to.y as f32),
-                    )
-                });
+                    if large_arc != (theta > PI) {
+                        theta = TAU - theta;
+                    }
+
+                    if !sweep {
+                        theta = -theta;
+                    }
+                    sink.arc2_to((theta * 0.25).tan(), Vector2F::new(to.x, to.y));
+                } else {
+                    let arc = lyon_geom::SvgArc {
+                        from: point(prev_to.x(), prev_to.y()),
+                        to: point(to.x, to.y),
+                        radii: vector(radii.x, radii.y),
+                        x_rotation: Angle::radians(p.x),
+                        flags: ArcFlags { large_arc, sweep },
+                    };
+
+                    arc.for_each_quadratic_bezier(&mut |s| {
+                        sink.quadratic_curve_to(
+                            Vector2F::new(s.ctrl.x as f32, s.ctrl.y as f32),
+                            Vector2F::new(s.to.x as f32, s.to.y as f32),
+                        )
+                    });
+                }
 
                 prev_to = Vector2F::new(to.x as f32, to.y as f32);
             }
@@ -1354,4 +1380,31 @@ pub fn compute_shape_sdf_tex(
         cur_off,
         is_reverse,
     )
+}
+
+#[test]
+fn test() {
+    let p1 = (0.0f32, 10.0f32);
+    let p2 = (10.0f32, 0.0f32);
+    let r = 10.0f32;
+    let d = ((p2.0 - p1.0).powi(2) + (p2.1 - p1.1).powi(2)).sqrt();
+    let mut theta = 2.0 * (d / (2.0 * r)).asin();
+
+    // large_arc 决定弧线是大于还是小于 180 度，0 表示小角度弧，1 表示大角度弧。
+    // sweep 表示弧线的方向，0 表示从起点到终点沿逆时针画弧，1 表示从起点到终点沿顺时针画弧。
+
+    let large_arc = false;
+    let sweet = true;
+    if large_arc != (theta > PI) {
+        theta = TAU - theta;
+    }
+
+    if sweet {
+        theta = -theta;
+    }
+
+    // 将弧度转换为角度
+    let theta_degrees = theta * 180.0 / PI;
+    println!("圆心角（弧度）：{}", theta);
+    println!("圆心角（度）：{}", theta_degrees);
 }
