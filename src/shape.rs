@@ -892,8 +892,25 @@ pub struct SvgInfo {
     is_reverse: Option<bool>,
 }
 
-impl SvgInfo{
-    pub fn new(binding_box: Aabb, arc_endpoints: Vec<ArcEndpoint>) -> SvgInfo {
+impl SvgInfo {
+    pub fn new(binding_box: &[f32], arc_endpoints: Vec<f32>, is_area: bool, is_reverse: Option<bool>) -> SvgInfo {
+        assert_eq!(arc_endpoints.len() % 3, 0);
+        let mut arc_endpoints2 = Vec::with_capacity(arc_endpoints.len() / 3);
+        arc_endpoints
+            .chunks(3)
+            .for_each(|v| arc_endpoints2.push(ArcEndpoint::new(v[0], v[1], v[2])));
+        SvgInfo {
+            binding_box: Aabb::new(
+                Point::new(binding_box[0], binding_box[1]),
+                Point::new(binding_box[2], binding_box[3]),
+            ),
+            arc_endpoints: arc_endpoints2,
+            is_area,
+            is_reverse,
+        }
+    }
+
+    pub fn new_from_arc_endpoint(binding_box: Aabb, arc_endpoints: Vec<ArcEndpoint>) -> SvgInfo {
         SvgInfo {
             binding_box,
             arc_endpoints,
@@ -1338,4 +1355,3 @@ pub fn compute_shape_sdf_tex(
         is_reverse,
     )
 }
-

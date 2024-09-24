@@ -943,7 +943,7 @@ impl OutlineInfo {
         pxrange: u32,
         is_outer_glow: bool,
     ) -> SdfInfo2 {
-        println!("bbox: {:?}", self.bbox);
+        // println!("bbox: {:?}", self.bbox);
         let mut extents = self.bbox;
         let (plane_bounds, atlas_bounds, distance, tex_size) = compute_layout(
             &mut extents,

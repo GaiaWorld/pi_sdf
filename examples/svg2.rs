@@ -2,7 +2,7 @@ use image::ColorType;
 use parry2d::bounding_volume::Aabb;
 use pi_sdf::{
     blur::blur_box,
-    shape::{compute_shape_sdf_tex, Path, PathVerb},
+    shape::{compute_shape_sdf_tex, Path, PathVerb, SvgInfo},
     Point,
 };
 // 1 -> 5
@@ -63,32 +63,39 @@ fn main() {
     //     ],
     // );
 
-    let mut path = Path::new1(
-        vec![
-            PathVerb::MoveTo,
-            PathVerb::LineTo,
-            PathVerb::EllipticalArcTo,
-            PathVerb::LineTo,
-            PathVerb::EllipticalArcTo,
-            PathVerb::LineTo,
-            PathVerb::EllipticalArcTo,
-            PathVerb::LineTo,
-            PathVerb::EllipticalArcTo,
-        ],
-        vec![
-            100., 100., 
-            102., 100., 
-            15.,  15., 0., 0., 117., 85., 
-            117., 83., 
-            15.,  15., 0., 0., 102., 68., 
-            100., 68., 
-            15.,  15., 0., 0., 85., 83., 
-            85.,  85., 
-            15.,  15., 0., 0., 100.,100.,
-        ],
-    );
+    // let mut path = Path::new1(
+    //     vec![
+    //         PathVerb::MoveTo,
+    //         PathVerb::LineTo,
+    //         PathVerb::EllipticalArcTo,
+    //         PathVerb::LineTo,
+    //         PathVerb::EllipticalArcTo,
+    //         PathVerb::LineTo,
+    //         PathVerb::EllipticalArcTo,
+    //         PathVerb::LineTo,
+    //         PathVerb::EllipticalArcTo,
+    //     ],
+    //     vec![
+    //         100., 100., 102., 100., 15., 15., 0., 0., 117., 85., 117., 83., 15., 15., 0., 0., 102.,
+    //         68., 100., 68., 15., 15., 0., 0., 85., 83., 85., 85., 15., 15., 0., 0., 100., 100.,
+    //     ],
+    // );
 
-    let info = path.get_svg_info();
+    // let info = path.get_svg_info();
+
+    let point = [
+        100.0, 100.0, f32::INFINITY,
+        102.0, 100.0, 0.0,
+        117.0, 85.0, -std::f32::consts::FRAC_PI_8.tan(),
+        117.0, 83.0, 0.0,
+        102.0, 68.0, -std::f32::consts::FRAC_PI_8.tan(),
+        100.0, 68.0, 0.0,
+        85.0,  83.0, -std::f32::consts::FRAC_PI_8.tan(),
+        85.,   85., 0.0,
+        100., 100., -std::f32::consts::FRAC_PI_8.tan(),
+    ];
+    let binding_box = [85.0, 68.0, 117.0, 100.0];
+    let info = SvgInfo::new(&binding_box, point.to_vec(), true, None);
 
     let sdf = compute_shape_sdf_tex(info, 32, 2, false, 3);
     println!("sdf.sdf_tex: {}", sdf.sdf_tex[38 * 3 + 3]);
@@ -99,4 +106,5 @@ fn main() {
         sdf.tex_size as u32,
         ColorType::L8,
     );
+
 }
