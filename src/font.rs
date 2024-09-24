@@ -1,4 +1,3 @@
-use std::char;
 use crate::{
     glyphy::blob::TexInfo2,
     utils::{compute_cell_range, CellInfo},
@@ -13,6 +12,7 @@ use allsorts::{
 };
 use pi_share::Share;
 use serde::{Deserialize, Serialize};
+use std::char;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::wasm_bindgen;
 
@@ -27,10 +27,7 @@ use crate::{
         outline::glyphy_outline_winding_from_even_odd,
         util::GLYPHY_INFINITY,
     },
-    utils::{
-        compute_layout, GlyphVisitor, OutlineInfo, SCALE,
-        TOLERANCE,
-    },
+    utils::{compute_layout, GlyphVisitor, OutlineInfo, SCALE, TOLERANCE},
     Point,
 };
 
@@ -542,17 +539,40 @@ impl FontFace {
                 .lookup_glyph_index(ch, MatchingPresentation::NotRequired, None);
         assert_ne!(glyph_index, 0);
         let advance = self.font.horizontal_advance(glyph_index).unwrap();
-
+        // self.font.
+        // let vertical_advance = self.font.vertical_advance(glyph_index).unwrap();
+        // println!(
+        //     "advance: {:?}",
+        //     (
+        //         ch,
+        //         advance,
+        //         self.units_per_em,
+        //         advance as f32 / self.units_per_em as f32,
+        //         self.ascender(),
+        //         self.descender()
+        //     )
+        // );
         let _ = self.glyf.visit(glyph_index, &mut sink);
-        let GlyphVisitor {
-            accumulate, bbox, ..
-        } = sink;
+        // let time = std::time::Instant::now();
+        let mut bbox2 = Aabb::new(Point::new(0.0, 0.0), Point::new(0.0, 0.0));
+        if let Ok(r) = self.glyf.get_parsed_glyph(glyph_index) {
+            if let Some(g) = r {
+                // println!("g.bounding_box:{:?}", g.bounding_box);
+                bbox2.mins.x = g.bounding_box.x_min as f32;
+                bbox2.mins.y = g.bounding_box.y_min as f32 ;
+                bbox2.maxs.x = g.bounding_box.x_max as f32 ;
+                bbox2.maxs.y = g.bounding_box.y_max as f32 ;
+            }
+        }
+
+        let GlyphVisitor { accumulate, bbox, .. } = sink;
+        // println!("================ bbox: {:?}",  bbox);
 
         let GlyphyArcAccumulator { result, .. } = accumulate;
-        println!("arc size: {}", result.len());
+        // println!("arc size: {:?}", (result.len(), bbox2));
         OutlineInfo {
             endpoints: result,
-            bbox,
+            bbox: bbox2,
             advance,
             units_per_em: self.units_per_em,
             char: ch,

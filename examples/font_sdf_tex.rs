@@ -6,7 +6,7 @@ use tracing::Level;
 use tracing_subscriber::fmt::Subscriber;
 
 // use nalgebra::Vector3;
-use pi_sdf::{blur::gaussian_blur, font::FontFace, glyphy::{blob::TexData, geometry::{aabb::Aabb, arc::Arc as SdfArc}}, utils::{create_indices, CellInfo}};
+use pi_sdf::{blur::gaussian_blur, font::FontFace, glyphy::{blob::TexData, geometry::{aabb::Aabb, arc::Arc as SdfArc}}, utils::{compute_layout, create_indices, CellInfo}};
 use pi_wgpu as wgpu;
 use wgpu::{util::DeviceExt, BlendState, ColorTargetState};
 use winit::{
@@ -80,9 +80,17 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     println!("max_box_normaliz: {:?}", ft_face.max_box_normaliz());
     let pxrange = 10;
     let time = std::time::Instant::now();
-    let mut outline_info = ft_face.to_outline3('A');
+    let mut outline_info = ft_face.to_outline3('a');
+    let (plane_bounds, atlas_bounds, _, tex_size) = compute_layout(
+        &mut outline_info.bbox.clone(),
+        32,
+        5,
+        outline_info.units_per_em,
+        5,
+        false,
+    );
 
-    // println!("bbox: {:?}", outline_info.bbox);
+    println!("===================plane_bounds: {:?}", plane_bounds);
     let result_arcs = outline_info.compute_near_arcs(2.0);
     // for (indexs, aabb) in &result_arcs.info{
     //     let mut str = "".to_string();

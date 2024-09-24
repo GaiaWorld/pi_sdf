@@ -596,7 +596,14 @@ fn compute_sdf2(
     let mut sdf = glyphy_sdf_from_arc_list3(near_arcs, p.clone(), global_arcs).0;
     let p2 = Point::new(85.0, 82.0) - p;
     if p2.norm_squared() < 0.1{
-        println!("p : {:?}", (p, sdf, ));
+        println!("p : {:?}", (p, sdf, distance));
+        for i in near_arcs{
+            println!("{:?}", global_arcs[*i]);
+        }
+    }
+    let p2 = Point::new(85.0, 86.0) - p;
+    if p2.norm_squared() < 0.1{
+        println!("p : {:?}", (p, sdf, distance));
         for i in near_arcs{
             println!("{:?}", global_arcs[*i]);
         }
@@ -619,7 +626,7 @@ fn compute_sdf2(
         // println!("{:?}", (radius, sdf));
     } else {
         sdf = sdf / distance;
-        return ((1.0 - sdf) * 127.0) as u8;
+        return ((1.0 - sdf) * 127.0).round() as u8;
     }
 }
 
@@ -646,9 +653,6 @@ pub fn compute_layout(
     extents.mins.y -= expand;
     extents.maxs.x += expand;
     extents.maxs.y += expand;
-
-    
-   
 
     // let pxrange = (pxrange >> 2 << 2) + 4;
     let tex_size = tex_size + (cur_off * 2) as usize + 1;
@@ -939,6 +943,7 @@ impl OutlineInfo {
         pxrange: u32,
         is_outer_glow: bool,
     ) -> SdfInfo2 {
+        println!("bbox: {:?}", self.bbox);
         let mut extents = self.bbox;
         let (plane_bounds, atlas_bounds, distance, tex_size) = compute_layout(
             &mut extents,
