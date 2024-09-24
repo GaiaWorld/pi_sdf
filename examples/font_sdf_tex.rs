@@ -80,7 +80,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     println!("max_box_normaliz: {:?}", ft_face.max_box_normaliz());
     let pxrange = 10;
     let time = std::time::Instant::now();
-    let mut outline_info = ft_face.to_outline3('3');
+    let mut outline_info = ft_face.to_outline3('魔');
     // let (plane_bounds, atlas_bounds, _, tex_size) = compute_layout(
     //     &mut outline_info.extents.clone(),
     //     outline_info.bbox.clone(),

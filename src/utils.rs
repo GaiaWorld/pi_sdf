@@ -118,11 +118,11 @@ impl GlyphVisitor {
 //     }
 // }
 
-pub trait OutlineSinkExt: OutlineSink  {
+pub trait OutlineSinkExt: OutlineSink {
     fn arc2_to(&mut self, d: f32, to: Vector2F);
 }
 
-impl OutlineSinkExt for GlyphVisitor{
+impl OutlineSinkExt for GlyphVisitor {
     fn arc2_to(&mut self, d: f32, to: Vector2F) {
         let to = Point::new(to.x(), to.y()) * self.scale;
         log::info!("+ L {} {} ", to.x, to.y);
@@ -545,15 +545,33 @@ pub fn encode_sdf2(
 
     for (near_arcs, cell) in arcs_info {
         if let Some(ab) = cell.collision(extents) {
-            // println!("cell: {:?}, extents: {:?}, ab: {:?}", cell, extents, ab);
+            //
             let begin = ab.mins - extents.mins;
             let end = ab.maxs - extents.mins;
 
-            let begin_x = (begin.x / unit_d).trunc() as usize;
-            let begin_y = (begin.y / unit_d).trunc() as usize;
+            let mut begin_x = begin.x / unit_d;
+            if (begin_x.fract() - 0.5).abs() < 0.001 {
+                begin_x -= 0.01;
+            }
+            let begin_x = begin_x.round() as usize;
 
-            let end_x = (end.x / unit_d).ceil() as usize;
-            let end_y = (end.y / unit_d).ceil() as usize;
+            let mut begin_y = begin.y / unit_d;
+            if (begin_y.fract() - 0.5).abs() < 0.001 {
+                begin_y -= 0.01;
+            }
+            let begin_y = begin_y.round() as usize;
+
+            let mut end_x = end.x / unit_d;
+            if (end_x.fract() - 0.5).abs() < 0.001 {
+                end_x -= 0.01;
+            }
+            let end_x = end_x.round() as usize;
+
+            let mut end_y = end.y / unit_d;
+            if (end_y.fract() - 0.5).abs() < 0.001 {
+                end_y -= 0.01;
+            }
+            let end_y = end_y.round() as usize;
             // println!("{:?}", (begin_x, begin_y, end_x, end_y));
             // If the arclist is two arcs that can be combined in encoding if reordered, do that.
             for i in begin_x..end_x {
@@ -562,7 +580,13 @@ pub fn encode_sdf2(
                         (i as f32 + 0.5) * unit_d + extents.mins.x,
                         (j as f32 + 0.5) * unit_d + extents.mins.y,
                     );
-
+                    // if j == 29 && i == 25 {
+                    //     println!(
+                    //         "============== cell: {:?}, extents: {:?}, ab: {:?}, unit_d: {:?}",
+                    //         cell, extents, ab, unit_d
+                    //     );
+                    //     println!("begin: {}, end: {}", begin.y / unit_d, end.y / unit_d)
+                    // }
                     let r = compute_sdf2(
                         global_arcs,
                         p,
@@ -587,8 +611,6 @@ pub fn encode_sdf2(
 }
 
 fn compute_sdf(p: Point, near_arcs: &Vec<Arc>, is_area: Option<bool>) -> u8 {
-    
-    
     let sdf = glyphy_sdf_from_arc_list2(near_arcs, p).0;
 
     let a = if let Some(is_area) = is_area {
@@ -626,16 +648,16 @@ fn compute_sdf2(
     //     }
     // }
     let p2 = Point::new(85.0, 86.0) - p;
-    if p2.norm_squared() < 0.1{
+    if p2.norm_squared() < 0.1 {
         println!("p : {:?}", (p, sdf, distance));
-        for i in near_arcs{
+        for i in near_arcs {
             println!("{:?}", global_arcs[*i]);
         }
     }
     let p2 = Point::new(85.0, 87.0) - p;
-    if p2.norm_squared() < 0.1{
+    if p2.norm_squared() < 0.1 {
         println!("p : {:?}", (p, sdf, distance));
-        for i in near_arcs{
+        for i in near_arcs {
             println!("{:?}", global_arcs[*i]);
         }
     }
@@ -702,7 +724,7 @@ pub fn compute_layout(
             // println!("============= is_svg: {}", (temp / extents.height() * tex_size as f32 - 1.0));
             atlas_bounds.maxs.y -= (temp / extents.height() * tex_size as f32 - 1.0).trunc();
         } else {
-            atlas_bounds.mins.y += (temp / extents.height() * tex_size as f32 - 1.0).ceil() ;
+            atlas_bounds.mins.y += (temp / extents.height() * tex_size as f32 - 1.0).ceil();
         }
 
         // atlas_bounds.maxs.y -= (temp / extents.height() * tex_size as f32).round();
@@ -962,7 +984,7 @@ pub struct OutlineInfo {
     pub bbox: Aabb,
     pub advance: u16,
     pub units_per_em: u16,
-    pub extents: Aabb
+    pub extents: Aabb,
 }
 
 impl OutlineInfo {
