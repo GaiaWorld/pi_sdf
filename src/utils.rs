@@ -515,9 +515,9 @@ pub fn encode_sdf(
                 );
                 // svg 不需要颠倒纹理
                 if is_svg {
-                    data[j * width_cells + i] = r;
+                    data[j * width_cells + i] = r.0;
                 } else {
-                    data[(height_cells - j - 1) * width_cells + i] = r;
+                    data[(height_cells - j - 1) * width_cells + i] = r.0;
                 }
             }
         }
@@ -550,27 +550,19 @@ pub fn encode_sdf2(
             let end = ab.maxs - extents.mins;
 
             let mut begin_x = begin.x / unit_d;
-            if (begin_x.fract() - 0.5).abs() < 0.001 {
-                begin_x -= 0.01;
-            }
+            begin_x = (begin_x * 10000.0).round() * 0.0001;
             let begin_x = begin_x.round() as usize;
 
             let mut begin_y = begin.y / unit_d;
-            if (begin_y.fract() - 0.5).abs() < 0.001 {
-                begin_y -= 0.01;
-            }
+            begin_y = (begin_y * 10000.0).round() * 0.0001;
             let begin_y = begin_y.round() as usize;
 
             let mut end_x = end.x / unit_d;
-            if (end_x.fract() - 0.5).abs() < 0.001 {
-                end_x -= 0.01;
-            }
+            end_x = (end_x * 10000.0).round() * 0.0001;
             let end_x = end_x.round() as usize;
 
             let mut end_y = end.y / unit_d;
-            if (end_y.fract() - 0.5).abs() < 0.001 {
-                end_y -= 0.01;
-            }
+            end_y = (end_y * 10000.0).round() * 0.0001;
             let end_y = end_y.round() as usize;
             // println!("{:?}", (begin_x, begin_y, end_x, end_y));
             // If the arclist is two arcs that can be combined in encoding if reordered, do that.
@@ -580,13 +572,7 @@ pub fn encode_sdf2(
                         (i as f32 + 0.5) * unit_d + extents.mins.x,
                         (j as f32 + 0.5) * unit_d + extents.mins.y,
                     );
-                    // if j == 29 && i == 25 {
-                    //     println!(
-                    //         "============== cell: {:?}, extents: {:?}, ab: {:?}, unit_d: {:?}",
-                    //         cell, extents, ab, unit_d
-                    //     );
-                    //     println!("begin: {}, end: {}", begin.y / unit_d, end.y / unit_d)
-                    // }
+                    
                     let r = compute_sdf2(
                         global_arcs,
                         p,
@@ -596,12 +582,22 @@ pub fn encode_sdf2(
                         is_outer_glow,
                         is_reverse,
                     );
+                    if j == 6 && (i == 7 || i == 6) {
+                        println!("p: {}, i: {}, j: {}", p, i, j);
+                        println!("============== cell: {:?}, extents: {:?}, ab: {:?}, unit_d: {:?}", cell, extents, ab, unit_d);
+                        println!("begin: {}, end: {}", begin.y / unit_d, end.y / unit_d);
+                        println!("sdf: {:?}", r);
+                        for a in &near_arcs {
+                            println!("{:?}", global_arcs[*a])
+                        }
+                    }
+                    
                     // svg 不需要颠倒纹理
                     if is_svg {
-                        data[j * tex_size + i] = r;
+                        data[j * tex_size + i] = r.0;
                     } else {
                         // println!("{:?}", (r, j, i));
-                        data[(tex_size - j - 1) * tex_size + i] = r;
+                        data[(tex_size - j - 1) * tex_size + i] = r.0;
                     }
                 }
             }
@@ -638,8 +634,9 @@ fn compute_sdf2(
     width: Option<f32>,
     is_outer_glow: bool,
     is_reverse: Option<bool>,
-) -> u8 {
+) -> (u8, f32, f32) {
     let mut sdf = glyphy_sdf_from_arc_list3(near_arcs, p.clone(), global_arcs).0;
+    // 去除浮点误差
     sdf = (sdf * 10000.0).round() * 0.0001;
     // let p2 = Point::new(85.0, 82.0) - p;
     // if p2.norm_squared() < 0.1{
@@ -648,20 +645,20 @@ fn compute_sdf2(
     //         println!("{:?}", global_arcs[*i]);
     //     }
     // }
-    let p2 = Point::new(85.5, 84.5) - p;
-    if p2.norm_squared() < 0.1 {
-        println!("p : {:?}", (p, sdf, distance));
-        for i in near_arcs {
-            println!("{:?}", global_arcs[*i]);
-        }
-    }
-    let p2 = Point::new(85.5, 85.5) - p;
-    if p2.norm_squared() < 0.1 {
-        println!("p : {:?}", (p, sdf, distance));
-        for i in near_arcs {
-            println!("{:?}", global_arcs[*i]);
-        }
-    }
+    // let p2 = Point::new(85.5, 84.5) - p;
+    // if p2.norm_squared() < 0.1 {
+    //     println!("p : {:?}", (p, sdf, distance));
+    //     for i in near_arcs {
+    //         println!("{:?}", global_arcs[*i]);
+    //     }
+    // }
+    // let p2 = Point::new(85.5, 85.5) - p;
+    // if p2.norm_squared() < 0.1 {
+    //     println!("p : {:?}", (p, sdf, distance));
+    //     for i in near_arcs {
+    //         println!("{:?}", global_arcs[*i]);
+    //     }
+    // }
     if let Some(is_reverse) = is_reverse {
         if is_reverse {
             sdf = -sdf;
@@ -672,17 +669,18 @@ fn compute_sdf2(
     }
 
     if is_outer_glow {
-        let radius = distance;
+        // let radius = distance;
+        let sdf2 = (1.0 - (sdf / distance)).powf(1.99);
         // println!("{:?}", (radius, sdf));
-        sdf = ((radius - sdf) / radius).clamp(0.0, 1.0).powf(5.0);
+        // let sdf2 = ((radius - sdf) / radius).clamp(-1.0, 1.0).powf(2.0);
         // println!("{:?}", (radius, sdf));
-        return (sdf * 127.0).round() as u8;
+        return ((sdf2 * 255.0).round() as u8, sdf, sdf2);
         // println!("{:?}", (radius, sdf));
     } else {
-        sdf = sdf / distance;
-        let a = ((1.0 - sdf) * 127.0).round() as u8;
+        let sdf2 = sdf / distance;
+        let a = ((1.0 - sdf2) * 127.0).round() as u8;
         // println!("sdf: {:?}", (sdf, a, distance));
-        return a;
+        return (a, sdf, sdf2);
     }
 }
 
@@ -1137,7 +1135,7 @@ impl Serialize for CellInfo {
             let h = ab.height() / unit_size;
             let mut temp = Vec::with_capacity(arcs.len());
             for arc in arcs {
-                temp.push(*arc as u8);
+                temp.push(*arc as u16);
             }
 
             info.push((
@@ -1187,7 +1185,7 @@ impl<'de> Deserialize<'de> for CellInfo {
                 let arcs = seq
                     .next_element()?
                     .ok_or_else(|| de::Error::invalid_length(4, &self))?;
-                let src_info: Vec<(Vec<u8>, u8, u8, u8, u8)> = seq
+                let src_info: Vec<(Vec<u16>, u8, u8, u8, u8)> = seq
                     .next_element()?
                     .ok_or_else(|| de::Error::invalid_length(5, &self))?;
 

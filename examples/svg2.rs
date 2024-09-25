@@ -104,7 +104,7 @@ fn main() {
     // let binding_box = [85.0, 68.0, 117.0, 100.0];
     // let info = SvgInfo::new(&binding_box, point.to_vec(), true, None);
 
-    let sdf = compute_shape_sdf_tex(info, 32, 1, false, 2);
+    let sdf = compute_shape_sdf_tex(info, 32, 10, true, 10);
     println!("sdf.sdf_tex: {}", sdf.sdf_tex[38 * 3 + 3]);
     let _ = image::save_buffer(
         "Rounded_rectangle.png",

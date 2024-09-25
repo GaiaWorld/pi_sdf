@@ -259,6 +259,9 @@ pub fn glyphy_sdf_from_arc_list3(arcs: &Vec<usize>, p: Point, global_arcs: &Vec<
             let la = (arc.p0 - c).norm();
             let lb = (arc.p1 - c).norm();
             let udist = if la < lb { la } else { lb };
+            if (p - Point::new(293.82404, 216.00003)).norm_squared() < 0.01 ||(p - Point::new(341.82404, 216.00003)).norm_squared() < 0.01{
+                println!("udist: {}, min_dist: {:?}", udist, min_dist);
+            }
 
             if udist < min_dist {
                 // 比 原来的 小，则 更新 此距离
@@ -299,6 +302,14 @@ pub fn glyphy_sdf_from_arc_list3(arcs: &Vec<usize>, p: Point, global_arcs: &Vec<
         // p0 = arc.p.clone();
     }
 
+    if (p - Point::new(293.82404, 216.00003)).norm_squared() < 0.01 ||(p - Point::new(341.82404, 216.00003)).norm_squared() < 0.01{
+        println!("side: {}, closest_arc: {:?}", side, closest_arc);
+        for i in 0..arcs.len() {
+            let arc = &global_arcs[arcs[i]];
+
+          println!("arc.wedge_contains_point(&c): {}", arc.wedge_contains_point(&c)); 
+        }
+    }
     if side == 0 {
         // Technically speaking this should not happen, but it does.  So try to fix it.
         let ext_dist = closest_arc.extended_dist(&c);
