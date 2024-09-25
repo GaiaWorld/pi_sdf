@@ -612,7 +612,7 @@ pub fn encode_sdf2(
 
 fn compute_sdf(p: Point, near_arcs: &Vec<Arc>, is_area: Option<bool>) -> u8 {
     let sdf = glyphy_sdf_from_arc_list2(near_arcs, p).0;
-
+    
     let a = if let Some(is_area) = is_area {
         let sdf1 = if !is_area {
             (256.0 - (sdf.abs()) * 32.0).clamp(0.0, 255.0)
@@ -640,6 +640,7 @@ fn compute_sdf2(
     is_reverse: Option<bool>,
 ) -> u8 {
     let mut sdf = glyphy_sdf_from_arc_list3(near_arcs, p.clone(), global_arcs).0;
+    sdf = (sdf * 10000.0).round() * 0.0001;
     // let p2 = Point::new(85.0, 82.0) - p;
     // if p2.norm_squared() < 0.1{
     //     println!("p : {:?}", (p, sdf, distance));
@@ -647,14 +648,14 @@ fn compute_sdf2(
     //         println!("{:?}", global_arcs[*i]);
     //     }
     // }
-    let p2 = Point::new(85.0, 86.0) - p;
+    let p2 = Point::new(85.5, 84.5) - p;
     if p2.norm_squared() < 0.1 {
         println!("p : {:?}", (p, sdf, distance));
         for i in near_arcs {
             println!("{:?}", global_arcs[*i]);
         }
     }
-    let p2 = Point::new(85.0, 87.0) - p;
+    let p2 = Point::new(85.5, 85.5) - p;
     if p2.norm_squared() < 0.1 {
         println!("p : {:?}", (p, sdf, distance));
         for i in near_arcs {
@@ -695,14 +696,15 @@ pub fn compute_layout(
 ) -> (Aabb, Aabb, f32, usize) {
     // map 无序导致每次计算的数据不一样
     // let bbox = extents.clone();
+    // println!("")
     let extents_w = extents.width();
     let extents_h = extents.height();
     let scale = 1.0 / units_per_em as f32;
     let plane_bounds = extents.scaled(&Vector::new(scale, scale));
 
     let px_distance = extents_w.max(extents_h) / tex_size as f32;
-    let distance = px_distance * (pxrange >> 1) as f32;
-    let expand = px_distance * (cur_off as f32 + 0.5);
+    let distance = px_distance * pxrange as f32;
+    let expand = px_distance * cur_off as f32;
     // println!("distance: {}", distance);
     extents.mins.x -= expand;
     extents.mins.y -= expand;
@@ -710,24 +712,23 @@ pub fn compute_layout(
     extents.maxs.y += expand;
 
     // let pxrange = (pxrange >> 2 << 2) + 4;
-    let tex_size = tex_size + (cur_off * 2) as usize + 1;
+    let tex_size = tex_size + (cur_off * 2) as usize;
     let mut atlas_bounds = Aabb::new_invalid();
-    atlas_bounds.mins.x = cur_off as f32 + 0.5;
-    atlas_bounds.mins.y = cur_off as f32 + 0.5;
-    atlas_bounds.maxs.x = tex_size as f32 - cur_off as f32 - 0.5;
-    atlas_bounds.maxs.y = tex_size as f32 - cur_off as f32 - 0.5;
+    atlas_bounds.mins.x = cur_off as f32;
+    atlas_bounds.mins.y = cur_off as f32;
+    atlas_bounds.maxs.x = tex_size as f32 - cur_off as f32 - 1.0;
+    atlas_bounds.maxs.y = tex_size as f32 - cur_off as f32 - 1.0;
 
     let temp = extents_w - extents_h;
     if temp > 0.0 {
         extents.maxs.y += temp;
         if is_svg {
             // println!("============= is_svg: {}", (temp / extents.height() * tex_size as f32 - 1.0));
-            atlas_bounds.maxs.y -= (temp / extents.height() * tex_size as f32 - 1.0).trunc();
+            atlas_bounds.maxs.y -= (temp / extents.height() * tex_size as f32 ).trunc();
         } else {
-            atlas_bounds.mins.y += (temp / extents.height() * tex_size as f32 - 1.0).ceil();
+            // 字体的y最终需要上下颠倒
+            atlas_bounds.mins.y += (temp / extents.height() * tex_size as f32).ceil();
         }
-
-        // atlas_bounds.maxs.y -= (temp / extents.height() * tex_size as f32).round();
     } else {
         extents.maxs.x -= temp;
         atlas_bounds.maxs.x -= (temp.abs() / extents.width() * tex_size as f32).trunc();
@@ -998,6 +999,7 @@ impl OutlineInfo {
         tex_size: usize,
         pxrange: u32,
         is_outer_glow: bool,
+        cur_off: u32
     ) -> SdfInfo2 {
         // println!("bbox: {:?}", self.bbox);
         let mut extents = self.extents;
@@ -1006,7 +1008,7 @@ impl OutlineInfo {
             tex_size,
             pxrange,
             self.units_per_em,
-            pxrange >> 1,
+            cur_off,
             false,
         );
         let CellInfo { arcs, info, .. } = result_arcs;
@@ -1060,9 +1062,10 @@ impl OutlineInfo {
         tex_size: usize,
         pxrange: u32,
         is_outer_glow: bool,
+        cur_off: u32
     ) -> Vec<u8> {
         let info: CellInfo = bitcode::deserialize(result_arcs).unwrap();
-        bitcode::serialize(&self.compute_sdf_tex(info, tex_size, pxrange, is_outer_glow)).unwrap()
+        bitcode::serialize(&self.compute_sdf_tex(info, tex_size, pxrange, is_outer_glow, cur_off)).unwrap()
     }
 }
 

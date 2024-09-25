@@ -110,10 +110,18 @@ pub fn blur_box(bbox: &[f32], pxrange: f32, txe_size: usize) -> BlurInfo {
     }
 }
 
-pub fn gaussian_blur(sdf_tex: Vec<u8>, width: u32, height: u32, radius: u32, weight: f32) -> Vec<u8> {
+const SCALE: f32 = 10.0;
+
+pub fn gaussian_blur(
+    sdf_tex: Vec<u8>,
+    width: u32,
+    height: u32,
+    radius: u32,
+    weight: f32,
+) -> Vec<u8> {
     // let (width, height) = img.dimensions();
     let mut output = Vec::with_capacity(sdf_tex.len());
-
+    let weight = -weight / SCALE;
     let kernel = create_gaussian_kernel(radius);
     let kernel_size = kernel.len() as u32;
 
@@ -127,11 +135,13 @@ pub fn gaussian_blur(sdf_tex: Vec<u8>, width: u32, height: u32, radius: u32, wei
 
             for ky in 0..kernel_size {
                 for kx in 0..kernel_size {
-                    let px = (x as i32 + kx as i32 - radius as i32).clamp(0, width as i32 - 1) as u32;
-                    let py = (y as i32 + ky as i32 - radius as i32).clamp(0, height as i32 - 1) as u32;
+                    let px =
+                        (x as i32 + kx as i32 - radius as i32).clamp(0, width as i32 - 1) as u32;
+                    let py =
+                        (y as i32 + ky as i32 - radius as i32).clamp(0, height as i32 - 1) as u32;
 
                     let sdf = sdf_tex[(px + py * width) as usize] as f32 / 255.0;
-                    let fill_sd_px = sdf - weight;
+                    let fill_sd_px = sdf - (0.5 + weight);
                     let pixel = (fill_sd_px + 0.5).clamp(0.0, 1.0);
 
                     let weight = kernel[ky as usize][kx as usize];
@@ -146,7 +156,7 @@ pub fn gaussian_blur(sdf_tex: Vec<u8>, width: u32, height: u32, radius: u32, wei
 
             let pixel = (a / weight_sum * 255.0) as u8;
 
-            output.push( pixel);
+            output.push(pixel);
         }
     }
 

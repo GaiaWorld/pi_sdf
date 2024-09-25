@@ -76,8 +76,15 @@ fn main() {
             PathVerb::EllipticalArcTo,
         ],
         vec![
-            100., 100., 102., 100., 15., 15., 0., 0., 117., 85., 117., 83., 15., 15., 0., 0., 102.,
-            68., 100., 68., 15., 15., 0., 0., 85., 83., 85., 85., 15., 15., 0., 0., 100., 100.,
+            100., 100., 
+            102., 100., 
+            15., 15., 0., 0., 117., 85., 
+            117., 83., 
+            15., 15., 0., 0., 102.,68., 
+            100., 68., 
+            15., 15., 0., 0., 85., 83., 
+            85., 85., 
+            15., 15., 0., 0., 100., 100.,
         ],
     );
 
@@ -97,7 +104,7 @@ fn main() {
     // let binding_box = [85.0, 68.0, 117.0, 100.0];
     // let info = SvgInfo::new(&binding_box, point.to_vec(), true, None);
 
-    let sdf = compute_shape_sdf_tex(info, 32, 2, false, 2);
+    let sdf = compute_shape_sdf_tex(info, 32, 1, false, 2);
     println!("sdf.sdf_tex: {}", sdf.sdf_tex[38 * 3 + 3]);
     let _ = image::save_buffer(
         "Rounded_rectangle.png",
