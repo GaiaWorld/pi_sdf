@@ -716,8 +716,8 @@ pub fn compute_layout(
     let mut atlas_bounds = Aabb::new_invalid();
     atlas_bounds.mins.x = cur_off as f32;
     atlas_bounds.mins.y = cur_off as f32;
-    atlas_bounds.maxs.x = tex_size as f32 - cur_off as f32 - 1.0;
-    atlas_bounds.maxs.y = tex_size as f32 - cur_off as f32 - 1.0;
+    atlas_bounds.maxs.x = tex_size as f32 - cur_off as f32;
+    atlas_bounds.maxs.y = tex_size as f32 - cur_off as f32;
 
     let temp = extents_w - extents_h;
     if temp > 0.0 {
