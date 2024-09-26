@@ -112,16 +112,19 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     // println!("arcs: {:?}", arcs);
     let weight = 0.0;
     let pxrange = 5;
-    let range = 0;
+    let range = 4;
     println!("time3: {:?}", time2.elapsed());
     let time4 = std::time::Instant::now();
-    let glpyh_info = outline_info.compute_sdf_tex(arcs, 32, pxrange, true, pxrange);
+    let glpyh_info = outline_info.compute_sdf_tex(arcs, 32, pxrange, false, pxrange);
     // let glpyh_info = FontFace::compute_sdf_tex(outline_info.clone(),  32, pxrange, false);
     println!("time4: {:?}", time4.elapsed());
     // println!("glpyh_info: {:?}", glpyh_info);
     let tex_size = glpyh_info.tex_size;
     let _ = image::save_buffer("image.png", &glpyh_info.sdf_tex, tex_size as u32, tex_size as u32, ColorType::L8);
+
+    let time4 = std::time::Instant::now();
     let gaussian_blur = gaussian_blur(glpyh_info.sdf_tex.clone(), tex_size as u32, tex_size as u32, range, weight);
+    println!("time4: {:?}", time4.elapsed());
     let _ = image::save_buffer("gaussian_blur.png", &gaussian_blur, tex_size as u32, tex_size as u32, ColorType::L8);
     // let buffer = include_bytes!("../source/sdf.png").to_vec();
     // let image_buf = image::load_from_memory(&buffer).unwrap();

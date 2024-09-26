@@ -338,7 +338,8 @@ impl Aabb {
                         let dist = temps[j].1;
                         let d = arcs[i].squared_distance_to_point2(&p).norm_squared();
                         // println!("dist: {}, d: {}", dist, d);
-                        if d < dist {
+                        // 浮点误差
+                        if dist - d > 0.01 {
                             // let rangs = &mut temps[j].2;
                             // let mut new_rang = vec![];
                             // for r in rangs.iter() {
