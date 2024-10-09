@@ -1,13 +1,14 @@
-use std::sync::Arc;
+use std::{mem::transmute, sync::Arc};
 
 use image::ColorType;
 use parry2d::na::{self};
+use pi_assets::allocator::Allocator;
 use tracing::Level;
 use tracing_subscriber::fmt::Subscriber;
 
 // use nalgebra::Vector3;
 use pi_sdf::{font::FontFace, glyphy::blob::TexData, utils::create_indices};
-use pi_wgpu as wgpu;
+use pi_wgpu::{self as wgpu, Surface};
 use wgpu::{util::DeviceExt, BlendState, ColorTargetState};
 use winit::{
     event::{Event, WindowEvent},
@@ -27,7 +28,8 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     //     dx12_shader_compiler: Dx12Compiler::default(),
     // });
 
-    let surface = instance.create_surface(window.clone()).unwrap();
+    let surface = instance.create_surface(window.as_ref()).unwrap();
+    let surface: Surface<'static> = unsafe { transmute(surface) };
     let adapter = instance
         .request_adapter(&wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::default(),
@@ -39,6 +41,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         .expect("Failed to find an appropriate adapter");
 
     // Create the logical device and command queue
+    let mut allocator = Allocator::new(128 * 1024*1024);
     let (device, queue) = adapter
         .request_device(
             &wgpu::DeviceDescriptor {
@@ -49,6 +52,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
                     .using_resolution(adapter.limits()),
             },
             None,
+            &mut allocator
         )
         .await
         .expect("Failed to create device");
@@ -80,9 +84,10 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     println!("max_box_normaliz: {:?}", ft_face.max_box_normaliz());
     let pxrange = 40;
     let time = std::time::Instant::now();
-    let  outline_info = ft_face.to_outline3('口');
+    let  outline_info = ft_face.to_outline('口');
+    let result_arcs = outline_info.compute_near_arcs(2.0); 
     // println!("bbox: {:?}", outline_info.bbox);
-    let glpyh_info = FontFace::compute_sdf_tex(outline_info.clone(),  32, pxrange, true);
+    let glpyh_info = outline_info.compute_sdf_tex(result_arcs.clone(),  32, pxrange, true, pxrange);
     println!("time: {:?}", time.elapsed());
     // println!("glpyh_info: {:?}", glpyh_info);
     let tex_size = glpyh_info.tex_size;

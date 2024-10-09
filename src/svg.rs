@@ -17,7 +17,7 @@ use crate::{
         },
         util::GLYPHY_INFINITY,
     },
-    utils::CellInfo,
+    utils::{compute_cell_range, CellInfo},
     Point,
 };
 
@@ -313,58 +313,4 @@ impl Svg {
 //     (blob_arc, map)
 // }
 
-pub fn compute_near_arcs<'a>(
-    view_box: Aabb,
-    endpoints: &mut Vec<ArcEndpoint>,
-) -> CellInfo {
-    let extents = view_box;
-    // println!("extents: {:?}", extents);
-    // let extents = compute_cell_range(extents, scale);
-    let mut min_width = f32::INFINITY;
-    let mut min_height = f32::INFINITY;
 
-    let mut p0 = Point::new(0., 0.);
-    // println!("extents2: {:?}", extents);
-    let mut near_arcs = Vec::with_capacity(endpoints.len());
-    let mut arcs = Vec::with_capacity(endpoints.len());
-    // println!("endpoints: {:?}", endpoints);
-    for i in 0..endpoints.len() {
-        let endpoint = &endpoints[i];
-        if endpoint.d == GLYPHY_INFINITY {
-            p0 = Point::new(endpoint.p[0], endpoint.p[1]);
-            continue;
-        }
-        let arc = Arc::new(p0, Point::new(endpoint.p[0], endpoint.p[1]), endpoint.d);
-        p0 = Point::new(endpoint.p[0], endpoint.p[1]);
-
-        near_arcs.push(arc);
-        arcs.push(unsafe { std::mem::transmute(near_arcs.last().unwrap()) });
-    }
-
-    let mut result_arcs = vec![];
-    let mut temp = Vec::with_capacity(arcs.len());
-    // println!("arcs:{:?}", arcs.len());
-    recursion_near_arcs_of_cell(
-        &near_arcs,
-        &extents,
-        &extents,
-        &arcs,
-        &mut min_width,
-        &mut min_height,
-        None,
-        None,
-        None,
-        None,
-        &mut result_arcs,
-        &mut temp,
-    );
-
-    CellInfo{
-        extents,
-        arcs: near_arcs,
-        info: result_arcs,
-        // min_width,
-        // min_height,
-    }
-
-}

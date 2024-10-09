@@ -1,13 +1,14 @@
-use std::{fmt::UpperHex, sync::Arc};
+use std::{fmt::UpperHex, mem::transmute, sync::Arc};
 
 use image::ColorType;
 use parry2d::na::{self};
+use pi_assets::allocator::Allocator;
 use tracing::Level;
 use tracing_subscriber::fmt::Subscriber;
 
 // use nalgebra::Vector3;
-use pi_sdf::{blur::gaussian_blur, font::FontFace, glyphy::{blob::TexData, geometry::{aabb::Aabb, arc::Arc as SdfArc}}, utils::{compute_layout, create_indices, CellInfo}};
-use pi_wgpu as wgpu;
+use pi_sdf::{blur::gaussian_blur, font::FontFace, glyphy::{blob::TexData, geometry::{aabb::Aabb, arc::Arc as SdfArc}}, utils::{create_indices, CellInfo}};
+use pi_wgpu::{self as wgpu, Surface};
 use wgpu::{util::DeviceExt, BlendState, ColorTargetState};
 use winit::{
     event::{Event, WindowEvent},
@@ -27,7 +28,8 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     //     dx12_shader_compiler: Dx12Compiler::default(),
     // });
 
-    let surface = instance.create_surface(window.clone()).unwrap();
+    let surface = instance.create_surface(window.as_ref()).unwrap();
+    let surface: Surface<'static> = unsafe { transmute(surface) };
     let adapter = instance
         .request_adapter(&wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::default(),
@@ -39,6 +41,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         .expect("Failed to find an appropriate adapter");
 
     // Create the logical device and command queue
+    let mut allocator = Allocator::new(128 * 1024 * 1024);
     let (device, queue) = adapter
         .request_device(
             &wgpu::DeviceDescriptor {
@@ -49,6 +52,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
                     .using_resolution(adapter.limits()),
             },
             None,
+            &mut allocator
         )
         .await
         .expect("Failed to create device");
@@ -80,16 +84,8 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     println!("max_box_normaliz: {:?}", ft_face.max_box_normaliz());
     let pxrange = 10;
     let time = std::time::Instant::now();
-    let mut outline_info = ft_face.to_outline3('2');
-    // let (plane_bounds, atlas_bounds, _, tex_size) = compute_layout(
-    //     &mut outline_info.extents.clone(),
-    //     outline_info.bbox.clone(),
-    //     32,
-    //     5,
-    //     outline_info.units_per_em,
-    //     5,
-    //     false,
-    // );
+    let mut outline_info = ft_face.to_outline('2');
+
 
     // println!("===================plane_bounds: {:?}", plane_bounds);
     let result_arcs = outline_info.compute_near_arcs(2.0);

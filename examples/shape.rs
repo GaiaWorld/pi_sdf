@@ -16,7 +16,7 @@ use pi_sdf::{
     utils::create_indices,
     Point,
 };
-use pi_wgpu::{self as wgpu, Dx12Compiler};
+use pi_wgpu::{self as wgpu, Dx12Compiler, InstanceDescriptor};
 use wgpu::{util::DeviceExt, BlendState, ColorTargetState};
 use winit::{
     event::{Event, WindowEvent},
@@ -31,10 +31,6 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
 
     let window_size = window.inner_size();
     let instance = wgpu::Instance::default();
-    let instance = wgpu::Instance::new(InstanceDescriptor {
-        backends: Backend::Gl.into(),
-        dx12_shader_compiler: Dx12Compiler::default(),
-    });
 
     let surface = { instance.create_surface(window.clone()) }.unwrap();
     let adapter = instance
@@ -101,7 +97,33 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         sdf_tex3: vec![0; tex_size.0 * tex_size.1 / 64], // 数据纹理宽
     };
     let time = std::time::Instant::now();
-    let shapes = create_shape();
+    let mut path = Path::new1(
+        vec![
+            PathVerb::MoveTo,
+            PathVerb::LineTo,
+            PathVerb::EllipticalArcTo,
+            PathVerb::LineTo,
+            PathVerb::EllipticalArcTo,
+            PathVerb::LineTo,
+            PathVerb::EllipticalArcTo,
+            PathVerb::LineTo,
+            PathVerb::EllipticalArcTo,
+        ],
+        vec![
+            100., 100., 
+            102., 100., 
+            15., 15., 0., 0., 117., 85., 
+            117., 83., 
+            15., 15., 0., 0., 102.,68., 
+            100., 68., 
+            15., 15., 0., 0., 85., 83., 
+            85., 85., 
+            15., 15., 0., 0., 100., 100.,
+        ],
+    );
+
+    let info = path.get_svg_info();
+    info
     let (texs_info, attributes, ts) = shapes.out_tex_data(&mut tex_data).unwrap();
     println!("out_tex_data: {:?}", time.elapsed());
     let vertexs = shapes.verties();
@@ -998,122 +1020,3 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     });
 }
 
-fn create_shape() -> SvgScenes {
-    let mut shapes = SvgScenes::new(Aabb::new(Point::new(0.0, 0.0), Point::new(400.0, 400.0)));
-    // 矩形
-    let mut rect = Rect::new(120.0, 70.0, 100.0, 50.0);
-    // 填充颜色 默认0. 0. 0. 0.
-    rect.attribute.set_fill_color(0, 0, 255);
-    // 描边颜色 默认 0. 0. 0.
-    rect.attribute.set_stroke_color(0, 0, 0);
-    // 描边宽度，默认0.0
-    rect.attribute.set_stroke_width(2.0);
-    shapes.add_shape(rect.get_hash(), Box::new(rect));
-
-    // // 圆
-    // let mut circle = Circle::new(200.0, 60.0, 40.0).unwrap();
-    // circle.attribute.set_fill_color(0, 0, 255);
-    // circle.attribute.set_stroke_color(0, 0, 0);
-    // circle.attribute.set_stroke_width(2.0);
-    // shapes.add_shape(circle.get_hash(), Box::new(circle));
-
-    // // 椭圆
-    // let mut ellipse = Ellipse::new(320.0, 60.0, 50.0, 25.0);
-    // ellipse.attribute.set_fill_color(0, 0, 255);
-    // ellipse.attribute.set_stroke_color(0, 0, 0);
-    // ellipse.attribute.set_stroke_width(2.0);
-    // shapes.add_shape(ellipse.get_hash(), Box::new(ellipse));
-
-    // 线段
-    // let mut segment = Segment::new(Point::new(20.0, 100.0), Point::new(120.0, 180.0));
-    // segment.attribute.set_stroke_color(255, 0, 0);
-    // segment.attribute.set_stroke_width(2.0);
-    // shapes.add_shape(Box::new(segment));
-
-    // // 多边形
-    // let mut polygon = Polygon::new(vec![
-    //     Point::new(270.0, 110.0),
-    //     Point::new(350.0, 170.0),
-    //     Point::new(320.0, 220.0),
-    //     Point::new(220.0, 210.0),
-    //     Point::new(200.0, 160.0),
-    // ]);
-    // polygon.attribute.set_fill_color(0, 255, 0);
-    // polygon.attribute.set_stroke_color(0, 0, 0);
-    // polygon.attribute.set_stroke_width(2.0);
-    // shapes.add_shape(Box::new(polygon));
-
-    // // 多段线
-    // let mut polyline: Polyline = Polyline::new(vec![
-    //     Point::new(20., 220.),
-    //     Point::new(40., 225.),
-    //     Point::new(60., 240.),
-    //     Point::new(80., 320.),
-    //     Point::new(120., 340.),
-    //     Point::new(180., 320.),
-    // ]);
-    // polyline.attribute.set_fill_color(0, 255, 0);
-    // polyline.attribute.set_stroke_color(0, 0, 0);
-    // polyline.attribute.set_stroke_width(2.0);
-    // shapes.add_shape(Box::new(polyline));
-
-    // // 路径
-    let mut path = Path::new(
-        vec![1, 17],
-        vec![110., 215., 30., 50., 0., 1., 162.55, 162.45],
-    );
-    let r = path.get_svg_info();
-    // polygon.attribute.set_fill_color(0, 255, 0);
-    // path.attribute.set_stroke_color(0, 255, 255);
-    // path.attribute.set_stroke_width(2.0);
-    // shapes.add_shape(path.get_hash(), Box::new(path));
-
-    // M 10 315
-    // L 110 215
-    // A 30 50 0 0 1 162.55 162.45
-    // L 172.55 152.45
-    // A 30 50 -45 0 1 215.1 109.9
-    // L 315 10
-
-    // // 虚线
-    // let mut path = Path::new(
-    //     vec![PathVerb::MoveTo, PathVerb::LineToRelative],
-    //     vec![Point::new(10., 400.), Point::new(215., 0.)],
-    // );
-    // path.attribute.set_stroke_dasharray(vec![20., 10.]);
-    // path.attribute.set_stroke_color(0, 0, 0);
-    // path.attribute.set_stroke_width(3.0);
-    // shapes.add_shape(path.get_hash() ,Box::new(path));
-
-    shapes
-}
-
-fn main() {
-    let event_loop = EventLoop::new();
-    let window = WindowBuilder::new()
-        .with_inner_size(winit::dpi::PhysicalSize::new(512, 512))
-        .build(&event_loop)
-        .unwrap();
-    let window = Arc::new(window);
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
-        pollster::block_on(run(event_loop, window));
-    }
-    #[cfg(target_arch = "wasm32")]
-    {
-        std::panic::set_hook(Box::new(console_error_panic_hook::hook));
-        console_log::init().expect("could not initialize logger");
-        use winit::platform::web::WindowExtWebSys;
-        // On wasm, append the canvas to the document body
-        web_sys::window()
-            .and_then(|win| win.document())
-            .and_then(|doc| doc.body())
-            .and_then(|body| {
-                body.append_child(&web_sys::Element::from(window.canvas()))
-                    .ok()
-            })
-            .expect("couldn't append canvas to document body");
-        wasm_bindgen_futures::spawn_local(run(event_loop, window));
-    }
-}

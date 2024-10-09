@@ -17,9 +17,8 @@ use usvg::{Color, Fill, NonZeroPositiveF64, Paint, Stroke};
 use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::{
-    font::SdfInfo2,
     glyphy::{
-        blob::TexInfo2,
+        blob::{travel_data, BlobArc},
         geometry::{aabb::Aabb, arcs::GlyphyArcAccumulator},
         sdf::{glyphy_sdf_from_arc_list2, glyphy_sdf_from_arc_list3},
         util::float2_equals,
@@ -52,6 +51,135 @@ pub static ENLIGHTEN_MAX: f32 = 0.0001; /* Per EM */
 pub static EMBOLDEN_MAX: f32 = 0.0001; /* Per EM */
 
 pub static SCALE: f32 = 2048.0;
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct TexInfo2 {
+    pub sdf_offset_x: usize,
+    pub sdf_offset_y: usize,
+    pub advance: f32,
+    pub char: char,
+    pub plane_min_x: f32,
+    pub plane_min_y: f32,
+    pub plane_max_x: f32,
+    pub plane_max_y: f32,
+    pub atlas_min_x: f32,
+    pub atlas_min_y: f32,
+    pub atlas_max_x: f32,
+    pub atlas_max_y: f32,
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SdfInfo2 {
+    pub tex_info: TexInfo2,
+    pub sdf_tex: Vec<u8>,
+    pub tex_size: u32,
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OutlineInfo {
+    pub(crate) char: char,
+    pub(crate) endpoints: Vec<ArcEndpoint>,
+    pub bbox: Vec<f32>,
+    pub advance: u16,
+    pub units_per_em: u16,
+    pub extents: Vec<f32>,
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
+impl OutlineInfo {
+    pub fn compute_near_arcs(&self, scale: f32) -> CellInfo {
+        FontFace::compute_near_arcs(
+            Aabb::new(
+                Point::new(self.extents[0], self.extents[1]),
+                Point::new(self.extents[2], self.extents[3]),
+            ),
+            scale,
+            &self.endpoints,
+        )
+    }
+
+    pub fn compute_near_arcs_of_wasm(&self, scale: f32) -> Vec<u8> {
+        bitcode::serialize(&self.compute_near_arcs(scale)).unwrap()
+    }
+
+    pub fn compute_sdf_tex(
+        &self,
+        result_arcs: CellInfo,
+        tex_size: usize,
+        pxrange: u32,
+        is_outer_glow: bool,
+        cur_off: u32,
+    ) -> SdfInfo2 {
+        let LayoutInfo {
+            plane_bounds,
+            atlas_bounds,
+            distance,
+            tex_size,
+            extents,
+        } = self.compute_layout(tex_size, pxrange, cur_off);
+        let extents = Aabb::new(
+            Point::new(extents[0], extents[1]),
+            Point::new(extents[2], extents[3]),
+        );
+        let CellInfo { arcs, info, .. } = result_arcs;
+        let pixmap = encode_sdf(
+            &arcs,
+            info,
+            &extents,
+            tex_size as usize,
+            distance,
+            None,
+            is_outer_glow,
+            false,
+            None,
+        );
+
+        SdfInfo2 {
+            tex_info: TexInfo2 {
+                char: self.char,
+                advance: self.advance as f32 / self.units_per_em as f32,
+                sdf_offset_x: 0,
+                sdf_offset_y: 0,
+                plane_min_x: plane_bounds[0],
+                plane_min_y: plane_bounds[1],
+                plane_max_x: plane_bounds[2],
+                plane_max_y: plane_bounds[3],
+                atlas_min_x: atlas_bounds[0],
+                atlas_min_y: atlas_bounds[1],
+                atlas_max_x: atlas_bounds[2],
+                atlas_max_y: atlas_bounds[3],
+            },
+            sdf_tex: pixmap,
+            tex_size,
+        }
+    }
+
+    pub fn compute_sdf_tex_of_wasm(
+        &self,
+        result_arcs: &[u8],
+        tex_size: usize,
+        pxrange: u32,
+        is_outer_glow: bool,
+        cur_off: u32,
+    ) -> Vec<u8> {
+        let result_arcs: CellInfo = bitcode::deserialize(result_arcs).unwrap();
+        bitcode::serialize(&self.compute_sdf_tex(result_arcs, tex_size, pxrange, is_outer_glow, cur_off)).unwrap()
+    }
+
+    pub fn compute_layout(&self, tex_size: usize, pxrange: u32, cur_off: u32) -> LayoutInfo {
+        compute_layout(
+            &self.extents,
+            tex_size,
+            pxrange,
+            self.units_per_em,
+            cur_off,
+            false,
+        )
+    }
+}
 pub struct User {
     pub accumulate: GlyphyArcAccumulator,
     pub path_str: String,
@@ -105,19 +233,6 @@ impl GlyphVisitor {
     }
 }
 
-// impl GlyphVisitor {
-//     pub fn get_pixmap(&mut self) -> ImageBuffer<Rgba<u8>, Vec<u8>> {
-//         let mut img = ImageBuffer::from_fn(512, 512, |_, _| Rgba([255u8, 0, 0, 0]));
-
-//         self.rasterizer.for_each_pixel_2d(|x, y, a| {
-//             let rgba = img.get_pixel_mut(x, 512 - y - 1);
-//             rgba[3] = (a * 255.0) as u8;
-//         });
-
-//         return img;
-//     }
-// }
-
 pub trait OutlineSinkExt: OutlineSink {
     fn arc2_to(&mut self, d: f32, to: Vector2F);
 }
@@ -125,7 +240,7 @@ pub trait OutlineSinkExt: OutlineSink {
 impl OutlineSinkExt for GlyphVisitor {
     fn arc2_to(&mut self, d: f32, to: Vector2F) {
         let to = Point::new(to.x(), to.y()) * self.scale;
-        log::info!("+ L {} {} ", to.x, to.y);
+        log::info!("+ A {} {} ", to.x, to.y);
         // if self.scale > 0.02 {
         self.accumulate.arc_to(to, d);
         #[cfg(feature = "debug")]
@@ -267,265 +382,7 @@ impl OutlineSink for GlyphVisitor {
     }
 }
 
-pub fn encode_uint_arc_data(
-    result_arcs: Vec<(Vec<Arc>, Aabb)>,
-    extents: &Aabb,
-    _min_width: f32,
-    _min_height: f32,
-    is_area: Option<bool>,
-    // units_per_em: u16,
-) -> (Vec<Vec<UnitArc>>, HashMap<u64, u64>) {
-    let glyph_width = extents.width();
-    let glyph_height = extents.height();
-    // 格子列的数量;
-    // todo 为了兼容阴影minimip先强制索引纹理为32 * 32
-    let mut width_cells = 32 as usize;
-    // 格子行的数量
-    let mut height_cells = 32 as usize;
-
-    if is_area.is_some() {
-        if glyph_width > 128.0 {
-            width_cells = 64;
-            height_cells = 64;
-        }
-    }
-
-    // 格子列的数量
-    let min_width = glyph_width / width_cells as f32;
-    // 格子行的数量
-    let min_height = glyph_height / height_cells as f32;
-
-    let mut data = vec![
-        vec![
-            UnitArc {
-                parent_cell: Extents {
-                    min_x: 0.,
-                    min_y: 0.,
-                    max_x: 0.,
-                    max_y: 0.
-                },
-                offset: 0,
-                sdf: 0.0,
-                #[cfg(feature = "debug")]
-                show: "".to_owned(),
-                data: Vec::with_capacity(8),
-                origin_data: vec![],
-                key: u64::MAX,
-                s_dist: 0,
-                s_dist_1: 0,
-                s_dist_2: 0,
-                s_dist_3: 0
-            };
-            width_cells
-        ];
-        height_cells
-    ];
-
-    // let glyph_width = extents.width();
-    // let glyph_height = extents.height();
-    let c = extents.center();
-    let unit = glyph_width.max(glyph_height);
-
-    let mut map = HashMap::with_capacity(32 * 32);
-    // 二分计算时，个格子的大小会不一样
-    // 统一以最小格子细分
-    for (near_arcs, cell) in result_arcs {
-        let mut near_endpoints = Vec::with_capacity(8);
-        let mut _p1 = Point::new(0.0, 0.0);
-
-        for i in 0..near_arcs.len() {
-            let arc = &near_arcs[i];
-
-            if i == 0 || !_p1.equals(&arc.p0) {
-                let endpoint = ArcEndpoint::new(arc.p0.x, arc.p0.y, GLYPHY_INFINITY);
-                near_endpoints.push(endpoint);
-                _p1 = arc.p0;
-            }
-
-            let endpoint = ArcEndpoint::new(arc.p1.x, arc.p1.y, arc.d);
-            near_endpoints.push(endpoint);
-            _p1 = arc.p1;
-        }
-        // println!("near_endpoints: {:?}", near_endpoints.len());
-
-        let begin = cell.mins - extents.mins;
-        let end = cell.maxs - extents.mins;
-        let begin_x = (begin.x / min_width).round() as usize;
-        let begin_y = (begin.y / min_height).round() as usize;
-
-        let end_x = (end.x / min_width).round() as usize;
-        let end_y = (end.y / min_height).round() as usize;
-        let parent_cell = Extents {
-            min_x: cell.mins.x,
-            min_y: cell.mins.y,
-            max_x: cell.maxs.x,
-            max_y: cell.maxs.y,
-        };
-
-        let mut line_result = None;
-        let mut arc_result = None;
-        // 如果是线段段都编码
-        if near_endpoints.len() == 2 && near_endpoints[1].d == 0.0 {
-            let start = &near_endpoints[0];
-            let end = &near_endpoints[1];
-
-            let mut line = Line::from_points(
-                snap(
-                    &Point::new(start.p[0], start.p[1]),
-                    &extents,
-                    glyph_width,
-                    glyph_height,
-                ),
-                snap(
-                    &Point::new(end.p[0], end.p[1]),
-                    &extents,
-                    glyph_width,
-                    glyph_height,
-                ),
-            );
-            // Shader的最后 要加回去
-            line.c -= line.n.dot(&c.into_vector());
-            // shader 的 decode 要 乘回去
-            line.c /= unit;
-
-            let line_key = near_endpoints[0].get_line_key(&near_endpoints[1]);
-            let le = line_encode(line);
-
-            let mut line_data = ArcEndpoint::new(0.0, 0.0, 0.0);
-            line_data.line_key = Some(line_key);
-            line_data.line_encode = Some(le);
-
-            line_result = Some((line_data, start.clone(), end.clone()));
-        } else {
-            if near_endpoints.len() == 4
-                && is_inf(near_endpoints[2].d)
-                && near_endpoints[0].p[0] == near_endpoints[3].p[0]
-                && near_endpoints[0].p[1] == near_endpoints[3].p[1]
-            {
-                let e0 = near_endpoints[2].clone();
-                let e1 = near_endpoints[3].clone();
-                let e2 = near_endpoints[1].clone();
-
-                near_endpoints.clear();
-                near_endpoints.push(e0);
-                near_endpoints.push(e1);
-                near_endpoints.push(e2);
-            }
-
-            // 编码到纹理：该格子 对应 的 圆弧数据
-            let mut hasher = pi_hash::DefaultHasher::default();
-            let mut key = Vec::with_capacity(20);
-            for endpoint in &near_endpoints {
-                key.push(endpoint.p[0]);
-                key.push(endpoint.p[1]);
-                key.push(endpoint.d);
-            }
-            hasher.write(bytemuck::cast_slice(&key));
-            let result = hasher.finish();
-
-            arc_result = Some(result);
-        }
-
-        // If the arclist is two arcs that can be combined in encoding if reordered, do that.
-        for i in begin_x..end_x {
-            for j in begin_y..end_y {
-                let unit_arc = &mut data[j][i];
-                if let Some((line_data, start, end)) = line_result.as_ref() {
-                    unit_arc.data.push(line_data.clone());
-                    // println!("1row: {}, col: {} line_data: {:?}n \n", row, col, unit_arc.data.len());
-                    unit_arc.origin_data.push(start.clone());
-                    unit_arc.origin_data.push(end.clone());
-                    unit_arc.parent_cell = parent_cell;
-                } else {
-                    let key = arc_result.as_ref().unwrap();
-                    unit_arc.data.extend_from_slice(&near_endpoints);
-                    unit_arc.parent_cell = parent_cell;
-                    unit_arc.key = key.clone();
-                }
-                let p = Point::new(
-                    (i as f32 + 0.5) * min_width + extents.mins.x,
-                    (j as f32 + 0.5) * min_height + extents.mins.y,
-                );
-
-                unit_arc.s_dist = compute_sdf(p, &near_arcs, is_area);
-            }
-        }
-        let key = data[begin_y][begin_x].get_key();
-        let ptr: *const UnitArc = &data[begin_y][begin_x];
-        // 使用map 去重每个格子的数据纹理
-        map.insert(key, ptr as u64);
-    }
-    (data, map)
-}
-
 pub fn encode_sdf(
-    global_arcs: &Vec<Arc>,
-    result_arcs: Vec<(Vec<usize>, Aabb)>,
-    extents: &Aabb,
-    width_cells: usize,
-    height_cells: usize,
-    distance: f32, // sdf在这个值上alpha 衰减为 0
-    width: Option<f32>,
-    is_outer_glow: bool,
-    is_svg: bool,
-    is_reverse: Option<bool>,
-) -> Vec<u8> {
-    // // todo 为了兼容阴影minimip先强制索引纹理为32 * 32
-    // let mut width_cells = 32 as usize;
-    // // 格子行的数量
-    // let mut height_cells = 32 as usize;
-
-    let glyph_width = extents.width();
-    let glyph_height = extents.height();
-
-    // 格子列的数量
-    let min_width = glyph_width / width_cells as f32;
-    // 格子行的数量
-    let min_height = glyph_height / height_cells as f32;
-
-    let mut data = vec![0; width_cells * height_cells];
-
-    for (near_arcs, cell) in result_arcs {
-        // println!("near_endpoints: {:?}", near_endpoints.len());
-
-        // if cell.
-        let begin = cell.mins - extents.mins;
-        let end = cell.maxs - extents.mins;
-        let begin_x = (begin.x / min_width).round() as usize;
-        let begin_y = (begin.y / min_height).round() as usize;
-
-        let end_x = (end.x / min_width).round() as usize;
-        let end_y = (end.y / min_height).round() as usize;
-
-        // If the arclist is two arcs that can be combined in encoding if reordered, do that.
-        for i in begin_x..end_x {
-            for j in begin_y..end_y {
-                let p = Point::new(
-                    (i as f32 + 0.5) * min_width + extents.mins.x,
-                    (j as f32 + 0.5) * min_height + extents.mins.y,
-                );
-                let r = compute_sdf2(
-                    global_arcs,
-                    p,
-                    &near_arcs,
-                    distance,
-                    width,
-                    is_outer_glow,
-                    is_reverse,
-                );
-                // svg 不需要颠倒纹理
-                if is_svg {
-                    data[j * width_cells + i] = r.0;
-                } else {
-                    data[(height_cells - j - 1) * width_cells + i] = r.0;
-                }
-            }
-        }
-    }
-    data
-}
-
-pub fn encode_sdf2(
     global_arcs: &Vec<Arc>,
     arcs_info: Vec<(Vec<usize>, Aabb)>,
     extents: &Aabb,
@@ -572,7 +429,7 @@ pub fn encode_sdf2(
                         (i as f32 + 0.5) * unit_d + extents.mins.x,
                         (j as f32 + 0.5) * unit_d + extents.mins.y,
                     );
-                    
+
                     let r = compute_sdf2(
                         global_arcs,
                         p,
@@ -591,7 +448,7 @@ pub fn encode_sdf2(
                     //         println!("{:?}", global_arcs[*a])
                     //     }
                     // }
-                    
+
                     // svg 不需要颠倒纹理
                     if is_svg {
                         data[j * tex_size + i] = r.0;
@@ -608,7 +465,7 @@ pub fn encode_sdf2(
 
 fn compute_sdf(p: Point, near_arcs: &Vec<Arc>, is_area: Option<bool>) -> u8 {
     let sdf = glyphy_sdf_from_arc_list2(near_arcs, p).0;
-    
+
     let a = if let Some(is_area) = is_area {
         let sdf1 = if !is_area {
             (256.0 - (sdf.abs()) * 32.0).clamp(0.0, 255.0)
@@ -669,11 +526,7 @@ fn compute_sdf2(
     }
 
     if is_outer_glow {
-        // let radius = distance;
         let sdf2 = (1.0 - (sdf / distance)).powf(1.99);
-        // println!("{:?}", (radius, sdf));
-        // let sdf2 = ((radius - sdf) / radius).clamp(-1.0, 1.0).powf(2.0);
-        // println!("{:?}", (radius, sdf));
         return ((sdf2 * 255.0).round() as u8, sdf, sdf2);
         // println!("{:?}", (radius, sdf));
     } else {
@@ -684,30 +537,43 @@ fn compute_sdf2(
     }
 }
 
-pub fn compute_layout(
-    extents: &mut Aabb,
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
+#[derive(Debug, Serialize, Deserialize)]
+pub struct LayoutInfo {
+    pub plane_bounds: Vec<f32>,
+    pub atlas_bounds: Vec<f32>,
+    pub extents: Vec<f32>,
+    pub distance: f32,
+    pub tex_size: u32,
+}
+
+// #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
+pub(crate) fn compute_layout(
+    extents: &[f32],
     tex_size: usize,
     pxrange: u32,
     units_per_em: u16,
     cur_off: u32,
     is_svg: bool,
-) -> (Aabb, Aabb, f32, usize) {
+) -> LayoutInfo {
     // map 无序导致每次计算的数据不一样
-    // let bbox = extents.clone();
-    // println!("")
-    let extents_w = extents.width();
-    let extents_h = extents.height();
+    let mut extents2 = Aabb::new(
+        Point::new(extents[0], extents[1]),
+        Point::new(extents[2], extents[3]),
+    );
+    let extents_w = extents2.width();
+    let extents_h = extents2.height();
     let scale = 1.0 / units_per_em as f32;
-    let plane_bounds = extents.scaled(&Vector::new(scale, scale));
+    let plane_bounds = extents2.scaled(&Vector::new(scale, scale));
 
     let px_distance = extents_w.max(extents_h) / tex_size as f32;
     let distance = px_distance * pxrange as f32;
     let expand = px_distance * cur_off as f32;
     // println!("distance: {}", distance);
-    extents.mins.x -= expand;
-    extents.mins.y -= expand;
-    extents.maxs.x += expand;
-    extents.maxs.y += expand;
+    extents2.mins.x -= expand;
+    extents2.mins.y -= expand;
+    extents2.maxs.x += expand;
+    extents2.maxs.y += expand;
 
     // let pxrange = (pxrange >> 2 << 2) + 4;
     let tex_size = tex_size + (cur_off * 2) as usize;
@@ -719,28 +585,50 @@ pub fn compute_layout(
 
     let temp = extents_w - extents_h;
     if temp > 0.0 {
-        extents.maxs.y += temp;
+        extents2.maxs.y += temp;
         if is_svg {
             // println!("============= is_svg: {}", (temp / extents.height() * tex_size as f32 - 1.0));
-            atlas_bounds.maxs.y -= (temp / extents.height() * tex_size as f32 ).trunc();
+            atlas_bounds.maxs.y -= (temp / extents2.height() * tex_size as f32).trunc();
         } else {
             // 字体的y最终需要上下颠倒
-            atlas_bounds.mins.y += (temp / extents.height() * tex_size as f32).ceil();
+            atlas_bounds.mins.y += (temp / extents2.height() * tex_size as f32).ceil();
         }
     } else {
-        extents.maxs.x -= temp;
-        atlas_bounds.maxs.x -= (temp.abs() / extents.width() * tex_size as f32).trunc();
+        extents2.maxs.x -= temp;
+        atlas_bounds.maxs.x -= (temp.abs() / extents2.width() * tex_size as f32).trunc();
     }
-
     // plane_bounds.scale(
     //     atlas_bounds.width() / 32.0 / plane_bounds.width(),
     //     atlas_bounds.height() / 32.0 / plane_bounds.width(),
     // );
+
     println!(
         "plane_bounds: {:?}, atlas_bounds: {:?}, tex_size: {}",
         plane_bounds, atlas_bounds, tex_size
     );
-    (Aabb(plane_bounds), atlas_bounds, distance, tex_size)
+
+    LayoutInfo {
+        plane_bounds: vec![
+            plane_bounds.mins.x,
+            plane_bounds.mins.y,
+            plane_bounds.maxs.x,
+            plane_bounds.maxs.y,
+        ],
+        atlas_bounds: vec![
+            atlas_bounds.mins.x,
+            atlas_bounds.mins.y,
+            atlas_bounds.maxs.x,
+            atlas_bounds.maxs.y,
+        ],
+        extents: vec![
+            extents2.mins.x,
+            extents2.mins.y,
+            extents2.maxs.x,
+            extents2.maxs.y,
+        ],
+        distance,
+        tex_size: tex_size as u32,
+    }
 }
 
 pub fn compute_cell_range(mut bbox: Aabb, scale: f32) -> Aabb {
@@ -953,120 +841,6 @@ impl Attribute {
     }
 }
 
-// #[cfg(not(target_arch = "wasm32"))]
-// #[derive(Debug, Clone)]
-// pub struct GlyphInfo {
-//     pub char: char,
-//     pub plane_bounds: Aabb,
-//     pub atlas_bounds: Aabb,
-//     pub advance: f32,
-//     pub sdf_tex: Vec<u8>,
-//     pub tex_size: u32,
-// }
-
-// #[cfg(target_arch = "wasm32")]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GlyphInfo {
-    pub char: char,
-    pub plane_bounds: [f32; 4],
-    pub atlas_bounds: [f32; 4],
-    pub advance: f32,
-    pub sdf_tex: Vec<u8>,
-    pub tex_size: u32,
-}
-
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
-#[derive(Debug, Clone)]
-pub struct OutlineInfo {
-    pub(crate) char: char,
-    pub(crate) endpoints: Vec<ArcEndpoint>,
-    pub bbox: Aabb,
-    pub advance: u16,
-    pub units_per_em: u16,
-    pub extents: Aabb,
-}
-
-impl OutlineInfo {
-    pub fn compute_near_arcs(&mut self, scale: f32) -> CellInfo {
-        FontFace::compute_near_arcs(self.extents, scale, &mut self.endpoints)
-    }
-
-    pub fn compute_sdf_tex(
-        &mut self,
-        result_arcs: CellInfo,
-        tex_size: usize,
-        pxrange: u32,
-        is_outer_glow: bool,
-        cur_off: u32
-    ) -> SdfInfo2 {
-        // println!("bbox: {:?}", self.bbox);
-        let mut extents = self.extents;
-        let (plane_bounds, atlas_bounds, distance, tex_size) = compute_layout(
-            &mut extents,
-            tex_size,
-            pxrange,
-            self.units_per_em,
-            cur_off,
-            false,
-        );
-        let CellInfo { arcs, info, .. } = result_arcs;
-        let pixmap = encode_sdf2(
-            &arcs,
-            info,
-            &extents,
-            tex_size,
-            distance,
-            None,
-            is_outer_glow,
-            false,
-            None,
-        );
-
-        SdfInfo2 {
-            tex_info: TexInfo2 {
-                char: self.char,
-                advance: self.advance as f32 / self.units_per_em as f32,
-                sdf_offset_x: 0,
-                sdf_offset_y: 0,
-                plane_min_x: plane_bounds.mins.x,
-                plane_min_y: plane_bounds.mins.y,
-                plane_max_x: plane_bounds.maxs.x,
-                plane_max_y: plane_bounds.maxs.y,
-                atlas_min_x: atlas_bounds.mins.x,
-                atlas_min_y: atlas_bounds.mins.y,
-                atlas_max_x: atlas_bounds.maxs.x,
-                atlas_max_y: atlas_bounds.maxs.y,
-            },
-            sdf_tex: pixmap,
-            tex_size,
-        }
-    }
-}
-
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
-impl OutlineInfo {
-    pub fn compute_near_arcs2(&mut self, scale: f32) -> Vec<u8> {
-        bitcode::serialize(&FontFace::compute_near_arcs(
-            self.bbox,
-            scale,
-            &mut self.endpoints,
-        ))
-        .unwrap()
-    }
-
-    pub fn compute_sdf_tex2(
-        &mut self,
-        result_arcs: &[u8],
-        tex_size: usize,
-        pxrange: u32,
-        is_outer_glow: bool,
-        cur_off: u32
-    ) -> Vec<u8> {
-        let info: CellInfo = bitcode::deserialize(result_arcs).unwrap();
-        bitcode::serialize(&self.compute_sdf_tex(info, tex_size, pxrange, is_outer_glow, cur_off)).unwrap()
-    }
-}
-
 pub fn arc_to_point(arcs: Vec<Arc>) -> Vec<ArcEndpoint> {
     let mut arc_endpoints = Vec::with_capacity(arcs.len());
     let mut _p1 = Point::new(0.0, 0.0);
@@ -1104,13 +878,213 @@ pub fn point_to_arc(endpoints: Vec<ArcEndpoint>) -> Vec<Arc> {
     arcs
 }
 
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Clone)]
 pub struct CellInfo {
     pub(crate) extents: Aabb,
-    pub arcs: Vec<Arc>,
-    pub info: Vec<(Vec<usize>, Aabb)>,
-    // pub(crate) _min_width: f32,
-    // pub(crate) _min_height: f32,
+    pub(crate) arcs: Vec<Arc>,
+    pub(crate) info: Vec<(Vec<usize>, Aabb)>,
+    pub(crate) min_width: f32,
+    pub(crate) min_height: f32,
+    pub(crate) is_area: bool,
+}
+
+impl CellInfo {
+    pub fn encode_blob_arc(&self) -> BlobArc {
+        let extents = &self.extents;
+
+        let result_arcs = &self.info;
+        let global_arcs = &self.arcs;
+        let glyph_width = extents.width();
+        let glyph_height = extents.height();
+        // // 格子列的数量;
+        // // todo 为了兼容阴影minimip先强制索引纹理为32 * 32
+        let width_cells = (glyph_width / self.min_width).round() as usize;
+        // 格子行的数量
+        let height_cells = (glyph_height / self.min_height).round() as usize;
+
+        // if is_area.is_some() {
+        //     if glyph_width > 128.0 {
+        //         width_cells = 64;
+        //         height_cells = 64;
+        //     }
+        // }
+
+        // 格子列的数量
+        let min_width = glyph_width / width_cells as f32;
+        // 格子行的数量
+        let min_height = glyph_height / height_cells as f32;
+
+        let mut data = vec![
+            vec![
+                UnitArc {
+                    parent_cell: Extents {
+                        min_x: 0.,
+                        min_y: 0.,
+                        max_x: 0.,
+                        max_y: 0.
+                    },
+                    offset: 0,
+                    sdf: 0.0,
+                    #[cfg(feature = "debug")]
+                    show: "".to_owned(),
+                    data: Vec::with_capacity(8),
+                    origin_data: vec![],
+                    key: u64::MAX,
+                    s_dist: 0,
+                    s_dist_1: 0,
+                    s_dist_2: 0,
+                    s_dist_3: 0
+                };
+                width_cells
+            ];
+            height_cells
+        ];
+
+        // let glyph_width = extents.width();
+        // let glyph_height = extents.height();
+        let c = extents.center();
+        let unit = glyph_width.max(glyph_height);
+
+        let mut map = HashMap::with_capacity(32 * 32);
+        // 二分计算时，个格子的大小会不一样
+        // 统一以最小格子细分
+        for (near_arcs, cell) in result_arcs {
+            let mut near_endpoints = Vec::with_capacity(8);
+            let mut _p1 = Point::new(0.0, 0.0);
+
+            for i in 0..near_arcs.len() {
+                let arc = &global_arcs[near_arcs[i]];
+
+                if i == 0 || !_p1.equals(&arc.p0) {
+                    let endpoint = ArcEndpoint::new(arc.p0.x, arc.p0.y, GLYPHY_INFINITY);
+                    near_endpoints.push(endpoint);
+                    _p1 = arc.p0;
+                }
+
+                let endpoint = ArcEndpoint::new(arc.p1.x, arc.p1.y, arc.d);
+                near_endpoints.push(endpoint);
+                _p1 = arc.p1;
+            }
+            // println!("near_endpoints: {:?}", near_endpoints.len());
+
+            let begin = cell.mins - extents.mins;
+            let end = cell.maxs - extents.mins;
+            let begin_x = (begin.x / min_width).round() as usize;
+            let begin_y = (begin.y / min_height).round() as usize;
+
+            let end_x = (end.x / min_width).round() as usize;
+            let end_y = (end.y / min_height).round() as usize;
+            let parent_cell = Extents {
+                min_x: cell.mins.x,
+                min_y: cell.mins.y,
+                max_x: cell.maxs.x,
+                max_y: cell.maxs.y,
+            };
+
+            let mut line_result = None;
+            let mut arc_result = None;
+            // 如果是线段段都编码
+            if near_endpoints.len() == 2 && near_endpoints[1].d == 0.0 {
+                let start = &near_endpoints[0];
+                let end = &near_endpoints[1];
+
+                let mut line = Line::from_points(
+                    snap(
+                        &Point::new(start.p[0], start.p[1]),
+                        &extents,
+                        glyph_width,
+                        glyph_height,
+                    ),
+                    snap(
+                        &Point::new(end.p[0], end.p[1]),
+                        &extents,
+                        glyph_width,
+                        glyph_height,
+                    ),
+                );
+                // Shader的最后 要加回去
+                line.c -= line.n.dot(&c.into_vector());
+                // shader 的 decode 要 乘回去
+                line.c /= unit;
+
+                let line_key = near_endpoints[0].get_line_key(&near_endpoints[1]);
+                let le = line_encode(line);
+
+                let mut line_data = ArcEndpoint::new(0.0, 0.0, 0.0);
+                line_data.line_key = Some(line_key);
+                line_data.line_encode = Some(le);
+
+                line_result = Some((line_data, start.clone(), end.clone()));
+            } else {
+                if near_endpoints.len() == 4
+                    && is_inf(near_endpoints[2].d)
+                    && near_endpoints[0].p[0] == near_endpoints[3].p[0]
+                    && near_endpoints[0].p[1] == near_endpoints[3].p[1]
+                {
+                    let e0 = near_endpoints[2].clone();
+                    let e1 = near_endpoints[3].clone();
+                    let e2 = near_endpoints[1].clone();
+
+                    near_endpoints.clear();
+                    near_endpoints.push(e0);
+                    near_endpoints.push(e1);
+                    near_endpoints.push(e2);
+                }
+
+                // 编码到纹理：该格子 对应 的 圆弧数据
+                let mut hasher = pi_hash::DefaultHasher::default();
+                let mut key = Vec::with_capacity(20);
+                for endpoint in &near_endpoints {
+                    key.push(endpoint.p[0]);
+                    key.push(endpoint.p[1]);
+                    key.push(endpoint.d);
+                }
+                hasher.write(bytemuck::cast_slice(&key));
+                let result = hasher.finish();
+
+                arc_result = Some(result);
+            }
+
+            // If the arclist is two arcs that can be combined in encoding if reordered, do that.
+            for i in begin_x..end_x {
+                for j in begin_y..end_y {
+                    let unit_arc = &mut data[j][i];
+                    if let Some((line_data, start, end)) = line_result.as_ref() {
+                        unit_arc.data.push(line_data.clone());
+                        // println!("1row: {}, col: {} line_data: {:?}n \n", row, col, unit_arc.data.len());
+                        unit_arc.origin_data.push(start.clone());
+                        unit_arc.origin_data.push(end.clone());
+                        unit_arc.parent_cell = parent_cell;
+                    } else {
+                        let key = arc_result.as_ref().unwrap();
+                        unit_arc.data.extend_from_slice(&near_endpoints);
+                        unit_arc.parent_cell = parent_cell;
+                        unit_arc.key = key.clone();
+                    }
+                    println!("i: {}, j: {}, unit_arc: {:?}", i, j, unit_arc);
+                }
+            }
+            let key = data[begin_y][begin_x].get_key();
+            let ptr: *const UnitArc = &data[begin_y][begin_x];
+            // 使用map 去重每个格子的数据纹理
+            map.insert(key, ptr as u64);
+        }
+        let [min_sdf, max_sdf] = travel_data(&data);
+
+        BlobArc {
+            min_sdf,
+            max_sdf,
+            cell_size: min_width,
+            #[cfg(feature = "debug")]
+            show: format!("<br> 格子数：宽 = {}, 高 = {} <br>", min_width, min_height),
+            extents: *extents,
+            data: data,
+            avg_fetch_achieved: 0.0,
+            endpoints: vec![],
+            data_tex_map: map,
+        }
+    }
 }
 
 impl Serialize for CellInfo {
@@ -1121,7 +1095,7 @@ impl Serialize for CellInfo {
         let unit_size = self.extents.width() / 32.0;
         let start_point = self.extents.mins;
 
-        let mut s = serializer.serialize_struct("CellInfo", 6)?;
+        let mut s = serializer.serialize_struct("CellInfo", 9)?;
         s.serialize_field("mins_x", &self.extents.mins.x)?;
         s.serialize_field("mins_y", &self.extents.mins.y)?;
         s.serialize_field("maxs_x", &self.extents.maxs.x)?;
@@ -1148,6 +1122,9 @@ impl Serialize for CellInfo {
         }
         // println!("CellInfo: {}", info.len() )
         s.serialize_field("info", &info)?;
+        s.serialize_field("min_width", &self.min_width)?;
+        s.serialize_field("min_height", &self.min_height)?;
+        s.serialize_field("is_area", &self.is_area)?;
         s.end()
     }
 }
@@ -1206,18 +1183,37 @@ impl<'de> Deserialize<'de> for CellInfo {
                     }
                     info.push((arc_index, Aabb::new(min, max)));
                 }
+                let min_width = seq
+                    .next_element()?
+                    .ok_or_else(|| de::Error::invalid_length(6, &self))?;
+                let min_height = seq
+                    .next_element()?
+                    .ok_or_else(|| de::Error::invalid_length(7, &self))?;
+                let is_area = seq
+                    .next_element()?
+                    .ok_or_else(|| de::Error::invalid_length(7, &self))?;
                 Ok(CellInfo {
                     extents,
                     arcs,
                     info,
-                    // min_width: 0.0,
-                    // min_height: 0.0,
+                    min_width,
+                    min_height,
+                    is_area,
                 })
             }
         }
 
-        const FIELDS: &'static [&'static str] =
-            &["arcs", "mins_x", "mins_y", "maxs_x", "maxs_y", "info"];
+        const FIELDS: &'static [&'static str] = &[
+            "mins_x",
+            "mins_y",
+            "maxs_x",
+            "maxs_y",
+            "arcs",
+            "info",
+            "min_width",
+            "min_height",
+            "is_area",
+        ];
         deserializer.deserialize_struct("Point", FIELDS, CellInfoVisitor)
     }
 }

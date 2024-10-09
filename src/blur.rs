@@ -264,7 +264,7 @@ pub fn compute_box_layout(bbox: Aabb, txe_size: usize, radius: u32) -> BoxInfo {
         bbox: atlas_bounds,
         radius
     };
-println!("BoxInfo: {:?}", info);
-info
+    println!("BoxInfo: {:?}", info);
+    info
     
 }

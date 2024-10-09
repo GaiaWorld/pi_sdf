@@ -1,5 +1,5 @@
-use std::{collections::HashMap, ops::Range};
 use parry2d::math::Vector;
+use std::{collections::HashMap, ops::Range};
 
 use serde::{Deserialize, Serialize};
 #[cfg(target_arch = "wasm32")]
@@ -32,7 +32,7 @@ pub enum EncodeError {
     NewLine,
 }
 
-#[cfg_attr(target_arch="wasm32", wasm_bindgen(getter_with_clone))]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
 #[derive(Clone, Debug)]
 pub struct UnitArc {
     pub parent_cell: Extents,
@@ -53,7 +53,7 @@ pub struct UnitArc {
     pub s_dist_3: u64,
 }
 
-#[cfg_attr(target_arch="wasm32", wasm_bindgen)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 impl UnitArc {
     pub fn get_data_len(&self) -> usize {
         self.data.len()
@@ -74,7 +74,7 @@ impl UnitArc {
     }
 }
 
-#[cfg_attr(target_arch="wasm32", wasm_bindgen)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 #[derive(Debug, Clone)]
 pub struct BlobArc {
     pub min_sdf: f32,
@@ -90,9 +90,10 @@ pub struct BlobArc {
     pub(crate) data: Vec<Vec<UnitArc>>,
     pub avg_fetch_achieved: f32,
     pub(crate) endpoints: Vec<ArcEndpoint>,
+    pub(crate) data_tex_map: HashMap<u64, u64>,
 }
 
-#[cfg_attr(target_arch="wasm32", wasm_bindgen)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 #[derive(Debug, Clone, Copy)]
 pub struct Extents {
     pub min_x: f32,
@@ -101,7 +102,7 @@ pub struct Extents {
     pub max_y: f32,
 }
 
-#[cfg_attr(target_arch="wasm32", wasm_bindgen)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 impl BlobArc {
     pub fn get_unit_arc(&self, i: usize, j: usize) -> UnitArc {
         // log::debug!("i: {}, j: {}", i, j);
@@ -124,11 +125,29 @@ impl BlobArc {
     pub fn get_endpoint(&self, index: usize) -> ArcEndpoint {
         self.endpoints[index].clone()
     }
+
+    pub fn encode_tex(&self) -> SdfInfo {
+        let data_tex = self.encode_data_tex1();
+        let (tex_info, index_tex, sdf_tex1, sdf_tex2, sdf_tex3, sdf_tex4) =
+            self.encode_index_tex1(data_tex.len());
+        let grid_size = self.grid_size();
+
+        SdfInfo {
+            tex_info,
+            data_tex,
+            index_tex,
+            sdf_tex1,
+            sdf_tex2,
+            sdf_tex3,
+            sdf_tex4,
+            grid_size: vec![grid_size.0, grid_size.1],
+        }
+    }
 }
 
 impl BlobArc {
     // 按数据去重，并编码到纹理
-    pub fn encode_data_tex(
+    fn encode_data_tex(
         &self,
         map: &HashMap<u64, u64>,
         data_tex: &mut Vec<u8>,
@@ -157,8 +176,9 @@ impl BlobArc {
         }
     }
 
-    pub fn encode_data_tex1(&self, map: &HashMap<u64, u64>) -> Vec<u8> {
+    fn encode_data_tex1(&self) -> Vec<u8> {
         // 返回索引数据和宽高
+        let map = &self.data_tex_map;
         let mut len = 0usize;
         let glyph_width = self.extents.width();
         let glyph_height = self.extents.height();
@@ -252,13 +272,14 @@ impl BlobArc {
         index_tex_width: usize,
         offset_x: &mut usize,
         offset_y: &mut usize,
-        data_tex_map: HashMap<u64, u64>,
+
         data_tex_len: usize,
         sdf_tex: &mut Vec<u8>, // 字节数 = 4 * 像素个数
         sdf_tex1: &mut Vec<u8>,
         sdf_tex2: &mut Vec<u8>,
         sdf_tex3: &mut Vec<u8>,
     ) -> Result<TexInfo, EncodeError> {
+        let data_tex_map = &self.data_tex_map;
         let max_offset = data_tex_len;
         // 计算sdf的 梯度等级
         let mut level = (2usize.pow(14) / max_offset) - 1;
@@ -385,7 +406,7 @@ impl BlobArc {
             sdf_step,
             char: char::default(),
             index_offset_x: 0,
-            index_offset_y:0,
+            index_offset_y: 0,
             data_offset_x: 0,
             data_offset_y: 0,
             extents_min_x: Default::default(),
@@ -400,10 +421,10 @@ impl BlobArc {
     }
 
     pub fn encode_index_tex1(
-        &mut self,
-        data_tex_map: HashMap<u64, u64>,
+        &self,
         data_tex_len: usize,
     ) -> (TexInfo, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>) {
+        let data_tex_map = &self.data_tex_map;
         let max_offset = data_tex_len;
         // 计算sdf的 梯度等级
         let mut level = (2usize.pow(14) / max_offset) - 1;
@@ -444,6 +465,7 @@ impl BlobArc {
                     }
 
                     let offset = map_arc_data.offset;
+                    // println!("offset: {}", offset);
                     let sdf = self.data[i][j].sdf;
 
                     let cell_size = self.cell_size;
@@ -465,37 +487,37 @@ impl BlobArc {
                     index_tex.push((encode as i32 & 0xff) as u8);
                     index_tex.push((encode as i32 >> 8) as u8);
                     // println!("index_tex[{}][{}]: {} {}", j, i, encode as i32 & 0xff, encode as i32 >> 8);
-                    sdf_tex.push(self.data[i][j].s_dist);
+                    // sdf_tex.push(self.data[i][j].s_dist);
 
-                    if i % 2 == 1 && j % 2 == 1 {
-                        self.data[i][j].s_dist_1 = (self.data[i][j].s_dist as u64
-                            + self.data[i - 1][j].s_dist as u64
-                            + self.data[i][j - 1].s_dist as u64
-                            + self.data[i - 1][j - 1].s_dist as u64)
-                            / 4;
+                    // if i % 2 == 1 && j % 2 == 1 {
+                    //     self.data[i][j].s_dist_1 = (self.data[i][j].s_dist as u64
+                    //         + self.data[i - 1][j].s_dist as u64
+                    //         + self.data[i][j - 1].s_dist as u64
+                    //         + self.data[i - 1][j - 1].s_dist as u64)
+                    //         / 4;
 
-                        sdf_tex1.push(self.data[i][j].s_dist_1 as u8);
+                    //     sdf_tex1.push(self.data[i][j].s_dist_1 as u8);
 
-                        if i % 4 == 3 && j % 4 == 3 {
-                            self.data[i][j].s_dist_2 = (self.data[i][j].s_dist_1 as u64
-                                + self.data[i - 2][j].s_dist_1 as u64
-                                + self.data[i][j - 2].s_dist_1 as u64
-                                + self.data[i - 2][j - 2].s_dist_1 as u64)
-                                / 4;
+                    //     if i % 4 == 3 && j % 4 == 3 {
+                    //         self.data[i][j].s_dist_2 = (self.data[i][j].s_dist_1 as u64
+                    //             + self.data[i - 2][j].s_dist_1 as u64
+                    //             + self.data[i][j - 2].s_dist_1 as u64
+                    //             + self.data[i - 2][j - 2].s_dist_1 as u64)
+                    //             / 4;
 
-                            sdf_tex2.push(self.data[i][j].s_dist_2 as u8);
+                    //         sdf_tex2.push(self.data[i][j].s_dist_2 as u8);
 
-                            if i % 8 == 7 && j % 8 == 7 {
-                                self.data[i][j].s_dist_3 = (self.data[i][j].s_dist_2 as u64
-                                    + self.data[i - 4][j].s_dist_2 as u64
-                                    + self.data[i][j - 4].s_dist_2 as u64
-                                    + self.data[i - 4][j - 4].s_dist_2 as u64)
-                                    / 4;
+                    //         if i % 8 == 7 && j % 8 == 7 {
+                    //             self.data[i][j].s_dist_3 = (self.data[i][j].s_dist_2 as u64
+                    //                 + self.data[i - 4][j].s_dist_2 as u64
+                    //                 + self.data[i][j - 4].s_dist_2 as u64
+                    //                 + self.data[i - 4][j - 4].s_dist_2 as u64)
+                    //                 / 4;
 
-                                sdf_tex3.push(self.data[i][j].s_dist_3 as u8);
-                            }
-                        }
-                    }
+                    //             sdf_tex3.push(self.data[i][j].s_dist_3 as u8);
+                    //         }
+                    //     }
+                    // }
 
                     #[cfg(feature = "debug")]
                     {
@@ -523,7 +545,7 @@ impl BlobArc {
                 sdf_step,
                 char: char::default(),
                 index_offset_x: 0,
-                index_offset_y:0,
+                index_offset_y: 0,
                 data_offset_x: 0,
                 data_offset_y: 0,
                 extents_min_x: Default::default(),
@@ -534,18 +556,16 @@ impl BlobArc {
                 binding_box_min_y: Default::default(),
                 binding_box_max_x: Default::default(),
                 binding_box_max_y: Default::default(),
-           
             },
             index_tex,
             sdf_tex,
             sdf_tex1,
             sdf_tex2,
             sdf_tex3,
-            
         );
     }
 
-    pub fn grid_size(&self) -> (f32, f32) {
+    fn grid_size(&self) -> (f32, f32) {
         (
             (self.extents.width() / self.cell_size).round(),
             (self.extents.height() / self.cell_size).round(),
@@ -742,7 +762,7 @@ pub fn is_point_same_sign(point: Point, endpoints: &Vec<ArcEndpoint>, sdf_sign: 
     return v == sdf_sign;
 }
 
-#[cfg_attr(target_arch="wasm32", wasm_bindgen(getter_with_clone))]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Clone)]
 pub struct TexData {
     pub index_tex: Vec<u8>, // 字节数 = 2 * 像素个数
@@ -764,7 +784,7 @@ pub struct TexData {
 //     pub fn new(index_tex: )
 // }
 
-#[cfg_attr(target_arch="wasm32", wasm_bindgen)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TexInfo {
     pub grid_w: f32,
@@ -775,7 +795,7 @@ pub struct TexInfo {
     pub max_offset: usize,
     pub min_sdf: f32,
     pub sdf_step: f32,
-    
+
     pub index_offset_x: usize,
     pub index_offset_y: usize,
     pub data_offset_x: usize,
@@ -784,28 +804,11 @@ pub struct TexInfo {
     pub extents_min_x: f32,
     pub extents_min_y: f32,
     pub extents_max_x: f32,
-    pub extents_max_y: f32, 
+    pub extents_max_y: f32,
     pub binding_box_min_x: f32,
     pub binding_box_min_y: f32,
     pub binding_box_max_x: f32,
     pub binding_box_max_y: f32,
-}
-
-#[cfg_attr(target_arch="wasm32", wasm_bindgen)]
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct TexInfo2 {
-    pub sdf_offset_x: usize,
-    pub sdf_offset_y: usize,
-    pub advance: f32,
-    pub char: char,
-    pub plane_min_x: f32,
-    pub plane_min_y: f32,
-    pub plane_max_x: f32,
-    pub plane_max_y: f32, 
-    pub atlas_min_x: f32,
-    pub atlas_min_y: f32,
-    pub atlas_max_x: f32,
-    pub atlas_max_y: f32,
 }
 
 impl Default for TexInfo {
@@ -833,6 +836,19 @@ impl Default for TexInfo {
             // ..
         }
     }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
+pub struct SdfInfo {
+    pub tex_info: TexInfo,
+    pub data_tex: Vec<u8>,
+    pub index_tex: Vec<u8>,
+    pub sdf_tex1: Vec<u8>,
+    pub sdf_tex2: Vec<u8>,
+    pub sdf_tex3: Vec<u8>,
+    pub sdf_tex4: Vec<u8>,
+    pub grid_size: Vec<f32>,
 }
 
 // 两张纹理，索引纹理 和 数据纹理
@@ -1181,11 +1197,11 @@ pub fn recursion_near_arcs_of_cell<'a>(
         && (cell_height * 32.0 - glyph_height).abs() < 0.1
     {
         let mut arcs_index = Vec::with_capacity(arcs.len());
-        for arc in arcs{
+        for arc in arcs {
             let index = global_arcs.iter().position(|a| a.id == arc.id).unwrap();
             // println!("arc: {:?}, global_arcs: {:?}", arc, global_arcs[index]);
             arcs_index.push(index);
-        } 
+        }
         result_arcs.push((arcs_index, cell.clone()));
     } else {
         let (
