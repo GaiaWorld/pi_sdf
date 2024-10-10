@@ -1,5 +1,7 @@
 use parry2d::math::Vector;
-use std::{collections::HashMap, ops::Range};
+use std:: ops::Range;
+// use std::collections::HashMap;
+use std::collections::BTreeMap as HashMap;
 
 use serde::{Deserialize, Serialize};
 #[cfg(target_arch = "wasm32")]
@@ -129,7 +131,7 @@ impl BlobArc {
     pub fn encode_tex(&self) -> SdfInfo {
         let data_tex = self.encode_data_tex1();
         let (tex_info, index_tex, sdf_tex1, sdf_tex2, sdf_tex3, sdf_tex4) =
-            self.encode_index_tex1(data_tex.len());
+            self.encode_index_tex1(data_tex.len() / 4);
         let grid_size = self.grid_size();
 
         SdfInfo {
@@ -470,6 +472,13 @@ impl BlobArc {
 
                     let cell_size = self.cell_size;
                     let is_interval = sdf.abs() <= cell_size * 0.5f32.sqrt();
+                    // println!("================  {:?}",( is_interval,
+                    //     num_points as f32,
+                    //     offset as f32,
+                    //     max_offset as f32,
+                    //     sdf,
+                    //     self.min_sdf,
+                    //     sdf_step,));
                     let [encode, _] = encode_to_uint16(
                         is_interval,
                         num_points as f32,

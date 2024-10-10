@@ -76,15 +76,15 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         },
     });
 
-    let buffer = std::fs::read("./source/SOURCEHANSANSK-MEDIUM.TTF").unwrap();
-    // let buffer = std::fs::read("./source/msyh.ttf").unwrap();
+    // let buffer = std::fs::read("./source/SOURCEHANSANSK-MEDIUM.TTF").unwrap();
+    let buffer = std::fs::read("./source/msyh.ttf").unwrap();
     let mut ft_face = FontFace::new(Arc::new(buffer));
     
     
     println!("max_box_normaliz: {:?}", ft_face.max_box_normaliz());
     let pxrange = 10;
     let time = std::time::Instant::now();
-    let mut outline_info = ft_face.to_outline('2');
+    let mut outline_info = ft_face.to_outline('魔');
 
 
     // println!("===================plane_bounds: {:?}", plane_bounds);

@@ -79,12 +79,12 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     let buffer = std::fs::read("./source/msyh.ttf").unwrap();
     // let buffer = std::fs::read("./source/msyh.ttf").unwrap();
     let mut ft_face = FontFace::new(Arc::new(buffer));
-    let outline = ft_face.to_outline('一');
+    let outline = ft_face.to_outline('魔');
     let cell_info = outline.compute_near_arcs(1.0);
     let blob_arc = cell_info.encode_blob_arc();
     let sdf_tex = blob_arc.encode_tex();
 
-    let verties = ft_face.verties(32.0, &mut [2.]);
+    // let verties = ft_face.verties(32.0, &mut [2.]);
     let verties = [
         0.0f32, 0.0, 0.0, 0.0, 
         0.0, 1.0, 0.0, 1.0, 
@@ -177,6 +177,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         height: tex_size.1 as u32,
         depth_or_array_layers: 1,
     };
+
     let index_tex_sampler = device.create_sampler(&wgpu::SamplerDescriptor::default());
     let index_texture = device.create_texture(&wgpu::TextureDescriptor {
         label: None,
@@ -200,6 +201,12 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         index_texture_extent,
     );
 
+    let u_data_tex_width_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("u_data_tex_width_buffer"),
+        contents: bytemuck::cast_slice(&[index_tex.len() as f32]),
+        usage: wgpu::BufferUsages::UNIFORM,
+    });
+
     let bind_group_layout1 = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: None,
         entries: &[
@@ -214,7 +221,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
                 visibility: wgpu::ShaderStages::FRAGMENT,
                 ty: wgpu::BindingType::Texture {
                     multisampled: false,
-                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    sample_type: wgpu::TextureSampleType::Float { filterable: false },
                     view_dimension: wgpu::TextureViewDimension::D2,
                 },
                 count: None,
@@ -243,6 +250,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         height: 1,
         depth_or_array_layers: 1,
     };
+    println!("sdf_tex.data_tex: {:?}", sdf_tex.data_tex);
     let data_tex_sampler = device.create_sampler(&wgpu::SamplerDescriptor::default());
     let data_texture = device.create_texture(&wgpu::TextureDescriptor {
         label: None,
@@ -257,7 +265,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
 
     let data_tex_size_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("u_weight_and_offset_buffer"),
-        contents: bytemuck::cast_slice(&[sdf_tex.data_tex.len() as f32, 1 as f32]),
+        contents: bytemuck::cast_slice(&[(sdf_tex.data_tex.len() / 4) as f32, 1 as f32]),
         usage: wgpu::BufferUsages::UNIFORM,
     });
 

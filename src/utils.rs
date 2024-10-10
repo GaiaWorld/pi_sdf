@@ -1,5 +1,6 @@
 use core::fmt;
-use std::collections::HashMap;
+// use std::collections::HashMap;
+use std::collections::BTreeMap as HashMap;
 
 use ab_glyph_rasterizer::Rasterizer;
 use allsorts::{
@@ -946,7 +947,7 @@ impl CellInfo {
         let c = extents.center();
         let unit = glyph_width.max(glyph_height);
 
-        let mut map = HashMap::with_capacity(32 * 32);
+        let mut map = HashMap::new();
         // 二分计算时，个格子的大小会不一样
         // 统一以最小格子细分
         for (near_arcs, cell) in result_arcs {
@@ -1062,7 +1063,7 @@ impl CellInfo {
                         unit_arc.parent_cell = parent_cell;
                         unit_arc.key = key.clone();
                     }
-                    println!("i: {}, j: {}, unit_arc: {:?}", i, j, unit_arc);
+                    // println!("i: {}, j: {}, unit_arc: {:?}", i, j, unit_arc);
                 }
             }
             let key = data[begin_y][begin_x].get_key();

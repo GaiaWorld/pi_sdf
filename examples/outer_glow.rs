@@ -84,7 +84,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     println!("max_box_normaliz: {:?}", ft_face.max_box_normaliz());
     let pxrange = 40;
     let time = std::time::Instant::now();
-    let  outline_info = ft_face.to_outline('口');
+    let  outline_info = ft_face.to_outline('魔');
     let result_arcs = outline_info.compute_near_arcs(2.0); 
     // println!("bbox: {:?}", outline_info.bbox);
     let glpyh_info = outline_info.compute_sdf_tex(result_arcs.clone(),  32, pxrange, true, pxrange);
