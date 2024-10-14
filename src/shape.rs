@@ -931,7 +931,7 @@ impl Path {
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize,)]
 pub struct SvgInfo {
     binding_box: Vec<f32>,
     arc_endpoints: Vec<ArcEndpoint>,
