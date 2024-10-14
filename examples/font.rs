@@ -74,23 +74,33 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
             defines: Default::default(),
         },
     });
-
+    let scale = 1.0;
     // 加载字体文件
     let buffer = std::fs::read("./source/msyh.ttf").unwrap();
     // let buffer = std::fs::read("./source/msyh.ttf").unwrap();
     let mut ft_face = FontFace::new(Arc::new(buffer));
     let outline = ft_face.to_outline('魔');
-    let cell_info = outline.compute_near_arcs(1.0);
+    let cell_info = outline.compute_near_arcs(scale);
     let blob_arc = cell_info.encode_blob_arc();
     let sdf_tex = blob_arc.encode_tex();
-
+    let pxrange = 5.0;
+    let sdf_tex_size = 32.0;
     // let verties = ft_face.verties(32.0, &mut [2.]);
+    let width = cell_info.extents.width();
+    let height = cell_info.extents.height();
+
+    let size = sdf_tex_size * (scale + 1.0); // 
+    let px_distance =  sdf_tex.tex_info.grid_w  / size;
+    let distance = (1.0 / px_distance) / pxrange;
+    println!("px_distance: {:?}", (px_distance, distance));
+    let size_2 = size * 0.5;
     let verties = [
-        0.0f32, 0.0, 0.0, 0.0, 
-        0.0, 1.0, 0.0, 1.0, 
-        1.0, 0.0, 1.0, 0.0, 
-        1.0, 1.0, 1.0, 1.0,
+        0.0, 0.0, (size_2 - sdf_tex_size * 0.5 - pxrange) / size, (size_2 - sdf_tex_size * 0.5 - pxrange) / size,
+        0.0, 1.0, (size_2 - sdf_tex_size * 0.5 - pxrange) / size, (size_2 + sdf_tex_size * 0.5 + pxrange) / size,
+        1.0, 0.0, (size_2 + sdf_tex_size * 0.5 + pxrange) / size, (size_2 - sdf_tex_size * 0.5 - pxrange) / size,
+        1.0, 1.0, (size_2 + sdf_tex_size * 0.5 + pxrange) / size, (size_2 + sdf_tex_size * 0.5 + pxrange) / size,
     ]; // 获取网格数据
+    println!("verties: {:?}", verties);
     let view_matrix = na::Matrix4::<f32>::identity(); // 视口矩阵
     let view_matrix_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Index Buffer"),
@@ -363,7 +373,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     u_info.push(sdf_tex.tex_info.min_sdf as f32);
     u_info.push(sdf_tex.tex_info.sdf_step as f32);
     u_info.push(check);
-    let translation = vec![64.0f32, 64.0, 100.0, 100.0];
+    let translation = vec![sdf_tex_size + pxrange * 2.0, sdf_tex_size + pxrange * 2.0, 100.0, 100.0];
 
     println!("u_info: {:?}", u_info);
     println!("translation: {:?}", translation);
@@ -493,7 +503,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
                             view: &view,
                             resolve_target: None,
                             ops: wgpu::Operations {
-                                load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                                load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
                                 store: wgpu::StoreOp::Store,
                             },
                         })],

@@ -331,7 +331,7 @@ float glyphy_sdf(vec2 uv, vec2 nominal_size) {
 	float offset = float(index_info.offset);
 	// float a = offset / u_info.x;
 	float x = offset / (data_tex_size_buffer.x - 0.5);
-	float y = 0.0;
+	float y = 0.5;
 
 
 	vec4 rgba = texture(sampler2D(u_data_tex, data_tex_samp), vec2(x, y));
@@ -347,7 +347,7 @@ float glyphy_sdf(vec2 uv, vec2 nominal_size) {
 		// vec4 rgba = vec4(0.0);
 		float offset = 0.5 + float(index_info.offset + i);
 		float x = offset / (data_tex_size_buffer.x - 0.5);
-		float y = 0.0;
+		float y = 0.5;
 		
 		vec4 rgba = texture(sampler2D(u_data_tex, data_tex_samp), vec2(x, y) );
 
@@ -476,12 +476,16 @@ float antialias(float d) {
 
 void main() {
 	vec2 nominal_size = vec2(32., 32.);
-
+	int pxrange = 5;
 	// 重点：计算 SDF 
 	float gsdist = glyphy_sdf(uv, nominal_size);
-	fragColor = vec4(  gsdist, 0.0, 0.0, 1.0);
+
+	float d = 0.5 - (gsdist * 0.2);
+	fragColor = vec4(d, d, d, 1.0);
+
+	// fragColor = vec4((1.0 - (gsdist * 0.4)), 0.0, 0.0, 1.0);
 	// vec4 c = texture(sampler2D(u_index_tex, index_tex_samp), uv).rgba;
 	// fragColor = vec4(c.rg, 0.0, 1.0);
 	// fragColor = vec4(fwidth(p), 0., 1.0);
-	// fragColor.rgb *= fragColor.a;
+	fragColor.rgb *= fragColor.a;
 }

@@ -88,8 +88,6 @@ pub struct OutlineInfo {
     pub units_per_em: u16,
     pub extents: Vec<f32>,
 }
-
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 impl OutlineInfo {
     pub fn compute_near_arcs(&self, scale: f32) -> CellInfo {
         FontFace::compute_near_arcs(
@@ -100,10 +98,6 @@ impl OutlineInfo {
             scale,
             &self.endpoints,
         )
-    }
-
-    pub fn compute_near_arcs_of_wasm(&self, scale: f32) -> Vec<u8> {
-        bitcode::serialize(&self.compute_near_arcs(scale)).unwrap()
     }
 
     pub fn compute_sdf_tex(
@@ -157,6 +151,13 @@ impl OutlineInfo {
             tex_size,
         }
     }
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
+impl OutlineInfo {
+    pub fn compute_near_arcs_of_wasm(&self, scale: f32) -> Vec<u8> {
+        bitcode::serialize(&self.compute_near_arcs(scale)).unwrap()
+    }
 
     pub fn compute_sdf_tex_of_wasm(
         &self,
@@ -167,7 +168,14 @@ impl OutlineInfo {
         cur_off: u32,
     ) -> Vec<u8> {
         let result_arcs: CellInfo = bitcode::deserialize(result_arcs).unwrap();
-        bitcode::serialize(&self.compute_sdf_tex(result_arcs, tex_size, pxrange, is_outer_glow, cur_off)).unwrap()
+        bitcode::serialize(&self.compute_sdf_tex(
+            result_arcs,
+            tex_size,
+            pxrange,
+            is_outer_glow,
+            cur_off,
+        ))
+        .unwrap()
     }
 
     pub fn compute_layout(&self, tex_size: usize, pxrange: u32, cur_off: u32) -> LayoutInfo {
@@ -640,7 +648,6 @@ pub fn compute_cell_range(mut bbox: Aabb, scale: f32) -> Aabb {
     let temp = w - h;
     if temp > 0.0 {
         bbox.maxs.y += temp;
-        // atlas_bounds.maxs.y -= (temp / extents.height() * tex_size as f32).round();
     } else {
         bbox.maxs.x -= temp;
     }
@@ -879,10 +886,10 @@ pub fn point_to_arc(endpoints: Vec<ArcEndpoint>) -> Vec<Arc> {
     arcs
 }
 
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
+// #[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Clone)]
 pub struct CellInfo {
-    pub(crate) extents: Aabb,
+    pub extents: Aabb,
     pub(crate) arcs: Vec<Arc>,
     pub(crate) info: Vec<(Vec<usize>, Aabb)>,
     pub(crate) min_width: f32,
@@ -903,13 +910,6 @@ impl CellInfo {
         let width_cells = (glyph_width / self.min_width).round() as usize;
         // 格子行的数量
         let height_cells = (glyph_height / self.min_height).round() as usize;
-
-        // if is_area.is_some() {
-        //     if glyph_width > 128.0 {
-        //         width_cells = 64;
-        //         height_cells = 64;
-        //     }
-        // }
 
         // 格子列的数量
         let min_width = glyph_width / width_cells as f32;

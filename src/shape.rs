@@ -939,6 +939,21 @@ pub struct SvgInfo {
     is_reverse: Option<bool>,
 }
 
+impl SvgInfo {
+    pub fn compute_near_arcs(&self, scale: f32) -> CellInfo {
+        let mut info = compute_near_arcs(
+            Aabb::new(
+                Point::new(self.binding_box[0], self.binding_box[1]),
+                Point::new(self.binding_box[2], self.binding_box[3]),
+            ),
+            &self.arc_endpoints,
+            scale,
+        );
+        info.is_area = self.is_area;
+        info
+    }
+}
+
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 impl SvgInfo {
     pub fn new(
@@ -962,19 +977,6 @@ impl SvgInfo {
 
     pub fn compute_layout(&self, tex_size: usize, pxrange: u32, cur_off: u32) -> LayoutInfo {
         compute_layout(&self.binding_box, tex_size, pxrange, 1, cur_off, true)
-    }
-
-    pub fn compute_near_arcs(&self, scale: f32) -> CellInfo {
-        let mut info = compute_near_arcs(
-            Aabb::new(
-                Point::new(self.binding_box[0], self.binding_box[1]),
-                Point::new(self.binding_box[2], self.binding_box[3]),
-            ),
-            &self.arc_endpoints,
-            scale,
-        );
-        info.is_area = self.is_area;
-        info
     }
 
     pub fn compute_near_arcs_of_wasm(&self, scale: f32) -> Vec<u8> {
