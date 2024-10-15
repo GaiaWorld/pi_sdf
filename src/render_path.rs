@@ -227,7 +227,7 @@
 //             verties[3].g16hi as f32,
 //             verties[3].g16lo as f32,
 //         ];
-//         println!("a_glyph_vertex: {:?}", a_glyph_vertex);
+//         log::debug!("a_glyph_vertex: {:?}", a_glyph_vertex);
 //         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
 //             label: Some("Index Buffer"),
 //             contents: bytemuck::cast_slice(&a_glyph_vertex),
@@ -418,7 +418,7 @@
 //             ))
 //             .append_translation(&Vector3::new(pos.x, pos.y, 0.0));
 
-//         println!("world_matrix.as_slice(): {:?}", world_matrix.as_slice());
+//         log::debug!("world_matrix.as_slice(): {:?}", world_matrix.as_slice());
 //         let world_matrix_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
 //             label: Some("Index Buffer"),
 //             contents: bytemuck::cast_slice(world_matrix.as_slice()),
@@ -430,7 +430,7 @@
 //             contents: bytemuck::cast_slice(self.view_matrix.as_slice()),
 //             usage: wgpu::BufferUsages::UNIFORM,
 //         });
-//         println!("view_matrix.as_slice(): {:?}", self.view_matrix.as_slice());
+//         log::debug!("view_matrix.as_slice(): {:?}", self.view_matrix.as_slice());
 
 //         let proj_matrix_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
 //             label: Some("Index Buffer"),
@@ -438,7 +438,7 @@
 //             usage: wgpu::BufferUsages::UNIFORM,
 //         });
 
-//         println!(
+//         log::debug!(
 //             "proj_matrix.as_slice(): {:?}",
 //             self.proj_matrix.as_matrix().as_slice()
 //         );
@@ -638,7 +638,7 @@
 //             view_formats: &[],
 //         });
 
-//         // println!(
+//         // log::debug!(
 //         //     "tex.index_tex: {:?}, tex.grid_w: {}, tex.grid_h:{}, tex.index_tex len: {}",
 //         //     &tex.index_tex,
 //         //     tex.grid_w,
@@ -696,7 +696,7 @@
 //             view_formats: &[],
 //         });
 
-//         // println!("data_tex: {:?}, len: {}", tex.data_tex, tex.data_tex.len());
+//         // log::debug!("data_tex: {:?}, len: {}", tex.data_tex, tex.data_tex.len());
 //         let data_texture_view = data_texture.create_view(&wgpu::TextureViewDescriptor::default());
 //         queue.write_texture(
 //             data_texture.as_image_copy(),

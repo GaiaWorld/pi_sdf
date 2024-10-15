@@ -69,13 +69,13 @@ pub fn blur_box(bbox: &[f32], pxrange: f32, txe_size: usize) -> BlurInfo {
     let px_num2 = px_num + 0.5;
     let sigma = px_num / 6.0;
     let dsitance = px_dsitance * (px_num);
-    println!("{:?}", (b_w, b_h, px_dsitance, px_num, dsitance, bbox));
+    // log::debug!("{:?}", (b_w, b_h, px_dsitance, px_num, dsitance, bbox));
     let p_w = (b_w / px_dsitance).ceil() + px_num2 * 2.0;
     let p_h = (b_h / px_dsitance).ceil() + px_num2 * 2.0;
     let mut pixmap = vec![0; (p_w * p_h) as usize];
-    println!("{:?}", (p_w, p_h));
+    // log::debug!("{:?}", (p_w, p_h));
     let start = Point::new(bbox.mins.x - dsitance, bbox.mins.y - dsitance);
-    println!("{:?}", start);
+    // log::debug!("{:?}", start);
     let mut pos = Point::default();
     for i in 0..p_w as usize {
         for j in 0..p_h as usize {
@@ -84,7 +84,7 @@ pub fn blur_box(bbox: &[f32], pxrange: f32, txe_size: usize) -> BlurInfo {
                 start.x + i as f32 * px_dsitance,
                 start.y + j as f32 * px_dsitance,
             );
-            println!("pos: {}", pos);
+            // log::debug!("pos: {}", pos);
             let a = get_shadow_alpha(pos, &bbox.mins, &bbox.maxs, sigma);
             pixmap[j * p_w as usize + i as usize] = (a * 255.0) as u8;
         }
@@ -100,7 +100,7 @@ pub fn blur_box(bbox: &[f32], pxrange: f32, txe_size: usize) -> BlurInfo {
         Point::new(px_num2, px_num2),
         maxs,
     );
-    println!("atlasBounds: {:?}", atlas_bounds);
+    log::debug!("atlasBounds: {:?}", atlas_bounds);
 
     BlurInfo {
         tex: pixmap,
@@ -240,11 +240,11 @@ pub fn compute_box_layout(bbox: Aabb, txe_size: usize, radius: u32) -> BoxInfo {
     let px_num2 = px_num + 0.5;
     let sigma = px_num / 3.0;
     let dsitance = px_dsitance * px_num;
-    println!("{:?}", (b_w, b_h, px_dsitance, px_num, dsitance, bbox));
+    log::debug!("{:?}", (b_w, b_h, px_dsitance, px_num, dsitance, bbox));
     let p_w = (b_w / px_dsitance).ceil() + px_num2 * 2.0;
     let p_h = (b_h / px_dsitance).ceil() + px_num2 * 2.0;
     // let mut pixmap = vec![0; (p_w * p_h) as usize];
-    println!("{:?}", (p_w, p_h));
+    log::debug!("{:?}", (p_w, p_h));
     let start = Point::new(bbox.mins.x - dsitance, bbox.mins.y - dsitance);
 
     let maxs = if b_h > b_w {
@@ -264,7 +264,7 @@ pub fn compute_box_layout(bbox: Aabb, txe_size: usize, radius: u32) -> BoxInfo {
         bbox: atlas_bounds,
         radius
     };
-    println!("BoxInfo: {:?}", info);
+    log::debug!("BoxInfo: {:?}", info);
     info
     
 }

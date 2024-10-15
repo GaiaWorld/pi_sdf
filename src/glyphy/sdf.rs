@@ -260,7 +260,7 @@ pub fn glyphy_sdf_from_arc_list3(arcs: &Vec<usize>, p: Point, global_arcs: &Vec<
             let lb = (arc.p1 - c).norm();
             let udist = if la < lb { la } else { lb };
             // if (p - Point::new(293.82404, 216.00003)).norm_squared() < 0.01 ||(p - Point::new(341.82404, 216.00003)).norm_squared() < 0.01{
-            //     println!("udist: {}, min_dist: {:?}", udist, min_dist);
+            //     log::debug!("udist: {}, min_dist: {:?}", udist, min_dist);
             // }
 
             if udist < min_dist {
@@ -303,11 +303,11 @@ pub fn glyphy_sdf_from_arc_list3(arcs: &Vec<usize>, p: Point, global_arcs: &Vec<
     }
 
     // if (p - Point::new(293.82404, 216.00003)).norm_squared() < 0.01 ||(p - Point::new(341.82404, 216.00003)).norm_squared() < 0.01{
-    //     println!("side: {}, closest_arc: {:?}", side, closest_arc);
+    //     log::debug!("side: {}, closest_arc: {:?}", side, closest_arc);
     //     for i in 0..arcs.len() {
     //         let arc = &global_arcs[arcs[i]];
 
-    //       println!("arc.wedge_contains_point(&c): {}", arc.wedge_contains_point(&c)); 
+    //       log::debug!("arc.wedge_contains_point(&c): {}", arc.wedge_contains_point(&c)); 
     //     }
     // }
     if side == 0 {
@@ -327,5 +327,5 @@ fn test(){
         
     ];
     let sdf = glyphy_sdf_from_arc_list3(&vec![0,1], Point::new(84.999985, 82.0), &arcs);
-    println!("sdf: {}", sdf.0);
+    log::debug!("sdf: {}", sdf.0);
 }

@@ -71,8 +71,8 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         },
     });
 
-    // println!("vs: {:?}", vs);
-    // println!("fs: {:?}", fs);
+    // log::debug!("vs: {:?}", vs);
+    // log::debug!("fs: {:?}", fs);
     let buffer = std::fs::read("svg.svg").unwrap();
     let mut svg = Svg::new(buffer);
 
@@ -95,13 +95,13 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     };
     let time = std::time::Instant::now();
     let (texs_info, attributes) = svg.out_tex_data(&mut tex_data).unwrap();
-    println!("out_tex_data: {:?}", time.elapsed());
+    log::debug!("out_tex_data: {:?}", time.elapsed());
     let vertexs = svg.verties();
     // 字体缩放
     let scale = [1.0f32, 1.0];
     // 阴影偏移和模糊等级
     let mut shadow_offset_and_blur_level = vec![20.0f32, 0., 6.0, 0.0];
-    println!("vertexs: {:?}", vertexs);
+    log::debug!("vertexs: {:?}", vertexs);
 
     let view_matrix = na::Matrix4::<f32>::identity(); // 视口矩阵
     let view_matrix_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -109,7 +109,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         contents: bytemuck::cast_slice(view_matrix.as_slice()),
         usage: wgpu::BufferUsages::UNIFORM,
     });
-    println!("view_matrix.as_slice(): {:?}", view_matrix.as_slice());
+    log::debug!("view_matrix.as_slice(): {:?}", view_matrix.as_slice());
 
     let proj_matrix = na::Orthographic3::<f32>::new(
         0.0,
@@ -124,7 +124,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         contents: bytemuck::cast_slice(proj_matrix.as_matrix().as_slice()),
         usage: wgpu::BufferUsages::UNIFORM,
     });
-    println!(
+    log::debug!(
         "proj_matrix.as_slice(): {:?}",
         proj_matrix.as_matrix().as_slice()
     );
@@ -606,7 +606,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
             height: tex_size.1 as u32 >> i,
             depth_or_array_layers: 1,
         };
-        println!("sdf{}: {}", i, sdf_tex[i as usize][0]);
+        log::debug!("sdf{}: {}", i, sdf_tex[i as usize][0]);
         queue.write_texture(
             wgpu::ImageCopyTexture {
                 texture: &sdf_texture,
@@ -692,7 +692,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
 
     let swapchain_capabilities = surface.get_capabilities(&adapter);
     let swapchain_format = swapchain_capabilities.formats[1];
-    println!("swapchain_format: {:?}", swapchain_capabilities.formats);
+    log::debug!("swapchain_format: {:?}", swapchain_capabilities.formats);
     // 创建网格数据
     let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Index Buffer"),
@@ -725,10 +725,10 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         u_info.push(info.sdf_step as f32);
         u_info.push(check);
     }
-    println!("index_info: {:?}", index_info);
-    println!("translation: {:?}", translation);
-    println!("data_offset: {:?}", data_offset);
-    println!("u_info: {:?}", u_info);
+    log::debug!("index_info: {:?}", index_info);
+    log::debug!("translation: {:?}", translation);
+    log::debug!("data_offset: {:?}", data_offset);
+    log::debug!("u_info: {:?}", u_info);
 
     let mut index = 0;
     for attr in &attributes {
@@ -766,9 +766,9 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
 
         index += 1;
     }
-    println!("fill_color: {:?}", fill_color);
-    println!("stroke_color_and_width: {:?}", stroke_color_and_width);
-    println!("start_and_step: {:?}", start_and_step);
+    log::debug!("fill_color: {:?}", fill_color);
+    log::debug!("stroke_color_and_width: {:?}", stroke_color_and_width);
+    log::debug!("start_and_step: {:?}", start_and_step);
 
     let index_info_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("index_info_buffer"),
@@ -917,7 +917,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         multiview: None,
     });
 
-    // println!("render_pipeline: {:?}", render_pipeline);
+    // log::debug!("render_pipeline: {:?}", render_pipeline);
 
     let mut config = wgpu::SurfaceConfiguration {
         usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
@@ -940,7 +940,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         // let _ = (&instance, &adapter, &shader, &pipeline_layout);
 
         *control_flow = ControlFlow::Wait;
-        // println!("=========1");
+        // log::debug!("=========1");
         match event {
             Event::WindowEvent {
                 event: WindowEvent::Resized(size),

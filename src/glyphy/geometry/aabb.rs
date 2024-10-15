@@ -288,10 +288,10 @@ impl Aabb {
     ) {
         // let mut temps = Vec::with_capacity(arcs.len());
         temps.clear();
-        // println!("segment: {:?}", segment);
+        // log::debug!("segment: {:?}", segment);
         for i in 0..arcs.len() {
             let (rang, s, min_dist) = arcs[i].projection_to_bound(self, &segment);
-            // println!(
+            // log::debug!(
             //     "arcs: {:?}, rang: {:?}, dist: {},p: {}",
             //     arcs[i], rang, min_dist, p
             // );
@@ -305,7 +305,7 @@ impl Aabb {
                 for j in 0..result_arcs.len() {
                     let result_arc = result_arcs[j];
                     let dist = result_arc.squared_distance_to_point2(&p).norm_squared();
-                    // println!("dist: {}", dist);
+                    // log::debug!("dist: {}", dist);
                     if min_dist >= dist {
                         let (p1, p2) = if segment.a.x == segment.b.x {
                             (
@@ -337,7 +337,7 @@ impl Aabb {
                         let p = temps[j].0;
                         let dist = temps[j].1;
                         let d = arcs[i].squared_distance_to_point2(&p).norm_squared();
-                        // println!("dist: {}, d: {}", dist, d);
+                        // log::debug!("dist: {}, d: {}", dist, d);
                         // 浮点误差
                         if dist - d > 0.01 {
                             // let rangs = &mut temps[j].2;
@@ -372,15 +372,15 @@ impl Aabb {
                     }
                 }
 
-                // println!("delete_index: {:?}", delete_index);
+                // log::debug!("delete_index: {:?}", delete_index);
                 for i in (0..delete_index.len()).rev() {
                     let _r = result_arcs.remove(delete_index[i]);
                     temps.remove(delete_index[i]);
-                    // println!("remove : {:?}", r);
+                    // log::debug!("remove : {:?}", r);
                 }
 
                 if is_push {
-                    // println!("is_push");
+                    // log::debug!("is_push");
                     result_arcs.push(&arcs[i]);
                     temps.push((p, min_dist, vec![rang]));
                 }
@@ -395,11 +395,11 @@ impl Aabb {
     //     result_arcs: &mut Vec<&'static Arc>,
     // ) {
     //     let mut temps = vec![];
-    //     println!("segment: {:?}", segment);
+    //     log::debug!("segment: {:?}", segment);
     //     for i in 0..arcs.len() {
     //         let line0 = segment.squared_distance_to_point2(&arcs[i].p0);
     //         let line1 = segment.squared_distance_to_point2(&arcs[i].p1);
-    //         println!("line0: {:?}, line1: {:?}", line0, line1);
+    //         log::debug!("line0: {:?}, line1: {:?}", line0, line1);
 
     //         if i == 0 {
     //             result_arcs.push(&arcs[i]);
@@ -431,7 +431,7 @@ impl Aabb {
     //                     let p = temps[j].0;
     //                     let dist = temps[j].1;
     //                     let d = arcs[i].squared_distance_to_point2(&p);
-    //                     println!("dist: {}, d: {}", dist, d);
+    //                     log::debug!("dist: {}, d: {}", dist, d);
     //                     if d < dist {
     //                         // let rangs = &mut temps[j].2;
     //                         // let mut new_rang = vec![];
@@ -470,15 +470,15 @@ impl Aabb {
     //                     }
     //                 }
     //             }
-    //             // println!("delete_index: {:?}", delete_index);
+    //             // log::debug!("delete_index: {:?}", delete_index);
     //             for i in (0..delete_index.len()).rev() {
     //                 let r = result_arcs.remove(delete_index[i]);
     //                 temps.remove(delete_index[i]);
-    //                 println!("remove : {:?}", r);
+    //                 log::debug!("remove : {:?}", r);
     //             }
 
     //             if is_push {
-    //                 // println!("is_push");
+    //                 // log::debug!("is_push");
     //                 result_arcs.push(&arcs[i]);
     //                 temps.push((p, min_dist, vec![rang]));
     //             }
@@ -536,5 +536,5 @@ fn test() {
     //     -0.14173229,
     // );
     // let dist = arc.squared_distance_to_point2(&Point::new(216.85324, 171.0));
-    // println!("dist : {:?}", dist);
+    // log::debug!("dist : {:?}", dist);
 }

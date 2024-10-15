@@ -81,15 +81,15 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     let mut ft_face = FontFace::new(Arc::new(buffer));
     
     
-    println!("max_box_normaliz: {:?}", ft_face.max_box_normaliz());
+    log::debug!("max_box_normaliz: {:?}", ft_face.max_box_normaliz());
     let pxrange = 40;
     let time = std::time::Instant::now();
     let  outline_info = ft_face.to_outline('魔');
     let result_arcs = outline_info.compute_near_arcs(2.0); 
-    // println!("bbox: {:?}", outline_info.bbox);
+    // log::debug!("bbox: {:?}", outline_info.bbox);
     let glpyh_info = outline_info.compute_sdf_tex(result_arcs.clone(),  32, pxrange, true, pxrange);
-    println!("time: {:?}", time.elapsed());
-    // println!("glpyh_info: {:?}", glpyh_info);
+    log::debug!("time: {:?}", time.elapsed());
+    // log::debug!("glpyh_info: {:?}", glpyh_info);
     let tex_size = glpyh_info.tex_size;
     let _ = image::save_buffer("outer_glow.png", &glpyh_info.sdf_tex, tex_size as u32, tex_size as u32, ColorType::L8);
 
@@ -109,7 +109,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         1.0, 0.0, 1.0, 0.0, 
         1.0, 1.0, 1.0, 1.0,
     ]; // 获取网格数据
-    println!("vertexs: {:?}", vertexs);
+    log::debug!("vertexs: {:?}", vertexs);
 
     let view_matrix = na::Matrix4::<f32>::identity(); // 视口矩阵
     let view_matrix_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -117,7 +117,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         contents: bytemuck::cast_slice(view_matrix.as_slice()),
         usage: wgpu::BufferUsages::UNIFORM,
     });
-    println!("view_matrix.as_slice(): {:?}", view_matrix.as_slice());
+    log::debug!("view_matrix.as_slice(): {:?}", view_matrix.as_slice());
 
     // 投影矩阵
     let proj_matrix = na::Orthographic3::<f32>::new(
@@ -133,7 +133,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         contents: bytemuck::cast_slice(proj_matrix.as_matrix().as_slice()),
         usage: wgpu::BufferUsages::UNIFORM,
     });
-    println!(
+    log::debug!(
         "proj_matrix.as_slice(): {:?}",
         proj_matrix.as_matrix().as_slice()
     );
@@ -293,7 +293,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
 
     let swapchain_capabilities = surface.get_capabilities(&adapter);
     let swapchain_format = swapchain_capabilities.formats[1];
-    println!("swapchain_format: {:?}", swapchain_capabilities.formats);
+    log::debug!("swapchain_format: {:?}", swapchain_capabilities.formats);
     // 创建网格数据
     let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Index Buffer"),
@@ -358,7 +358,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         multiview: None,
     });
 
-    // println!("render_pipeline: {:?}", render_pipeline);
+    // log::debug!("render_pipeline: {:?}", render_pipeline);
 
     let mut config = wgpu::SurfaceConfiguration {
         usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
@@ -380,7 +380,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         // let _ = (&instance, &adapter, &shader, &pipeline_layout);
 
         *control_flow = ControlFlow::Wait;
-        // println!("=========1");
+        // log::debug!("=========1");
         match event {
             Event::WindowEvent {
                 event: WindowEvent::Resized(size),

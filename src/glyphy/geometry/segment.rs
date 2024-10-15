@@ -149,10 +149,10 @@ impl SegmentEXT for Segment {
         //     Point::new(aabb.maxs.x, aabb.mins.y),
         // );
 
-        // println!("top_aabb: {:?}", top_aabb);
+        // log::debug!("top_aabb: {:?}", top_aabb);
         if let Some(s) = top_aabb.clip_segment(&self.a, &self.b) {
             if s.a.y != top_aabb.maxs.y && s.b.y != top_aabb.maxs.y {
-                // println!("s: {:?}", s);
+                // log::debug!("s: {:?}", s);
                 let rang = if s.b.x > s.a.x {
                     s.a.x..s.b.x
                 } else {
@@ -172,10 +172,10 @@ impl SegmentEXT for Segment {
 
     fn projection_to_bottom_area(&self, bottom_aabb: &Aabb) -> Option<(Range<f32>, f32)> {
         // 包含线段或者与aabb的边相交
-        // println!("bottom_aabb: {:?}", bottom_aabb);
+        // log::debug!("bottom_aabb: {:?}", bottom_aabb);
         if let Some(s) = bottom_aabb.clip_segment(&self.a, &self.b) {
             if s.a.y != bottom_aabb.mins.y && s.b.y != bottom_aabb.mins.y {
-                // println!("s: {:?}", s);
+                // log::debug!("s: {:?}", s);
                 // let d = s.b.x - s.a.x;
                 let rang = if s.b.x > s.a.x {
                     s.a.x..s.b.x
@@ -198,7 +198,7 @@ impl SegmentEXT for Segment {
         // 包含线段或者与aabb的边相交
         if let Some(s) = left_aabb.clip_segment(&self.a, &self.b) {
             if s.a.x != left_aabb.maxs.x && s.b.x != left_aabb.maxs.x {
-                // println!("s: {:?}", s);
+                // log::debug!("s: {:?}", s);
                 let rang = if s.b.y > s.a.y {
                     s.a.y..s.b.y
                 } else {
@@ -220,7 +220,7 @@ impl SegmentEXT for Segment {
         // 包含线段或者与aabb的边相交
         if let Some(s) = right_aabb.clip_segment(&self.a, &self.b) {
             if s.a.x != right_aabb.mins.x && s.b.x != right_aabb.mins.x {
-                // println!("s: {:?}", s);
+                // log::debug!("s: {:?}", s);
                 let rang = if s.b.y > s.a.y {
                     s.a.y..s.b.y
                 } else {
