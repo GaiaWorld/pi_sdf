@@ -174,6 +174,10 @@ impl Circle {
         }
     }
 
+    pub fn get_svg_info_of_wasm(&self) -> Vec<u8> {
+        bitcode::serialize(&self.get_svg_info()).unwrap()
+    }
+
     pub fn is_area(&self) -> bool {
         true
     }
@@ -265,6 +269,10 @@ impl Rect {
             is_area: self.is_area(),
             is_reverse: None,
         }
+    }
+
+    pub fn get_svg_info_of_wasm(&self) -> Vec<u8> {
+        bitcode::serialize(&self.get_svg_info()).unwrap()
     }
 
     pub fn is_area(&self) -> bool {
@@ -389,6 +397,10 @@ impl Segment {
         }
     }
 
+    pub fn get_svg_info_of_wasm(&self) -> Vec<u8> {
+        bitcode::serialize(&self.get_svg_info()).unwrap()
+    }
+
     pub fn is_area(&self) -> bool {
         false
     }
@@ -507,6 +519,10 @@ impl Ellipse {
         }
     }
 
+    pub fn get_svg_info_of_wasm(&self) -> Vec<u8> {
+        bitcode::serialize(&self.get_svg_info()).unwrap()
+    }
+
     pub fn is_area(&self) -> bool {
         true
     }
@@ -604,6 +620,10 @@ impl Polygon {
             is_area: self.is_area(),
             is_reverse: None,
         }
+    }
+
+    pub fn get_svg_info_of_wasm(&self) -> Vec<u8> {
+        bitcode::serialize(&self.get_svg_info()).unwrap()
     }
 
     pub fn is_area(&self) -> bool {
@@ -724,6 +744,10 @@ impl Polyline {
             is_area: self.is_area(),
             is_reverse: None,
         }
+    }
+
+    pub fn get_svg_info_of_wasm(&self) -> Vec<u8> {
+        bitcode::serialize(&self.get_svg_info()).unwrap()
     }
 
     pub fn is_area(&self) -> bool {
@@ -919,6 +943,10 @@ impl Path {
         }
     }
 
+    pub fn get_svg_info_of_wasm(&self) -> Vec<u8> {
+        bitcode::serialize(&self.get_svg_info()).unwrap()
+    }
+
     pub fn is_area(&self) -> bool {
         self.is_close()
     }
@@ -931,7 +959,7 @@ impl Path {
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
-#[derive(Clone, Debug, Serialize, Deserialize,)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SvgInfo {
     binding_box: Vec<f32>,
     arc_endpoints: Vec<ArcEndpoint>,
@@ -939,22 +967,6 @@ pub struct SvgInfo {
     is_reverse: Option<bool>,
 }
 
-impl SvgInfo {
-    pub fn compute_near_arcs(&self, scale: f32) -> CellInfo {
-        let mut info = compute_near_arcs(
-            Aabb::new(
-                Point::new(self.binding_box[0], self.binding_box[1]),
-                Point::new(self.binding_box[2], self.binding_box[3]),
-            ),
-            &self.arc_endpoints,
-            scale,
-        );
-        info.is_area = self.is_area;
-        info
-    }
-}
-
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 impl SvgInfo {
     pub fn new(
         binding_box: &[f32],
@@ -978,9 +990,18 @@ impl SvgInfo {
     pub fn compute_layout(&self, tex_size: usize, pxrange: u32, cur_off: u32) -> LayoutInfo {
         compute_layout(&self.binding_box, tex_size, pxrange, 1, cur_off, true)
     }
-
-    pub fn compute_near_arcs_of_wasm(&self, scale: f32) -> Vec<u8> {
-        bitcode::serialize(&self.compute_near_arcs(scale)).unwrap()
+    
+    pub fn compute_near_arcs(&self, scale: f32) -> CellInfo {
+        let mut info = compute_near_arcs(
+            Aabb::new(
+                Point::new(self.binding_box[0], self.binding_box[1]),
+                Point::new(self.binding_box[2], self.binding_box[3]),
+            ),
+            &self.arc_endpoints,
+            scale,
+        );
+        info.is_area = self.is_area;
+        info
     }
 
     pub fn compute_sdf_tex(
@@ -1041,16 +1062,53 @@ impl SvgInfo {
             },
         }
     }
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
+impl SvgInfo {
+    pub fn new_of_wasm(
+        binding_box: &[f32],
+        arc_endpoints: Vec<f32>,
+        is_area: bool,
+        is_reverse: Option<bool>,
+    ) -> Vec<u8> {
+        bitcode::serialize(&Self::new(binding_box, arc_endpoints, is_area, is_reverse)).unwrap()
+    }
+
+
+
+    pub fn compute_layout_of_wasm(info: &[u8], tex_size: usize, pxrange: u32, cur_off: u32) -> Vec<f32> {
+        let info: SvgInfo = bitcode::deserialize(info).unwrap();
+        let LayoutInfo {
+            mut plane_bounds,
+            mut atlas_bounds,
+            mut extents,
+            distance,
+            tex_size,
+        } = compute_layout(&info.binding_box, tex_size, pxrange, 1, cur_off, true);
+        let mut res = Vec::with_capacity(14);
+        res.append(&mut plane_bounds);
+        res.append(&mut atlas_bounds);
+        res.append(&mut extents);
+        res.push(distance);
+        res.push(tex_size as f32);
+        res
+    }
+
+    pub fn compute_near_arcs_of_wasm(&self, scale: f32) -> Vec<u8> {
+        bitcode::serialize(&self.compute_near_arcs(scale)).unwrap()
+    }
 
     pub fn compute_sdf_tex_of_wasm(
-        &self,
+        info: &[u8],
         tex_size: usize,
         pxrange: u32,
         is_outer_glow: bool,
         cur_off: u32,
         scale: f32,
     ) -> Vec<u8> {
-        bitcode::serialize(&self.compute_sdf_tex(tex_size, pxrange, is_outer_glow, cur_off, scale))
+        let info: SvgInfo = bitcode::deserialize(info).unwrap();
+        bitcode::serialize(&info.compute_sdf_tex(tex_size, pxrange, is_outer_glow, cur_off, scale))
             .unwrap()
     }
 }

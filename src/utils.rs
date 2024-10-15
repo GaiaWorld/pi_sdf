@@ -100,6 +100,17 @@ impl OutlineInfo {
         )
     }
 
+    pub fn compute_layout(&self, tex_size: usize, pxrange: u32, cur_off: u32) -> LayoutInfo {
+        compute_layout(
+            &self.extents,
+            tex_size,
+            pxrange,
+            self.units_per_em,
+            cur_off,
+            false,
+        )
+    }
+
     pub fn compute_sdf_tex(
         &self,
         result_arcs: CellInfo,
@@ -155,20 +166,22 @@ impl OutlineInfo {
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 impl OutlineInfo {
-    pub fn compute_near_arcs_of_wasm(&self, scale: f32) -> Vec<u8> {
-        bitcode::serialize(&self.compute_near_arcs(scale)).unwrap()
+    pub fn compute_near_arcs_of_wasm(outline: &[u8], scale: f32) -> Vec<u8> {
+        let outline: OutlineInfo = bitcode::deserialize(outline).unwrap();
+        bitcode::serialize(&outline.compute_near_arcs(scale)).unwrap()
     }
 
     pub fn compute_sdf_tex_of_wasm(
-        &self,
+        outline: &[u8],
         result_arcs: &[u8],
         tex_size: usize,
         pxrange: u32,
         is_outer_glow: bool,
         cur_off: u32,
     ) -> Vec<u8> {
+        let outline: OutlineInfo = bitcode::deserialize(outline).unwrap();
         let result_arcs: CellInfo = bitcode::deserialize(result_arcs).unwrap();
-        bitcode::serialize(&self.compute_sdf_tex(
+        bitcode::serialize(&outline.compute_sdf_tex(
             result_arcs,
             tex_size,
             pxrange,
@@ -178,15 +191,17 @@ impl OutlineInfo {
         .unwrap()
     }
 
-    pub fn compute_layout(&self, tex_size: usize, pxrange: u32, cur_off: u32) -> LayoutInfo {
-        compute_layout(
-            &self.extents,
-            tex_size,
-            pxrange,
-            self.units_per_em,
-            cur_off,
-            false,
-        )
+
+    pub fn compute_layout_of_wasm(outline: &[u8], tex_size: usize, pxrange: u32, cur_off: u32) -> Vec<f32> {
+        let outline: OutlineInfo = bitcode::deserialize(outline).unwrap();
+        let  LayoutInfo { mut plane_bounds, mut atlas_bounds, mut extents, distance, tex_size } = compute_layout(&outline.extents, tex_size,pxrange, outline.units_per_em, cur_off,false);
+        let mut res =Vec::with_capacity(14);
+        res.append(&mut plane_bounds);
+        res.append(&mut atlas_bounds);
+        res.append(&mut extents);
+        res.push(distance);
+        res.push(tex_size as f32);
+        res
     }
 }
 pub struct User {
@@ -249,7 +264,7 @@ pub trait OutlineSinkExt: OutlineSink {
 impl OutlineSinkExt for GlyphVisitor {
     fn arc2_to(&mut self, d: f32, to: Vector2F) {
         let to = Point::new(to.x(), to.y()) * self.scale;
-        log::info!("+ A {} {} ", to.x, to.y);
+        log::debug!("+ A {} {} ", to.x, to.y);
         // if self.scale > 0.02 {
         self.accumulate.arc_to(to, d);
         #[cfg(feature = "debug")]
@@ -270,7 +285,7 @@ impl OutlineSink for GlyphVisitor {
     fn move_to(&mut self, to: Vector2F) {
         self.arcs += 1;
         let to = Point::new(to.x(), to.y()) * self.scale;
-        log::info!("M {} {} ", to.x, to.y);
+        log::debug!("M {} {} ", to.x, to.y);
 
         // if self.scale > 0.02 {
         self.accumulate.move_to(Point::new(to.x, to.y));
@@ -285,7 +300,7 @@ impl OutlineSink for GlyphVisitor {
 
     fn line_to(&mut self, to: Vector2F) {
         let to = Point::new(to.x(), to.y()) * self.scale;
-        log::info!("+ L {} {} ", to.x, to.y);
+        log::debug!("+ L {} {} ", to.x, to.y);
         // if self.scale > 0.02 {
         self.accumulate.line_to(to);
         #[cfg(feature = "debug")]
@@ -305,7 +320,7 @@ impl OutlineSink for GlyphVisitor {
         let control = Point::new(control.x(), control.y()) * self.scale;
         let to = Point::new(to.x(), to.y()) * self.scale;
 
-        log::info!("+ Q {} {} {} {} ", control.x, control.y, to.x, to.y);
+        log::debug!("+ Q {} {} {} {} ", control.x, control.y, to.x, to.y);
         // if self.scale > 0.02 {
         self.accumulate.conic_to(control, to);
         self.svg_endpoints.push([to.x, to.y]);
@@ -327,7 +342,7 @@ impl OutlineSink for GlyphVisitor {
         let control2 = Point::new(control.to_x(), control.to_y()) * self.scale;
         let to = Point::new(to.x(), to.y()) * self.scale;
 
-        log::info!(
+        log::debug!(
             "+ C {}, {}, {}, {}, {}, {}",
             control1.x,
             control1.y,
@@ -357,7 +372,7 @@ impl OutlineSink for GlyphVisitor {
 
     fn close(&mut self) {
         if self.previous != self.start {
-            // log::debug!("+ L {} {} ", self.start.x, self.start.y);
+            log::debug!("+ L {} {} ", self.start.x, self.start.y);
             // if self.scale > 0.02 {
             self.accumulate.line_to(self.start);
             #[cfg(feature = "debug")]
@@ -372,7 +387,7 @@ impl OutlineSink for GlyphVisitor {
             //     )
             // }
         }
-        log::info!("+ Z");
+        log::debug!("+ Z");
         // if self.scale > 0.02 {
         self.accumulate.close_path();
         #[cfg(feature = "debug")]

@@ -277,7 +277,7 @@ impl FontFace {
             info: result_arcs,
             min_width,
             min_height,
-            is_area: true
+            is_area: true,
         }
     }
 }
@@ -391,5 +391,22 @@ impl FontFace {
         }
     }
 
-    
+    pub fn to_outline_of_wasm(&mut self, ch: char) -> WasmOutlineInfo {
+        let outline = self.to_outline(ch);
+        let buf = bitcode::serialize(&outline).unwrap();
+        WasmOutlineInfo {
+            buf,
+            units_per_em: outline.units_per_em,
+            advance: outline.advance,
+            bbox: outline.bbox,
+        }
+    }
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
+pub struct WasmOutlineInfo {
+    pub buf: Vec<u8>,
+    pub units_per_em: u16,
+    pub advance: u16,
+    pub bbox: Vec<f32>,
 }

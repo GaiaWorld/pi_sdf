@@ -1,6 +1,5 @@
 
 let fs = require("fs");
-let path = require("path");
 
 
 /**
@@ -23,7 +22,7 @@ let datas = data.split("=");
 if (datas.length == 2) {
 	let d = datas[1].trim();
 	if (d !== "") {
-		outDir = path.join(d, "node_modules/pi_wasm/src");
+		outDir = d;
 	}
 	
 }
