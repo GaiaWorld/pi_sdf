@@ -211,7 +211,7 @@ impl FontFace {
         endpoints: &Vec<ArcEndpoint>,
     ) -> CellInfo {
         let extents = compute_cell_range(extents, scale);
-        println!("extents: {:?}", extents);
+        log::debug!("extents: {:?}", extents);
 
         if endpoints.len() > 0 {
             // 用奇偶规则，计算 每个圆弧的 环绕数

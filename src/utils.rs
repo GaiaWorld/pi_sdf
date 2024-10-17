@@ -626,7 +626,7 @@ pub(crate) fn compute_layout(
     //     atlas_bounds.height() / 32.0 / plane_bounds.width(),
     // );
 
-    println!(
+    log::debug!(
         "plane_bounds: {:?}, atlas_bounds: {:?}, tex_size: {}",
         plane_bounds, atlas_bounds, tex_size
     );
