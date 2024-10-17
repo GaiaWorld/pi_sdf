@@ -88,6 +88,7 @@ pub struct OutlineInfo {
     pub units_per_em: u16,
     pub extents: Vec<f32>,
 }
+
 impl OutlineInfo {
     pub fn compute_near_arcs(&self, scale: f32) -> CellInfo {
         FontFace::compute_near_arcs(
@@ -172,30 +173,76 @@ impl OutlineInfo {
     }
 
     pub fn compute_sdf_tex_of_wasm(
-        outline: &[u8],
         result_arcs: &[u8],
+        extents: &[f32],
+        units_per_em: u16,
+        advance: u16,
         tex_size: usize,
         pxrange: u32,
         is_outer_glow: bool,
         cur_off: u32,
     ) -> Vec<u8> {
-        let outline: OutlineInfo = bitcode::deserialize(outline).unwrap();
         let result_arcs: CellInfo = bitcode::deserialize(result_arcs).unwrap();
-        bitcode::serialize(&outline.compute_sdf_tex(
-            result_arcs,
+        let LayoutInfo {
+            plane_bounds,
+            atlas_bounds,
+            distance,
             tex_size,
-            pxrange,
+            extents,
+        } = compute_layout(extents, tex_size, pxrange, units_per_em, cur_off, false);
+        let extents = Aabb::new(
+            Point::new(extents[0], extents[1]),
+            Point::new(extents[2], extents[3]),
+        );
+        let CellInfo { arcs, info, .. } = result_arcs;
+        let pixmap = encode_sdf(
+            &arcs,
+            info,
+            &extents,
+            tex_size as usize,
+            distance,
+            None,
             is_outer_glow,
-            cur_off,
-        ))
+            false,
+            None,
+        );
+
+        bitcode::serialize(&SdfInfo2 {
+            tex_info: TexInfo2 {
+                char: ' ',
+                advance: advance as f32 / units_per_em as f32,
+                sdf_offset_x: 0,
+                sdf_offset_y: 0,
+                plane_min_x: plane_bounds[0],
+                plane_min_y: plane_bounds[1],
+                plane_max_x: plane_bounds[2],
+                plane_max_y: plane_bounds[3],
+                atlas_min_x: atlas_bounds[0],
+                atlas_min_y: atlas_bounds[1],
+                atlas_max_x: atlas_bounds[2],
+                atlas_max_y: atlas_bounds[3],
+            },
+            sdf_tex: pixmap,
+            tex_size,
+        })
         .unwrap()
     }
 
-
-    pub fn compute_layout_of_wasm(outline: &[u8], tex_size: usize, pxrange: u32, cur_off: u32) -> Vec<f32> {
-        let outline: OutlineInfo = bitcode::deserialize(outline).unwrap();
-        let  LayoutInfo { mut plane_bounds, mut atlas_bounds, mut extents, distance, tex_size } = compute_layout(&outline.extents, tex_size,pxrange, outline.units_per_em, cur_off,false);
-        let mut res =Vec::with_capacity(14);
+    pub fn compute_layout_of_wasm(
+        extents: &[f32],
+        units_per_em: u16,
+        tex_size: usize,
+        pxrange: u32,
+        cur_off: u32,
+    ) -> Vec<f32> {
+        let LayoutInfo {
+            mut plane_bounds,
+            mut atlas_bounds,
+            mut extents,
+            distance,
+            tex_size,
+        } = compute_layout(extents, tex_size, pxrange, units_per_em, cur_off, false);
+        let mut res = Vec::with_capacity(14);
         res.append(&mut plane_bounds);
         res.append(&mut atlas_bounds);
         res.append(&mut extents);
@@ -400,9 +447,9 @@ impl OutlineSink for GlyphVisitor {
 
         // let r = self.compute_direction();
         // let s = if r { "顺时针" } else { "逆时针" };
-        // println!("{}", s);
+        // log::debug!("{}", s);
         self.index = self.accumulate.result.len();
-        // println!("close()");
+        // log::debug!("close()");
     }
 }
 
@@ -445,7 +492,7 @@ pub fn encode_sdf(
             let mut end_y = end.y / unit_d;
             end_y = (end_y * 10000.0).round() * 0.0001;
             let end_y = end_y.round() as usize;
-            // println!("{:?}", (begin_x, begin_y, end_x, end_y));
+            // log::debug!("{:?}", (begin_x, begin_y, end_x, end_y));
             // If the arclist is two arcs that can be combined in encoding if reordered, do that.
             for i in begin_x..end_x {
                 for j in begin_y..end_y {
@@ -464,12 +511,12 @@ pub fn encode_sdf(
                         is_reverse,
                     );
                     // if j == 6 && (i == 7 || i == 6) {
-                    //     println!("p: {}, i: {}, j: {}", p, i, j);
-                    //     println!("============== cell: {:?}, extents: {:?}, ab: {:?}, unit_d: {:?}", cell, extents, ab, unit_d);
-                    //     println!("begin: {}, end: {}", begin.y / unit_d, end.y / unit_d);
-                    //     println!("sdf: {:?}", r);
+                    //     log::debug!("p: {}, i: {}, j: {}", p, i, j);
+                    //     log::debug!("============== cell: {:?}, extents: {:?}, ab: {:?}, unit_d: {:?}", cell, extents, ab, unit_d);
+                    //     log::debug!("begin: {}, end: {}", begin.y / unit_d, end.y / unit_d);
+                    //     log::debug!("sdf: {:?}", r);
                     //     for a in &near_arcs {
-                    //         println!("{:?}", global_arcs[*a])
+                    //         log::debug!("{:?}", global_arcs[*a])
                     //     }
                     // }
 
@@ -477,7 +524,7 @@ pub fn encode_sdf(
                     if is_svg {
                         data[j * tex_size + i] = r.0;
                     } else {
-                        // println!("{:?}", (r, j, i));
+                        // log::debug!("{:?}", (r, j, i));
                         data[(tex_size - j - 1) * tex_size + i] = r.0;
                     }
                 }
@@ -521,23 +568,23 @@ fn compute_sdf2(
     sdf = (sdf * 10000.0).round() * 0.0001;
     // let p2 = Point::new(85.0, 82.0) - p;
     // if p2.norm_squared() < 0.1{
-    //     println!("p : {:?}", (p, sdf, distance));
+    //     log::debug!("p : {:?}", (p, sdf, distance));
     //     for i in near_arcs{
-    //         println!("{:?}", global_arcs[*i]);
+    //         log::debug!("{:?}", global_arcs[*i]);
     //     }
     // }
     // let p2 = Point::new(85.5, 84.5) - p;
     // if p2.norm_squared() < 0.1 {
-    //     println!("p : {:?}", (p, sdf, distance));
+    //     log::debug!("p : {:?}", (p, sdf, distance));
     //     for i in near_arcs {
-    //         println!("{:?}", global_arcs[*i]);
+    //         log::debug!("{:?}", global_arcs[*i]);
     //     }
     // }
     // let p2 = Point::new(85.5, 85.5) - p;
     // if p2.norm_squared() < 0.1 {
-    //     println!("p : {:?}", (p, sdf, distance));
+    //     log::debug!("p : {:?}", (p, sdf, distance));
     //     for i in near_arcs {
-    //         println!("{:?}", global_arcs[*i]);
+    //         log::debug!("{:?}", global_arcs[*i]);
     //     }
     // }
     if let Some(is_reverse) = is_reverse {
@@ -552,17 +599,17 @@ fn compute_sdf2(
     if is_outer_glow {
         let sdf2 = (1.0 - (sdf / distance)).powf(1.99);
         return ((sdf2 * 255.0).round() as u8, sdf, sdf2);
-        // println!("{:?}", (radius, sdf));
+        // log::debug!("{:?}", (radius, sdf));
     } else {
         let sdf2 = sdf / distance;
         let a = ((1.0 - sdf2) * 127.0).round() as u8;
-        // println!("sdf: {:?}", (sdf, a, distance));
+        // log::debug!("sdf: {:?}", (sdf, a, distance));
         return (a, sdf, sdf2);
     }
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LayoutInfo {
     pub plane_bounds: Vec<f32>,
     pub atlas_bounds: Vec<f32>,
@@ -593,7 +640,7 @@ pub(crate) fn compute_layout(
     let px_distance = extents_w.max(extents_h) / tex_size as f32;
     let distance = px_distance * pxrange as f32;
     let expand = px_distance * cur_off as f32;
-    // println!("distance: {}", distance);
+    // log::debug!("distance: {}", distance);
     extents2.mins.x -= expand;
     extents2.mins.y -= expand;
     extents2.maxs.x += expand;
@@ -611,7 +658,7 @@ pub(crate) fn compute_layout(
     if temp > 0.0 {
         extents2.maxs.y += temp;
         if is_svg {
-            // println!("============= is_svg: {}", (temp / extents.height() * tex_size as f32 - 1.0));
+            // log::debug!("============= is_svg: {}", (temp / extents.height() * tex_size as f32 - 1.0));
             atlas_bounds.maxs.y -= (temp / extents2.height() * tex_size as f32).trunc();
         } else {
             // 字体的y最终需要上下颠倒
@@ -982,7 +1029,7 @@ impl CellInfo {
                 near_endpoints.push(endpoint);
                 _p1 = arc.p1;
             }
-            // println!("near_endpoints: {:?}", near_endpoints.len());
+            // log::debug!("near_endpoints: {:?}", near_endpoints.len());
 
             let begin = cell.mins - extents.mins;
             let end = cell.maxs - extents.mins;
@@ -1068,7 +1115,7 @@ impl CellInfo {
                     let unit_arc = &mut data[j][i];
                     if let Some((line_data, start, end)) = line_result.as_ref() {
                         unit_arc.data.push(line_data.clone());
-                        // println!("1row: {}, col: {} line_data: {:?}n \n", row, col, unit_arc.data.len());
+                        // log::debug!("1row: {}, col: {} line_data: {:?}n \n", row, col, unit_arc.data.len());
                         unit_arc.origin_data.push(start.clone());
                         unit_arc.origin_data.push(end.clone());
                         unit_arc.parent_cell = parent_cell;
@@ -1078,7 +1125,7 @@ impl CellInfo {
                         unit_arc.parent_cell = parent_cell;
                         unit_arc.key = key.clone();
                     }
-                    // println!("i: {}, j: {}, unit_arc: {:?}", i, j, unit_arc);
+                    // log::debug!("i: {}, j: {}, unit_arc: {:?}", i, j, unit_arc);
                 }
             }
             let key = data[begin_y][begin_x].get_key();
@@ -1136,7 +1183,7 @@ impl Serialize for CellInfo {
                 h.round() as u8,
             ));
         }
-        // println!("CellInfo: {}", info.len() )
+        // log::debug!("CellInfo: {}", info.len() )
         s.serialize_field("info", &info)?;
         s.serialize_field("min_width", &self.min_width)?;
         s.serialize_field("min_height", &self.min_height)?;

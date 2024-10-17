@@ -9,15 +9,7 @@ use usvg::{
 };
 
 use crate::{
-    glyphy::{
-        blob::recursion_near_arcs_of_cell,
-        geometry::{
-            aabb::Aabb,
-            arc::{Arc, ArcEndpoint},
-        },
-        util::GLYPHY_INFINITY,
-    },
-    utils::{compute_cell_range, CellInfo},
+    glyphy::geometry::aabb::Aabb,
     Point,
 };
 
@@ -139,11 +131,11 @@ impl Svg {
     //     let root = &self.tree.root;
     //     for node in root.children() {
     //         match node.borrow().clone() {
-    //             NodeKind::Group(_) => println!("Group"),
+    //             NodeKind::Group(_) => log::debug!("Group"),
     //             NodeKind::Path(path) => {
-    //                 // println!("data: {:?}", path);
-    //                 println!("fill: {:?}", path.fill);
-    //                 println!("stroke: {:?}", path.stroke);
+    //                 // log::debug!("data: {:?}", path);
+    //                 log::debug!("fill: {:?}", path.fill);
+    //                 log::debug!("stroke: {:?}", path.stroke);
     //                 let mut sink = GlyphVisitor::new(1.0, 1.0);
     //                 // 圆弧拟合贝塞尔曲线的精度，值越小越精确
     //                 sink.accumulate.tolerance = 0.1;
@@ -189,7 +181,7 @@ impl Svg {
     //                 let (mut blob_arc, map) = self.compute_near_arc(sink.accumulate.result,false);
     //                 let size =
     //                     blob_arc.encode_data_tex(&map, data_tex, width0, offset_x0, offset_y0)?;
-    //                 // println!("data_map: {}", map.len());
+    //                 // log::debug!("data_map: {}", map.len());
     //                 let mut info = blob_arc.encode_index_tex(
     //                     index_tex, width1, offset_x1, offset_y1, map, size, sdf_tex, sdf_tex1,
     //                     sdf_tex2, sdf_tex3,
@@ -199,7 +191,7 @@ impl Svg {
     //                 info.index_offset_y = last_offset1.1;
     //                 info.data_offset_x = *offset_x0;
     //                 info.data_offset_y = *offset_y0;
-    //                 // println!(
+    //                 // log::debug!(
     //                 //     "info.index_offset: {:?}, info.data_offset: {:?}",
     //                 //     (info.index_offset_x, info.index_offset_y), (info.data_offset_x, info.data_offset_y)
     //                 // );
@@ -212,8 +204,8 @@ impl Svg {
 
     //                 infos.push(info);
     //             }
-    //             NodeKind::Image(_) => println!("Image"),
-    //             NodeKind::Text(_) => println!("Text"),
+    //             NodeKind::Image(_) => log::debug!("Image"),
+    //             NodeKind::Text(_) => log::debug!("Text"),
     //         }
     //     }
 
@@ -279,7 +271,7 @@ impl Svg {
 //         }
 //     }
 //     assert_eq!(points.next(), None);
-//     println!("is_close: {}", is_colse);
+//     log::debug!("is_close: {}", is_colse);
 //     is_colse
 // }
 

@@ -70,16 +70,16 @@ impl ArcEndpoint {
 
 impl ArcEndpoint {
     pub fn get_line_key(&self, ep1: &ArcEndpoint) -> u64 {
-        // println!(
+        // log::debug!(
         //     "{}_{}_{}_{}_{}_{}_",
         //     self.p.x, self.p.y, self.d, ep1.p.x, ep1.p.y, ep1.d
         // );
         let mut hasher = pi_hash::DefaultHasher::default();
         let data = [self.p[0], self.p[1], self.d, ep1.p[0], ep1.p[1], ep1.d];
-        // println!("data: {:?}", data);
+        // log::debug!("data: {:?}", data);
         hasher.write(bytemuck::cast_slice(&data));
         let r = hasher.finish();
-        // println!("r: {}", r);
+        // log::debug!("r: {}", r);
         r
     }
 }
@@ -429,7 +429,7 @@ impl Arc {
             // 距离的绝对值 就是 |点到圆心的距离 - 半径|
             // 符号，看 difference 的 neggative
             let v = if difference.negative { -1. } else { 1. };
-            // println!("p.distance_to_point(&self.center()): {}, self.radius(): {}", p.distance_to_point(&self.center()), self.radius());
+            // log::debug!("p.distance_to_point(&self.center()): {}, self.radius(): {}", p.distance_to_point(&self.center()), self.radius());
             return (p.distance_to_point(&self.center) - self.radius).abs() * v;
         }
 
@@ -646,18 +646,18 @@ fn test_projection_to_top_bound() {
     // );
 
     // let row_area = cell.near_area(Direction::Col);
-    // println!("row_area: {:?}", row_area);
+    // log::debug!("row_area: {:?}", row_area);
     // let segment = Segment::new(cell.mins, Point::new(cell.mins.x, cell.maxs.y));
-    // println!("segment: {:?}", segment);
+    // log::debug!("segment: {:?}", segment);
 
-    // // println!("ab: {:?}", ab);
+    // // log::debug!("ab: {:?}", ab);
 
     // let arc = Arc::new(
     //     Point::new(91.0, 744.0),
     //     Point::new(227.0, 1364.0),
     //     -0.14173229,
     // );
-    // println!(
+    // log::debug!(
     //     "r1 : {:?}",
     //     arc.projection_to_col_bound(&row_area, &segment),
     // );
@@ -667,7 +667,7 @@ fn test_projection_to_top_bound() {
     //     Point::new(621.0, 1575.0),
     //     -0.27165353,
     // );
-    // println!(
+    // log::debug!(
     //     "r2 : {:?}",
     //     arc.projection_to_col_bound(&row_area, &segment),
     // );
@@ -680,7 +680,7 @@ fn test_projection_to_top_bound() {
 fn test_projection_to_bottom_bound() {
     // let s = Segment::new(Point::new(1077.0, 0.0), Point::new(189.0, 0.0));
     // let r = squared_distance_segment(&Point::new(185.0, 5.0), &s);
-    // println!("R: {}", r);
+    // log::debug!("R: {}", r);
 }
 
 #[test]
@@ -695,7 +695,7 @@ fn test_projection_to_left_bound() {
 
     // let ab = Aabb::new(Point::new(0.0, 0.0), Point::new(5.0, 5.0)).near_area(Direction::Col);
     // let segment = Segment::new(Point::new(0.0, 0.0), Point::new(0.0, 5.0));
-    // println!("ab: {:?}", ab);
+    // log::debug!("ab: {:?}", ab);
 
     // let arc = Arc::new(Point::new(1.0, -2.0), Point::new(2.0, -1.0), 0.4);
     // // assert_eq!(
@@ -704,7 +704,7 @@ fn test_projection_to_left_bound() {
     // );
 
     // let arc = Arc::new(Point::new(-1.0, 1.0), Point::new(-3.0, -1.0), 0.4);
-    // println!(
+    // log::debug!(
     //     "arc: c: {}, r: {:?}, ab: {:?}",
     //     arc.center, arc.radius, arc.aabb
     // );
@@ -729,7 +729,7 @@ fn test_projection_to_left_bound() {
 //     assert_eq!(arc.projection_to_right_bound(&ab), Some((2.0..4.0, 1.0)));
 
 //     let arc = Arc::new(Point::new(6.0, 1.0), Point::new(8.0, -1.0), 0.4);
-//     println!(
+//     log::debug!(
 //         "arc: c: {}, r: {:?}, ab: {:?}",
 //         arc.center, arc.radius, arc.aabb
 //     );
@@ -742,5 +742,5 @@ fn test_projection_to_left_bound() {
 // #[test]
 // fn test() {
 //     let ab = Aabb::new(Point::new(1.0, 1.0), Point::new(5.0, 5.0));
-//     println!("ab: {}", ab.half_extents().norm())
+//     log::debug!("ab: {}", ab.half_extents().norm())
 // }

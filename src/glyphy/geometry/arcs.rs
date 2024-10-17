@@ -197,7 +197,7 @@ impl ArcsBezierApproximatorSpringSystem {
         let n = t.len() - 1;
 
         *e = vec![0.0; n];
-        // println!("e.len: {}", e.len());
+        // log::debug!("e.len: {}", e.len());
         arcs.clear();
 
         _max_e = 0.0;
@@ -212,7 +212,7 @@ impl ArcsBezierApproximatorSpringSystem {
                 arc_bezier_error_approximator_default,
             );
             arcs.push(arc);
-            // println!("n: {}", n);
+            // log::debug!("n: {}", n);
             e[i] = temp.value;
 
             _max_e = _max_e.max(e[i]);

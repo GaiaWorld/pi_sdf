@@ -174,8 +174,12 @@ impl Circle {
         }
     }
 
-    pub fn get_svg_info_of_wasm(&self) -> Vec<u8> {
-        bitcode::serialize(&self.get_svg_info()).unwrap()
+    pub fn get_svg_info_of_wasm(&self) -> WasmSvgInfo {
+        let info = self.get_svg_info();
+        WasmSvgInfo{
+            buf: bitcode::serialize(&info).unwrap(),
+            binding_box: info.binding_box,
+        }
     }
 
     pub fn is_area(&self) -> bool {
@@ -271,8 +275,12 @@ impl Rect {
         }
     }
 
-    pub fn get_svg_info_of_wasm(&self) -> Vec<u8> {
-        bitcode::serialize(&self.get_svg_info()).unwrap()
+    pub fn get_svg_info_of_wasm(&self) -> WasmSvgInfo {
+        let info = self.get_svg_info();
+        WasmSvgInfo{
+            buf: bitcode::serialize(&info).unwrap(),
+            binding_box: info.binding_box,
+        }
     }
 
     pub fn is_area(&self) -> bool {
@@ -397,8 +405,12 @@ impl Segment {
         }
     }
 
-    pub fn get_svg_info_of_wasm(&self) -> Vec<u8> {
-        bitcode::serialize(&self.get_svg_info()).unwrap()
+    pub fn get_svg_info_of_wasm(&self) -> WasmSvgInfo {
+        let info = self.get_svg_info();
+        WasmSvgInfo{
+            buf: bitcode::serialize(&info).unwrap(),
+            binding_box: info.binding_box,
+        }
     }
 
     pub fn is_area(&self) -> bool {
@@ -475,7 +487,7 @@ impl Ellipse {
         let mut sink = GlyphVisitor::new(1.0);
         // 圆弧拟合贝塞尔曲线的精度，值越小越精确
         sink.accumulate.tolerance = 0.1;
-        // println!("=====e.area():{}", e.area());
+        // log::debug!("=====e.area():{}", e.area());
         if e.area() > 0.0 {
             let temp = verbs[0];
             let len = verbs.len();
@@ -519,8 +531,12 @@ impl Ellipse {
         }
     }
 
-    pub fn get_svg_info_of_wasm(&self) -> Vec<u8> {
-        bitcode::serialize(&self.get_svg_info()).unwrap()
+    pub fn get_svg_info_of_wasm(&self) -> WasmSvgInfo {
+        let info = self.get_svg_info();
+        WasmSvgInfo{
+            buf: bitcode::serialize(&info).unwrap(),
+            binding_box: info.binding_box,
+        }
     }
 
     pub fn is_area(&self) -> bool {
@@ -622,8 +638,12 @@ impl Polygon {
         }
     }
 
-    pub fn get_svg_info_of_wasm(&self) -> Vec<u8> {
-        bitcode::serialize(&self.get_svg_info()).unwrap()
+    pub fn get_svg_info_of_wasm(&self) -> WasmSvgInfo {
+        let info = self.get_svg_info();
+        WasmSvgInfo{
+            buf: bitcode::serialize(&info).unwrap(),
+            binding_box: info.binding_box,
+        }
     }
 
     pub fn is_area(&self) -> bool {
@@ -746,8 +766,12 @@ impl Polyline {
         }
     }
 
-    pub fn get_svg_info_of_wasm(&self) -> Vec<u8> {
-        bitcode::serialize(&self.get_svg_info()).unwrap()
+    pub fn get_svg_info_of_wasm(&self) -> WasmSvgInfo {
+        let info = self.get_svg_info();
+        WasmSvgInfo{
+            buf: bitcode::serialize(&info).unwrap(),
+            binding_box: info.binding_box,
+        }
     }
 
     pub fn is_area(&self) -> bool {
@@ -791,7 +815,7 @@ impl Path {
         //     verbs[len - 1] = temp;
         // };
 
-        // println!("{:?}", (&points, &verbs));
+        // log::debug!("{:?}", (&points, &verbs));
 
         let mut attribute = Attribute::default();
         attribute.start = points[0];
@@ -827,7 +851,7 @@ impl Path {
         //     // verbs[len - 1] = temp;
         // };
 
-        // println!("{:?}", (&points, &verbs));
+        // log::debug!("{:?}", (&points, &verbs));
 
         let mut attribute = Attribute::default();
         attribute.start = points[0];
@@ -844,7 +868,7 @@ impl Path {
             r.is_reverse = compute_direction(&r.points);
         }
 
-        println!("attribute.is_close: {:?}", r.attribute.is_close);
+        log::debug!("attribute.is_close: {:?}", r.attribute.is_close);
         r
     }
 
@@ -943,8 +967,12 @@ impl Path {
         }
     }
 
-    pub fn get_svg_info_of_wasm(&self) -> Vec<u8> {
-        bitcode::serialize(&self.get_svg_info()).unwrap()
+    pub fn get_svg_info_of_wasm(&self) -> WasmSvgInfo {
+        let info = self.get_svg_info();
+        WasmSvgInfo{
+            buf: bitcode::serialize(&info).unwrap(),
+            binding_box: info.binding_box,
+        }
     }
 
     pub fn is_area(&self) -> bool {
@@ -958,7 +986,14 @@ impl Path {
     }
 }
 
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct WasmSvgInfo {
+    pub buf: Vec<u8>,
+    pub binding_box: Vec<f32>,
+}
+
+#[cfg_attr(target_arch = "wasm32",  wasm_bindgen(getter_with_clone))]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SvgInfo {
     binding_box: Vec<f32>,
@@ -1071,21 +1106,23 @@ impl SvgInfo {
         arc_endpoints: Vec<f32>,
         is_area: bool,
         is_reverse: Option<bool>,
-    ) -> Vec<u8> {
-        bitcode::serialize(&Self::new(binding_box, arc_endpoints, is_area, is_reverse)).unwrap()
+    ) -> WasmSvgInfo {
+        let info = Self::new(binding_box, arc_endpoints, is_area, is_reverse);
+        let buf = bitcode::serialize(&info).unwrap();
+        WasmSvgInfo{
+            buf,
+            binding_box: info.binding_box,
+        }
     }
 
-
-
-    pub fn compute_layout_of_wasm(info: &[u8], tex_size: usize, pxrange: u32, cur_off: u32) -> Vec<f32> {
-        let info: SvgInfo = bitcode::deserialize(info).unwrap();
+    pub fn compute_layout_of_wasm(binding_box: &[f32], tex_size: usize, pxrange: u32, cur_off: u32) -> Vec<f32> {
         let LayoutInfo {
             mut plane_bounds,
             mut atlas_bounds,
             mut extents,
             distance,
             tex_size,
-        } = compute_layout(&info.binding_box, tex_size, pxrange, 1, cur_off, true);
+        } = compute_layout(binding_box, tex_size, pxrange, 1, cur_off, true);
         let mut res = Vec::with_capacity(14);
         res.append(&mut plane_bounds);
         res.append(&mut atlas_bounds);
@@ -1181,7 +1218,7 @@ fn compute_outline<'a>(
     sink: &mut impl OutlineSinkExt,
     _is_reverse: bool,
 ) {
-    // println!("p: {:?}", points);
+    // log::debug!("p: {:?}", points);
     let mut prev_to = Vector2F::default();
     for path_verb in verbs {
         match path_verb {
@@ -1303,7 +1340,7 @@ fn compute_outline<'a>(
 }
 
 fn to_arc_flags(flag: f32) -> (bool, bool) {
-    println!("flag: {}", flag);
+    log::debug!("flag: {}", flag);
     match flag as u32 {
         0 => (false, false),
         1 => (false, true),
@@ -1331,16 +1368,16 @@ pub fn extents(mut binding_box: Aabb) -> Aabb {
 
 pub fn compute_near_arcs<'a>(view_box: Aabb, endpoints: &Vec<ArcEndpoint>, scale: f32) -> CellInfo {
     let extents = compute_cell_range(view_box, scale);
-    // println!("extents: {:?}", extents);
+    // log::debug!("extents: {:?}", extents);
     // let extents = compute_cell_range(extents, scale);
     let mut min_width = f32::INFINITY;
     let mut min_height = f32::INFINITY;
 
     let mut p0 = Point::new(0., 0.);
-    // println!("extents2: {:?}", extents);
+    // log::debug!("extents2: {:?}", extents);
     let mut near_arcs = Vec::with_capacity(endpoints.len());
     let mut arcs = Vec::with_capacity(endpoints.len());
-    // println!("endpoints: {:?}", endpoints);
+    // log::debug!("endpoints: {:?}", endpoints);
     for i in 0..endpoints.len() {
         let endpoint = &endpoints[i];
         if endpoint.d == GLYPHY_INFINITY {
@@ -1356,7 +1393,7 @@ pub fn compute_near_arcs<'a>(view_box: Aabb, endpoints: &Vec<ArcEndpoint>, scale
 
     let mut result_arcs = vec![];
     let mut temp = Vec::with_capacity(arcs.len());
-    // println!("arcs:{:?}", arcs.len());
+    // log::debug!("arcs:{:?}", arcs.len());
     recursion_near_arcs_of_cell(
         &near_arcs,
         &extents,
@@ -1405,6 +1442,6 @@ fn test() {
 
     // 将弧度转换为角度
     let theta_degrees = theta * 180.0 / PI;
-    println!("圆心角（弧度）：{}", theta);
-    println!("圆心角（度）：{}", theta_degrees);
+    log::debug!("圆心角（弧度）：{}", theta);
+    log::debug!("圆心角（度）：{}", theta_degrees);
 }

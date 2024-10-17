@@ -98,7 +98,7 @@ pub fn approximate_bezier_arc_error(
     let r = a.radius();
 
     _eb = Vector::new(c2 + v.x, c2 / tan_half_alpha + v.y).norm() - r;
-    // println!("_eb: {}", _eb);
+    // log::debug!("_eb: {}", _eb);
     assert!(_eb >= -0.1);
 
     return ea.value + _eb;
@@ -164,7 +164,7 @@ impl ArcBezierApproximatorQuantized {
         approximate_bezier_arc_error: fn(&Bezier, &Arc) -> f32,
     ) -> Arc {
         let mid_t = 0.5;
-        // println!("b: {:?}", b);
+        // log::debug!("b: {:?}", b);
         let mut a = Arc::from_points(b.p0, b.p3, b.point(mid_t), false);
         let orig_a = a.clone();
 
@@ -177,9 +177,9 @@ impl ArcBezierApproximatorQuantized {
         if self.d_bits != 0 && self.max_d != 0. {
             assert!(self.max_d < f32::INFINITY && self.max_d > -f32::INFINITY);
             // if a.d.abs() > self.max_d {
-            //     println!("a.d.abs(): {}, self.max_d: {}", a.d.abs(), self.max_d);
+            //     log::debug!("a.d.abs(): {}, self.max_d: {}", a.d.abs(), self.max_d);
             // }
-            // println!("a.d.abs(): {}, self.max_d: {}", a.d.abs(), self.max_d);
+            // log::debug!("a.d.abs(): {}, self.max_d: {}", a.d.abs(), self.max_d);
             assert!(a.d.abs() <= self.max_d);
 
             let _v = 1;

@@ -189,7 +189,7 @@ impl BlobArc {
         for v in map.values() {
             let unit_arc = unsafe { &mut *(*v as *mut UnitArc) };
             unit_arc.offset = len;
-            // println!("unit_arc.data.len(): {}", unit_arc.data.len());
+            // log::debug!("unit_arc.data.len(): {}", unit_arc.data.len());
             if unit_arc.data.len() == 1 {
                 assert!(unit_arc.data[0].line_encode.is_some());
                 if let Some(data) = &unit_arc.data[0].line_encode {
@@ -371,7 +371,7 @@ impl BlobArc {
                         }
                     }
 
-                    // println!(
+                    // log::debug!(
                     //     "i: {}, j: {}, sdf: {}, sdf1:{}",
                     //     i, j, self.data[i][j].s_dist, self.data[i][j].s_dist_1
                     // );
@@ -467,12 +467,12 @@ impl BlobArc {
                     }
 
                     let offset = map_arc_data.offset;
-                    // println!("offset: {}", offset);
+                    // log::debug!("offset: {}", offset);
                     let sdf = self.data[i][j].sdf;
 
                     let cell_size = self.cell_size;
                     let is_interval = sdf.abs() <= cell_size * 0.5f32.sqrt();
-                    // println!("================  {:?}",( is_interval,
+                    // log::debug!("================  {:?}",( is_interval,
                     //     num_points as f32,
                     //     offset as f32,
                     //     max_offset as f32,
@@ -495,7 +495,7 @@ impl BlobArc {
                     }
                     index_tex.push((encode as i32 & 0xff) as u8);
                     index_tex.push((encode as i32 >> 8) as u8);
-                    // println!("index_tex[{}][{}]: {} {}", j, i, encode as i32 & 0xff, encode as i32 >> 8);
+                    // log::debug!("index_tex[{}][{}]: {} {}", j, i, encode as i32 & 0xff, encode as i32 >> 8);
                     // sdf_tex.push(self.data[i][j].s_dist);
 
                     // if i % 2 == 1 && j % 2 == 1 {
@@ -964,7 +964,7 @@ fn get_offset(
     }
 
     let y = (len % 8) + offset_y;
-    // println!("x: {}, y: {}", x, y);
+    // log::debug!("x: {}, y: {}", x, y);
     Some((x, y))
 }
 
@@ -977,7 +977,7 @@ fn write_data_tex(
     offset_y: usize,
 ) -> Result<(), EncodeError> {
     if let Some((x, y)) = get_offset(*len, data_tex_width, offset_x, offset_y) {
-        // println!("x: {}, y: {}", x, y);
+        // log::debug!("x: {}, y: {}", x, y);
         let offset = (x + y * data_tex_width) * 4;
         *len = *len + 1;
 
@@ -1208,7 +1208,7 @@ pub fn recursion_near_arcs_of_cell<'a>(
         let mut arcs_index = Vec::with_capacity(arcs.len());
         for arc in arcs {
             let index = global_arcs.iter().position(|a| a.id == arc.id).unwrap();
-            // println!("arc: {:?}, global_arcs: {:?}", arc, global_arcs[index]);
+            // log::debug!("arc: {:?}, global_arcs: {:?}", arc, global_arcs[index]);
             arcs_index.push(index);
         }
         result_arcs.push((arcs_index, cell.clone()));
@@ -1266,7 +1266,7 @@ pub fn recursion_near_arcs_of_cell<'a>(
                 ),
             )
         };
-        // println!("cell1: {:?}, cell2: {:?}, cell: {:?}", cell1, cell2, cell);
+        // log::debug!("cell1: {:?}, cell2: {:?}, cell: {:?}", cell1, cell2, cell);
         recursion_near_arcs_of_cell(
             global_arcs,
             extents,
@@ -1323,7 +1323,7 @@ fn compute_near_arc(
             near_arcs.push(*arc);
         }
     }
-    // println!("near_arcs: {:?}", near_arcs);
+    // log::debug!("near_arcs: {:?}", near_arcs);
     let row_area = cell.near_area(Direction::Row);
 
     let top_near = if let Some((near, is_use)) = top_near.take() {

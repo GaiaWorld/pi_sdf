@@ -100,7 +100,7 @@ impl FontFace {
 
         // log::info!("=========== 10");
         // todo!()
-        println!("units_per_em: {}", head_table.units_per_em);
+        log::debug!("units_per_em: {}", head_table.units_per_em);
         Self {
             _data,
             font,
@@ -170,7 +170,7 @@ impl FontFace {
     //     extents: Aabb,
     //     mut endpoints: Vec<ArcEndpoint>,
     // ) -> (BlobArc, HashMap<u64, u64>) {
-    //     // println!("result_arcs: {:?}", result_arcs.len());
+    //     // log::debug!("result_arcs: {:?}", result_arcs.len());
 
     //     // let width_cells = (extents.width() / min_width).floor();
     //     // let height_cells = (extents.height() / min_height).floor();
@@ -180,7 +180,7 @@ impl FontFace {
     //     // log::trace!("near_arcs: {}", near_arcs.len());
     //     let (unit_arcs, map) =
     //         encode_uint_arc_data(info, &extents, min_width, min_height, None);
-    //     // println!("unit_arcs[14][5]: {:?}", unit_arcs[14][5]);
+    //     // log::debug!("unit_arcs[14][5]: {:?}", unit_arcs[14][5]);
 
     //     let [min_sdf, max_sdf] = travel_data(&unit_arcs);
     //     let blob_arc = BlobArc {
@@ -367,7 +367,7 @@ impl FontFace {
         let mut bbox2 = Aabb::new(Point::new(0.0, 0.0), Point::new(0.0, 0.0));
         if let Ok(r) = self.glyf.get_parsed_glyph(glyph_index) {
             if let Some(g) = r {
-                // println!("g.bounding_box:{:?}", g.bounding_box);
+                // log::debug!("g.bounding_box:{:?}", g.bounding_box);
                 bbox2.mins.x = g.bounding_box.x_min as f32;
                 bbox2.mins.y = g.bounding_box.y_min as f32;
                 bbox2.maxs.x = g.bounding_box.x_max as f32;
@@ -399,6 +399,7 @@ impl FontFace {
             units_per_em: outline.units_per_em,
             advance: outline.advance,
             bbox: outline.bbox,
+            extents: outline.extents
         }
     }
 }
@@ -409,4 +410,5 @@ pub struct WasmOutlineInfo {
     pub units_per_em: u16,
     pub advance: u16,
     pub bbox: Vec<f32>,
+    pub extents: Vec<f32>
 }

@@ -92,7 +92,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     let size = sdf_tex_size * (scale + 1.0); // 
     let px_distance =  sdf_tex.tex_info.grid_w  / size;
     let distance = (1.0 / px_distance) / pxrange;
-    println!("px_distance: {:?}", (px_distance, distance));
+    log::debug!("px_distance: {:?}", (px_distance, distance));
     let size_2 = size * 0.5;
     let verties = [
         0.0, 0.0, (size_2 - sdf_tex_size * 0.5 - pxrange) / size, (size_2 - sdf_tex_size * 0.5 - pxrange) / size,
@@ -100,14 +100,14 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         1.0, 0.0, (size_2 + sdf_tex_size * 0.5 + pxrange) / size, (size_2 - sdf_tex_size * 0.5 - pxrange) / size,
         1.0, 1.0, (size_2 + sdf_tex_size * 0.5 + pxrange) / size, (size_2 + sdf_tex_size * 0.5 + pxrange) / size,
     ]; // 获取网格数据
-    println!("verties: {:?}", verties);
+    log::debug!("verties: {:?}", verties);
     let view_matrix = na::Matrix4::<f32>::identity(); // 视口矩阵
     let view_matrix_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Index Buffer"),
         contents: bytemuck::cast_slice(view_matrix.as_slice()),
         usage: wgpu::BufferUsages::UNIFORM,
     });
-    println!("view_matrix.as_slice(): {:?}", view_matrix.as_slice());
+    log::debug!("view_matrix.as_slice(): {:?}", view_matrix.as_slice());
 
     // 投影矩阵
     let proj_matrix = na::Orthographic3::<f32>::new(
@@ -123,7 +123,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         contents: bytemuck::cast_slice(proj_matrix.as_matrix().as_slice()),
         usage: wgpu::BufferUsages::UNIFORM,
     });
-    println!(
+    log::debug!(
         "proj_matrix.as_slice(): {:?}",
         proj_matrix.as_matrix().as_slice()
     );
@@ -260,7 +260,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         height: 1,
         depth_or_array_layers: 1,
     };
-    println!("sdf_tex.data_tex: {:?}", sdf_tex.data_tex);
+    log::debug!("sdf_tex.data_tex: {:?}", sdf_tex.data_tex);
     let data_tex_sampler = device.create_sampler(&wgpu::SamplerDescriptor::default());
     let data_texture = device.create_texture(&wgpu::TextureDescriptor {
         label: None,
@@ -357,7 +357,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
 
     let swapchain_capabilities = surface.get_capabilities(&adapter);
     let swapchain_format = swapchain_capabilities.formats[1];
-    println!("swapchain_format: {:?}", swapchain_capabilities.formats);
+    log::debug!("swapchain_format: {:?}", swapchain_capabilities.formats);
     // 创建网格数据
     let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Index Buffer"),
@@ -375,8 +375,8 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     u_info.push(check);
     let translation = vec![sdf_tex_size + pxrange * 2.0, sdf_tex_size + pxrange * 2.0, 100.0, 100.0];
 
-    println!("u_info: {:?}", u_info);
-    println!("translation: {:?}", translation);
+    log::debug!("u_info: {:?}", u_info);
+    log::debug!("translation: {:?}", translation);
 
     let translation_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("translation_buffer"),
@@ -449,7 +449,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         multiview: None,
     });
 
-    // println!("render_pipeline: {:?}", render_pipeline);
+    // log::debug!("render_pipeline: {:?}", render_pipeline);
 
     let mut config = wgpu::SurfaceConfiguration {
         usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
@@ -471,7 +471,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         // let _ = (&instance, &adapter, &shader, &pipeline_layout);
 
         *control_flow = ControlFlow::Wait;
-        // println!("=========1");
+        // log::debug!("=========1");
         match event {
             Event::WindowEvent {
                 event: WindowEvent::Resized(size),
