@@ -797,6 +797,7 @@ pub struct Path {
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 impl Path {
     pub fn new(verbs: Vec<u8>, points: Vec<f32>) -> Self {
+        // let _ = console_log::init_with_level(log::Level::Warn);
         let verbs: Vec<PathVerb> = unsafe { transmute(verbs) };
 
         let points = points
@@ -828,6 +829,9 @@ impl Path {
         };
         r.attribute.is_close = r.is_close();
 
+        if r.attribute.is_close {
+            r.is_reverse = compute_direction(&r.points);
+        }
         r
     }
 

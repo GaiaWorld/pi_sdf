@@ -1,7 +1,7 @@
 use parry2d::math::Vector;
 use std:: ops::Range;
-// use std::collections::HashMap;
-use std::collections::BTreeMap as HashMap;
+use std::collections::HashMap;
+// use std::collections::BTreeMap as HashMap;
 
 use serde::{Deserialize, Serialize};
 #[cfg(target_arch = "wasm32")]
