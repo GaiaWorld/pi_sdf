@@ -87,6 +87,8 @@ pub struct OutlineInfo {
     pub advance: u16,
     pub units_per_em: u16,
     pub extents: Vec<f32>,
+    #[cfg(feature = "debug")]
+    pub svg_paths: Vec<String>,
 }
 
 impl OutlineInfo {
@@ -315,7 +317,7 @@ impl OutlineSinkExt for GlyphVisitor {
         // if self.scale > 0.02 {
         self.accumulate.arc_to(to, d);
         #[cfg(feature = "debug")]
-        self.path_str.push_str(&format!("L {} {}", to.x, to.y));
+        self.path_str.push_str(&format!("L {} {} ", to.x, to.y));
         self.svg_endpoints.push([to.x, to.y]);
         // } else {
         //     self.rasterizer.draw_line(
@@ -337,7 +339,7 @@ impl OutlineSink for GlyphVisitor {
         // if self.scale > 0.02 {
         self.accumulate.move_to(Point::new(to.x, to.y));
         #[cfg(feature = "debug")]
-        self.path_str.push_str(&format!("M {} {}", to.x, to.y));
+        self.path_str.push_str(&format!("M {} {} ", to.x, to.y));
         self.svg_endpoints.push([to.x, to.y]);
         // }
         self.bbox.extend_by(to.x, to.y);
@@ -351,7 +353,7 @@ impl OutlineSink for GlyphVisitor {
         // if self.scale > 0.02 {
         self.accumulate.line_to(to);
         #[cfg(feature = "debug")]
-        self.path_str.push_str(&format!("L {} {}", to.x, to.y));
+        self.path_str.push_str(&format!("L {} {} ", to.x, to.y));
         self.svg_endpoints.push([to.x, to.y]);
         // } else {
         //     self.rasterizer.draw_line(
@@ -370,6 +372,8 @@ impl OutlineSink for GlyphVisitor {
         log::debug!("+ Q {} {} {} {} ", control.x, control.y, to.x, to.y);
         // if self.scale > 0.02 {
         self.accumulate.conic_to(control, to);
+        #[cfg(feature = "debug")]
+        self.path_str.push_str(&format!("Q {} {} {} {} ", control.x, control.y, to.x, to.y));
         self.svg_endpoints.push([to.x, to.y]);
         // } else {
         //     self.rasterizer.draw_quad(
@@ -422,9 +426,9 @@ impl OutlineSink for GlyphVisitor {
             log::debug!("+ L {} {} ", self.start.x, self.start.y);
             // if self.scale > 0.02 {
             self.accumulate.line_to(self.start);
-            #[cfg(feature = "debug")]
-            self.path_str
-                .push_str(&format!("M {} {}", self.start.x, self.start.y));
+            // #[cfg(feature = "debug")]
+            // self.path_str
+            //     .push_str(&format!("M {} {}", self.start.x, self.start.y));
             self.svg_endpoints.push([self.start.x, self.start.y]);
             // } else {
             //     let x = self.previous.x * self.scale;

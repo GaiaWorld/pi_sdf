@@ -70,10 +70,10 @@ impl UnitArc {
         }
     }
 
-    #[cfg(feature = "debug")]
-    pub fn get_show(&self) -> String {
-        self.show
-    }
+    // #[cfg(feature = "debug")]
+    // pub fn get_show(&self) -> String {
+    //     self.show
+    // }
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
@@ -528,17 +528,17 @@ impl BlobArc {
                     //     }
                     // }
 
-                    #[cfg(feature = "debug")]
-                    {
-                        unit_arc.show = format!("{}", _num_points2);
-                    }
+                    // #[cfg(feature = "debug")]
+                    // {
+                    //     unit_arc.show = format!("{}", _num_points2);
+                    // }
                 }
             }
         }
 
         let cell_size = self.cell_size;
-        #[cfg(feature = "debug")]
-        self.show.push_str(&format!("<br> var max_offset = {:.2}, min_sdf = {:.2}, max_sdf = {:.2}, sdf_step = {:.2}, cell_size = {:.2} <br>", max_offset, self.min_sdf, self.max_sdf, sdf_step, cell_size));
+        // #[cfg(feature = "debug")]
+        // self.show.push_str(&format!("<br> var max_offset = {:.2}, min_sdf = {:.2}, max_sdf = {:.2}, sdf_step = {:.2}, cell_size = {:.2} <br>", max_offset, self.min_sdf, self.max_sdf, sdf_step, cell_size));
 
         return (
             TexInfo {

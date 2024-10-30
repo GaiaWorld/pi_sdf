@@ -81,46 +81,47 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     let mut ft_face = FontFace::new(Arc::new(buffer));
     
     
-    log::debug!("max_box_normaliz: {:?}", ft_face.max_box_normaliz());
+    println!("max_box_normaliz: {:?}", ft_face.max_box_normaliz());
     let pxrange = 10;
     let time = std::time::Instant::now();
     let mut outline_info = ft_face.to_outline('魔');
 
 
-    // log::debug!("===================plane_bounds: {:?}", plane_bounds);
+    // println!("===================plane_bounds: {:?}", plane_bounds);
     let result_arcs = outline_info.compute_near_arcs(2.0);
+    // println!("time: {:?}", time.elapsed(), );
     // for (indexs, aabb) in &result_arcs.info{
     //     let mut str = "".to_string();
     //     for i in indexs{
     //         str.push_str(&format!("{:?}", result_arcs.arcs[*i]));
     //     }
-    //     log::debug!("({:?})", aabb);
-    //     log::debug!("")
+    //     println!("({:?})", aabb);
+    //     println!("")
     // }
-    let time2 = std::time::Instant::now();
-    // let r = bincode::serialize(&result_arcs).unwrap();
-    let r = bitcode::serialize(&result_arcs).unwrap();
-    log::debug!("time2: {:?}", (time2.elapsed(), r.len()));
+    // let time2 = std::time::Instant::now();
+    // // let r = bincode::serialize(&result_arcs).unwrap();
+    // let r = bitcode::serialize(&result_arcs).unwrap();
+    // println!("time2: {:?}", (time2.elapsed(), r.len()));
    
-    let time2 = std::time::Instant::now();
-    // let arcs: CellInfo  = bincode::deserialize(&r).unwrap();
-    let arcs: CellInfo  = bitcode::deserialize(&r).unwrap();
-    // log::debug!("arcs: {:?}", arcs);
+    // let time2 = std::time::Instant::now();
+    // // let arcs: CellInfo  = bincode::deserialize(&r).unwrap();
+    // let arcs: CellInfo  = bitcode::deserialize(&r).unwrap();
+    // println!("arcs: {:?}", arcs);
     let weight = 0.0;
     let pxrange = 5;
     let range = 4;
-    log::debug!("time3: {:?}", time2.elapsed());
+    // println!("time3: {:?}", time2.elapsed());
     let time4 = std::time::Instant::now();
-    let glpyh_info = outline_info.compute_sdf_tex(arcs, 32, pxrange, false, pxrange);
+    let glpyh_info = outline_info.compute_sdf_tex(result_arcs, 32, pxrange, false, pxrange);
     // let glpyh_info = FontFace::compute_sdf_tex(outline_info.clone(),  32, pxrange, false);
-    log::debug!("time4: {:?}", time4.elapsed());
-    // log::debug!("glpyh_info: {:?}", glpyh_info);
+    println!("time4: {:?}", time.elapsed());
+    println!("glpyh_info: {:?}", glpyh_info.tex_info);
     let tex_size = glpyh_info.tex_size;
     let _ = image::save_buffer("image.png", &glpyh_info.sdf_tex, tex_size as u32, tex_size as u32, ColorType::L8);
 
-    let time4 = std::time::Instant::now();
+    // let time4 = std::time::Instant::now();
     let gaussian_blur = gaussian_blur(glpyh_info.sdf_tex.clone(), tex_size as u32, tex_size as u32, range, weight);
-    log::debug!("time4: {:?}", time4.elapsed());
+    // println!("time4: {:?}", time4.elapsed());
     let _ = image::save_buffer("gaussian_blur.png", &gaussian_blur, tex_size as u32, tex_size as u32, ColorType::L8);
     // let buffer = include_bytes!("../source/sdf.png").to_vec();
     // let image_buf = image::load_from_memory(&buffer).unwrap();
@@ -137,7 +138,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         1.0, 0.0, 1.0, 0.0, 
         1.0, 1.0, 1.0, 1.0,
     ]; // 获取网格数据
-    log::debug!("vertexs: {:?}", vertexs);
+    println!("vertexs: {:?}", vertexs);
 
     let view_matrix = na::Matrix4::<f32>::identity(); // 视口矩阵
     let view_matrix_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -145,7 +146,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         contents: bytemuck::cast_slice(view_matrix.as_slice()),
         usage: wgpu::BufferUsages::UNIFORM,
     });
-    log::debug!("view_matrix.as_slice(): {:?}", view_matrix.as_slice());
+    println!("view_matrix.as_slice(): {:?}", view_matrix.as_slice());
 
     // 投影矩阵
     let proj_matrix = na::Orthographic3::<f32>::new(
@@ -161,7 +162,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         contents: bytemuck::cast_slice(proj_matrix.as_matrix().as_slice()),
         usage: wgpu::BufferUsages::UNIFORM,
     });
-    log::debug!(
+    println!(
         "proj_matrix.as_slice(): {:?}",
         proj_matrix.as_matrix().as_slice()
     );
@@ -321,7 +322,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
 
     let swapchain_capabilities = surface.get_capabilities(&adapter);
     let swapchain_format = swapchain_capabilities.formats[1];
-    log::debug!("swapchain_format: {:?}", swapchain_capabilities.formats);
+    println!("swapchain_format: {:?}", swapchain_capabilities.formats);
     // 创建网格数据
     let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Index Buffer"),
@@ -386,7 +387,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         multiview: None,
     });
 
-    // log::debug!("render_pipeline: {:?}", render_pipeline);
+    // println!("render_pipeline: {:?}", render_pipeline);
 
     let mut config = wgpu::SurfaceConfiguration {
         usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
@@ -408,7 +409,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         // let _ = (&instance, &adapter, &shader, &pipeline_layout);
 
         *control_flow = ControlFlow::Wait;
-        // log::debug!("=========1");
+        // println!("=========1");
         match event {
             Event::WindowEvent {
                 event: WindowEvent::Resized(size),
@@ -486,7 +487,7 @@ fn main() {
     // let window = winit::window::Window::new(&event_loop).unwrap();
     #[cfg(not(target_arch = "wasm32"))]
     {
-        env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+        env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("debug")).init();
         pollster::block_on(run(event_loop, window));
     }
     #[cfg(target_arch = "wasm32")]

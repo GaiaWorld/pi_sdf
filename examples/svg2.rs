@@ -1,5 +1,5 @@
 use image::ColorType;
-use pi_sdf::shape::{Path, PathVerb};
+use pi_sdf::{shape::{Path, PathVerb, SvgInfo}, utils::SdfInfo2};
 // 1 -> 5
 // 2 -> 10
 fn main() {
@@ -60,19 +60,19 @@ fn main() {
 
     let mut path = Path::new1(
         vec![
-            PathVerb::MoveTo,
-            PathVerb::LineTo,
-            PathVerb::EllipticalArcTo,
-            PathVerb::LineTo,
-            PathVerb::EllipticalArcTo,
-            PathVerb::LineTo,
-            PathVerb::EllipticalArcTo,
-            PathVerb::LineTo,
-            PathVerb::EllipticalArcTo,
+            PathVerb::MoveTo, PathVerb::EllipticalArcTo, PathVerb::LineTo, PathVerb::EllipticalArcTo, PathVerb::LineTo, PathVerb::EllipticalArcTo, PathVerb::LineTo, PathVerb::EllipticalArcTo, PathVerb::Close
+            // PathVerb::MoveTo,
+            // PathVerb::LineTo,
+            // PathVerb::EllipticalArcTo,
+            // PathVerb::LineTo,
+            // PathVerb::EllipticalArcTo,
+            // PathVerb::LineTo,
+            // PathVerb::EllipticalArcTo,
+            // PathVerb::LineTo,
+            // PathVerb::EllipticalArcTo,
         ],
         vec![
-            100., 100., 102., 100., 15., 15., 0., 0., 117., 85., 117., 83., 15., 15., 0., 0., 102.,
-            68., 100., 68., 15., 15., 0., 0., 85., 83., 85., 85., 15., 15., 0., 0., 100., 100.,
+            0.0, 10.0, 8.0, 8.0, 0.0, 0.0, 8.0, 18.0, 10.0, 18.0, 8.0, 8.0, 0.0, 0.0, 18.0, 10.0, 18.0, 8.0, 8.0, 8.0, 0.0, 0.0, 10.0, 0.0, 8.0, 0.0, 8.0, 8.0, 0.0, 0.0, 0.0, 8.0
         ],
     );
 
@@ -92,13 +92,23 @@ fn main() {
     // let binding_box = [85.0, 68.0, 117.0, 100.0];
     // let info = SvgInfo::new(&binding_box, point.to_vec(), true, None);
 
-    let sdf = info.compute_sdf_tex(32, 1, false, 2, 1.0);
+    
+    let sdf = SvgInfo::compute_sdf_tex_of_wasm(&bitcode::serialize(&info).unwrap(),32, 1, false, 2, 1.0);
+    let sdf :SdfInfo2 = bitcode::deserialize(&sdf) .unwrap();
     log::debug!("sdf.sdf_tex: {}", sdf.sdf_tex[38 * 3 + 3]);
     let _ = image::save_buffer(
         "Rounded_rectangle.png",
         &sdf.sdf_tex,
         sdf.tex_size as u32,
         sdf.tex_size as u32,
+        ColorType::L8,
+    );
+    let buf = [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 236, 207, 192, 191, 191, 192, 207, 236, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 222, 162, 115, 82, 66, 64, 64, 66, 82, 115, 162, 222, 255, 255, 255, 255, 255, 255, 255, 255, 255, 192, 115, 49, 0, 0, 0, 0, 0, 0, 0, 0, 49, 115, 192, 255, 255, 255, 255, 255, 255, 255, 192, 99, 14, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 14, 99, 192, 255, 255, 255, 255, 255, 222, 115, 14, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 14, 115, 222, 255, 255, 255, 255, 162, 49, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 49, 162, 255, 255, 255, 236, 115, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 115, 236, 255, 255, 207, 82, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 82, 207, 255, 255, 192, 66, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 66, 192, 255, 255, 191, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 64, 191, 255, 255, 191, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 64, 191, 255, 255, 192, 66, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 66, 192, 255, 255, 207, 82, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 82, 207, 255, 255, 236, 115, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 115, 236, 255, 255, 255, 162, 49, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 49, 162, 255, 255, 255, 255, 222, 115, 14, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 14, 115, 222, 255, 255, 255, 255, 255, 192, 99, 14, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 14, 99, 192, 255, 255, 255, 255, 255, 255, 255, 192, 115, 49, 0, 0, 0, 0, 0, 0, 0, 0, 49, 115, 192, 255, 255, 255, 255, 255, 255, 255, 255, 255, 222, 162, 115, 82, 66, 64, 64, 66, 82, 115, 162, 222, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 236, 207, 192, 191, 191, 192, 207, 236, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255];
+    let _ = image::save_buffer(
+        "Rounded_rectangle2.png",
+        &buf,
+        22,
+        22,
         ColorType::L8,
     );
 }

@@ -50,11 +50,11 @@ pi_assets = "0.14"
 
 [profile.release]
 # incremental = true
-strip = true
+# strip = true
 lto = true
 # panic = "abort"
 # codegen-units = 1
-opt-level = 3
+# opt-level = 3
 # debug = true
 
 [features]

@@ -20,9 +20,11 @@ pub type Vector3 = parry2d::na::Vector3<f32>;
 pub type Vector2 = parry2d::na::Vector2<f32>;
 pub type Orthographic3 = parry2d::na::Orthographic3<f32>;
 
-use font::FontFace;
-use pi_share::Share;
-use utils::SdfInfo2;
+// use font::FontFace;
+use glyphy::geometry::{aabb::Aabb, arc::Arc};
+// use pi_share::Share;
+// use serde_json::value::Index;
+use utils::{CellInfo, OutlineInfo, SdfInfo2};
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::wasm_bindgen;
 
@@ -34,14 +36,110 @@ pub fn brotli_decompressor(data: &[u8]) -> Vec<u8> {
     buf
 }
 
-#[cfg(feature = "debug")]
+// // #[cfg(target_arch = "wasm32")]
+// #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
+// pub fn get_outline(char: String, tex_size: usize, pxrange: u32) -> OutlineInfo {
+//     let _ = console_log::init_with_level(log::Level::Debug);
+//     let buffer = include_bytes!("../source/msyh.ttf").to_vec();
+//     let mut ft_face = FontFace::new(buffer);
+//     let char = char.chars().next().unwrap();
+//     ft_face.to_outline(char)
+// }
+
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
-pub fn compute_sdf_debug(char: String, tex_size: usize, pxrange: u32) -> SdfInfo2 {
-    let _ = console_log::init_with_level(log::Level::Debug);
-    let buffer = include_bytes!("../source/msyh.ttf").to_vec();
-    let mut ft_face = FontFace::new(buffer);
-    let char = char.chars().next().unwrap();
-    let outline_info = ft_face.to_outline(char);
-    let cell_info = outline_info.compute_near_arcs(2.0);
-    outline_info.compute_sdf_tex(cell_info, tex_size, pxrange, false, pxrange)
+#[derive(Debug, Clone)]
+pub struct DebugAabb {
+    pub min_x: f32,
+    pub min_y: f32,
+    pub max_x: f32,
+    pub max_y: f32,
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
+pub struct DebugCellInfo {
+    pub extents: DebugAabb,
+    pub arcs: Vec<Arc>,
+    infos: Vec<Vec<f32>>,
+    pub min_width: f32,
+    pub min_height: f32,
+    pub is_area: bool,
+}
+
+impl DebugCellInfo {
+    pub fn get_info(&self, index: usize) -> Option<Vec<f32>> {
+        self.infos.get(index).map(|v| v.to_vec())
+    }
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
+pub fn compute_near_arcs(outline_info: &OutlineInfo, scale: f32) -> DebugCellInfo {
+    let CellInfo {
+        extents,
+        arcs,
+        info,
+        min_width,
+        min_height,
+        is_area,
+    } = outline_info.compute_near_arcs(scale);
+
+    DebugCellInfo {
+        extents: DebugAabb {
+            min_x: extents.mins.x,
+            min_y: extents.mins.y,
+            max_x: extents.maxs.x,
+            max_y: extents.maxs.y,
+        },
+        arcs,
+        infos: info
+            .iter()
+            .map(|(indexs, bbox)| {
+                let mut res = vec![bbox.mins.x, bbox.mins.y, bbox.maxs.x, bbox.maxs.y];
+                indexs.iter().for_each(|v| res.push((*v) as f32));
+                res
+            })
+            .collect(),
+        min_width,
+        min_height,
+        is_area,
+    }
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
+pub fn compute_sdf_tex(
+    outline_info: &OutlineInfo,
+    cell_info: &DebugCellInfo,
+    tex_size: usize,
+    pxrange: u32,
+) -> SdfInfo2 {
+    let DebugCellInfo {
+        extents,
+        arcs,
+        infos,
+        min_width,
+        min_height,
+        is_area,
+    } = cell_info;
+    let mut res = Vec::new();
+    for v in infos {
+        let bbox = Aabb::new(Point::new(v[0], v[1]), Point::new(v[2], v[3]));
+        let indexs = v[4..v.len()]
+            .iter()
+            .map(|v| *v as usize)
+            .collect::<Vec<usize>>();
+        res.push((indexs, bbox));
+    }
+
+    let info = CellInfo {
+        extents: Aabb::new(
+            Point::new(extents.min_x, extents.min_y),
+            Point::new(extents.max_x, extents.max_y),
+        ),
+        arcs: arcs.clone(),
+        info: res,
+        min_width: *min_width,
+        min_height: *min_height,
+        is_area: *is_area,
+    };
+
+    outline_info.compute_sdf_tex(info, tex_size, pxrange, false, pxrange)
 }

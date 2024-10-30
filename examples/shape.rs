@@ -123,7 +123,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     );
 
     let info = path.get_svg_info();
-    info
+    // info
     let (texs_info, attributes, ts) = shapes.out_tex_data(&mut tex_data).unwrap();
     log::debug!("out_tex_data: {:?}", time.elapsed());
     let vertexs = shapes.verties();

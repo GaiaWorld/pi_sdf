@@ -7,64 +7,151 @@
 </head>
 
 <body>
-    <label for="char" style="position: relative; left:10%;">(0, 0) 在左下角</label>
-    <br><br>
+    <input type="file" id="font-file"> </input>
+    <input type="text" id="char" required minlength="1" maxlength="1" size="10" />
+    <input type="text" id="size" required minlength="1" maxlength="2" size="10" />
+    <input type="text" id="pxrange" required minlength="1" maxlength="2" size="10" />
+    <input type="text" id="scale" required minlength="1" maxlength="3" size="10" />
+    <input type="button" id="conputerSDF" value="计算" />
 
-    <label for="dubug" style="position: relative; left:10%;">进入调试模式：</label>
-    <input type="checkbox" id="debug" value=false style="position: relative; left:10%;">
-    <br><br>
-    
-    <label for="char" style="position: relative; left:10%;">输入字符：</label>
-    <input type="text" id="char" value="魔" placeholder="输入字符" style="position: relative; left:10%;">
-    <br><br>
-    <label for="char_size" style="position: relative; left:10%;">像素大小：</label>
-    <input type="text" id="char_size" value="64" placeholder="像素大小" style="position: relative; left:10%;">
-    <br><br>
-    <canvas id="sdf-canvas" width="512" height="512" style="position: absolute; left: 150px; width:512px;height:512px;"></canvas>
-    <br><br>
-    <div id="debug_canvas" >
-        <form>
-            <fieldset>
-                <legend>贝塞尔曲线</legend>
-                <input type="checkbox" id="isBezierRender">
-                <label for="isBezierRender">是否渲染</label><br>
-                <input type="radio" id="bezierFill" name="bezier" value="fill" checked>
-                <label for="bezierFill">Fill: 红色</label><br>
-                <input type="radio" id="bezierStroke" name="bezier" value="stroke">
-                <label for="bezierStroke">Stroke: 红色</label><br>
-                <input type="checkbox" id="bezierEndpoints">
-                <label for="bezierEndpoints">Endpoints: 紫</label>
-            </fieldset>
-            <fieldset>
-                <legend>圆弧</legend>
-                <input type="checkbox" id="isArcRender" checked>
-                <label for="isArcRender">是否渲染</label><br>
-                <input type="radio" id="arcFill" name="arc" value="fill" checked>
-                <label for="arcFill">Fill: 绿色</label><br>
-                <input type="radio" id="arcStroke" name="arc" value="stroke">
-                <label for="arcStroke">Stroke: 绿色</label><br>
-                <input type="checkbox" id="arcEndpoints" checked>
-                <label for="arcEndpoints">Endpoints: 蓝色</label>
-            </fieldset>
-            <fieldset>
-                <legend>SDF</legend>
-                <input type="checkbox" id="grid" checked>
-                <label for="grid">画网格（此时，左键点击格子，会出现格子对应的端点【黑色】）</label><br>
+    <canvas id="cell-canvas" width="900" height="900"
+        style="position: absolute; left: 20px; top: 50px;width:900px;height:900px; background-color: aqua;"></canvas>
+    <canvas id="sdf-canvas"
+        style="position: absolute; left: 20px; top: 1000px; width:512px;height:512px; background-color: aquamarine;"></canvas>
 
-                <input type="checkbox" id="isSDFRender">
-                <label for="isSDFRender">渲染 SDF（没实现）</label><br>
-                </label>
-            </fieldset>
-        </form>
-        <!-- <label>圆弧 端点 数量：</label><label id="arc_count">：</label> -->
-        <br>
-        <!-- <label>贝塞尔曲线 端点 数量：</label><label id="bezier_count"></label> -->
-        <br>
-        <label id="data_texture_pixels"></label>
-        <br>
-        <canvas id="font-canvas" width="3000" height="4000" style="width:3000px;height:4000px"></canvas>
-    </div>    
-    <script type="module" src="app.js"></script>
+    <script type="module">
+        import init from './pkg/pi_sdf.js';
+        import { FontFace, compute_near_arcs, compute_sdf_tex } from './pkg/pi_sdf.js';
+
+        const fontFile = document.getElementById('font-file');
+        let fileInput;
+        fontFile.addEventListener('change', function (e) {
+            console.log(e)
+            fileInput = e;
+        });
+
+        const char = document.getElementById('char');
+        let charInput;
+        char.addEventListener('change', function (e) {
+            console.log(e)
+            charInput = document.getElementById('char').value;
+        });
+
+        const size = document.getElementById('size');
+        let sizeInput;
+        size.addEventListener('change', function (e) {
+            console.log(e)
+            sizeInput = parseInt(document.getElementById('size').value);
+        });
+
+        const pxrange = document.getElementById('pxrange');
+        let pxrangeInput;
+        pxrange.addEventListener('change', function (e) {
+            console.log(e)
+            pxrangeInput = parseInt(document.getElementById('pxrange').value);;
+        });
+
+        const scale = document.getElementById('scale');
+        let scaleInput;
+        scale.addEventListener('change', function (e) {
+            console.log(e)
+            scaleInput = parseFloat(document.getElementById('scale').value);;
+        });
+
+        const conputesdf = document.getElementById('conputerSDF');
+        conputesdf.addEventListener('click', function (e) {
+            console.log("start")
+            start();
+        });
+
+
+        let cell_canvas = document.getElementById("cell-canvas");
+        let ctx = cell_canvas.getContext("2d")
+        // let width = cell_canvas.width;
+        // let height = cell_canvas.height;
+        // drawCell(ctx, width, height);
+
+        const start = () => {
+            ctx.clearRect(0, 0, cell_canvas.width, cell_canvas.height);
+
+
+            init().then(() => {
+                if (!charInput) {
+                    throw new Error("请输入需计算的字符");
+                }
+                if (!sizeInput) {
+                    throw new Error("请输入需计算sdf纹理的大小");
+                }
+                if (!pxrangeInput) {
+                    throw new Error("请输入需计算sdf梯度递减值");
+                }
+                if (!scaleInput) {
+                    throw new Error("请输入需计算晶格缩放大小");
+                }
+                if (!fileInput) {
+                    throw new Error("请输入字体文件");
+                }
+                var file = fileInput.target.files[0];
+                var reader = new FileReader();
+                reader.onload = function (event) {
+                    var fileContent = event.target.result;
+                    let font_face = FontFace.new(new Uint8Array(fileContent));
+
+                    let outline = font_face.to_outline(charInput);
+                    console.log(outline);
+                    let cell_info = compute_near_arcs(outline, scaleInput);
+                    console.log(cell_info);
+                    cell_canvas.width = cell_info.extents.max_x - cell_info.extents.min_x;
+                    cell_canvas.height = cell_info.extents.max_y - cell_info.extents.min_y;
+                    ctx.translate(-cell_info.extents.min_x, -cell_info.extents.min_y);
+                    drawCell(ctx, cell_info.extents);
+                    drawFontOutline(ctx, cell_canvas.width, outline, cell_info.extents);
+                    let sdfinfo = compute_sdf_tex(outline, cell_info, sizeInput, pxrangeInput);
+                    console.log(sdfinfo);
+                };
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        function drawFontOutline(ctx, canvas_width, outline, extents) {
+            let extents_width = extents.max_x - extents.min_x;
+            let scale = canvas_width / extents_width;
+            let minx = extents.min_x;
+            let miny = extents.min_y;
+            let svg_paths = outline.svg_paths;
+
+            ctx.fillStyle = "green";
+
+            let paths = new Path2D();
+            for (let i = 0; i < svg_paths.length; i++) {
+                let path = new Path2D(svg_paths[i]);
+                paths.addPath(path)
+            }
+            ctx.fill(paths);
+        }
+
+
+        function drawCell(ctx, extents) {
+            // 设置笔触样式和线宽
+            ctx.strokeStyle = 'red';
+            ctx.lineWidth = 1;
+            let width = extents.max_x - extents.min_x;
+            let height = extents.max_y - extents.min_y;
+            let step = width / 32;
+            for (let i = 0; i < 32; i++) {
+                ctx.moveTo(i * step + extents.min_x, extents.min_y);
+                ctx.lineTo(i * step + extents.min_x, extents.max_y);
+            }
+
+            step = height / 32;
+            for (let i = 0; i < 32; i++) {
+                ctx.moveTo(extents.min_x, i * step + extents.min_y);
+                ctx.lineTo(extents.max_x, i * step + extents.min_y);
+            }
+            ctx.stroke();
+        }
+    </script>
+
 </body>
 
 </html>
