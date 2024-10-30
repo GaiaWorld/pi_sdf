@@ -168,10 +168,10 @@ pub fn even_odd(
                  */
                 let t = arc.tangents();
                 if s0 == 0 && arc.p0.x < p.x + GLYPHY_EPSILON {
-                    count += 0.5 * categorize(t.0.y, 0.0) as f32;
+                    count += 0.5 * categorize(t.0.1, 0.0) as f32;
                 }
                 if s1 == 0 && arc.p1.x < p.x + GLYPHY_EPSILON {
-                    count += 0.5 * categorize(t.1.y, 0.0) as f32;
+                    count += 0.5 * categorize(t.1.1, 0.0) as f32;
                 }
                 continue;
             }
@@ -203,18 +203,18 @@ pub fn even_odd(
                  * If the tangent has y==0, use the other endpoint's
                  * y value to decide which way the arc will be heading.
                  */
-                if is_zero(t.0.y, None) {
-                    t.0.y = categorize(arc.p1.y, p.y) as f32;
+                if is_zero(t.0.1, None) {
+                    t.0.1 = categorize(arc.p1.y, p.y) as f32;
                 }
-                if is_zero(t.1.y, None) {
-                    t.1.y = -categorize(arc.p0.y, p.y) as f32;
+                if is_zero(t.1.1, None) {
+                    t.1.1 = -categorize(arc.p0.y, p.y) as f32;
                 }
 
                 if s0 == 0 && arc.p0.x < p.x + GLYPHY_EPSILON {
-                    count += 0.5 * categorize(t.0.y, 0.0) as f32;
+                    count += 0.5 * categorize(t.0.1, 0.0) as f32;
                 }
                 if s1 == 0 && arc.p1.x < p.x + GLYPHY_EPSILON {
-                    count += 0.5 * categorize(t.1.y, 0.0) as f32;
+                    count += 0.5 * categorize(t.1.1, 0.0) as f32;
                 }
             }
 

@@ -6,7 +6,7 @@
 use std::ops::Range;
 
 use crate::{glyphy::geometry::line::Line, Point};
-use parry2d::{bounding_volume::Aabb, shape::Segment};
+use parry2d::{bounding_volume::Aabb, math::Vector, shape::Segment};
 
 use super::{point::PointExt, signed_vector::SignedVector};
 
@@ -20,7 +20,7 @@ pub trait SegmentEXT {
     fn projection_to_bottom_area(&self, aabb: &Aabb) -> Option<(Range<f32>, f32)>;
     fn projection_to_left_area(&self, aabb: &Aabb) -> Option<(Range<f32>, f32)>;
     fn projection_to_right_area(&self, aabb: &Aabb) -> Option<(Range<f32>, f32)>;
-    fn nearest_points_on_line_segments(&self, other: &Segment) -> Segment;
+    fn nearest_points_on_line_segments(&self, othera: &Point, otherb: &Point, result: &mut Segment);
     fn norm_squared(&self) -> f32;
     fn norm_scale(&self, scale: f32)->f32;
 }
@@ -91,13 +91,31 @@ impl SegmentEXT for Segment {
     }
 
     fn squared_distance_to_point2(&self, p: &Point) -> Segment {
-        let l2 = (self.a - self.b).norm_squared(); // i.e. |w-v|^2 -  avoid a sqrt
+        // let l2 = (self.a - self.b).norm_squared(); // i.e. |w-v|^2 -  avoid a sqrt
+        // if l2 == 0.0 {
+        //     return Segment::new(*p, self.a);
+        // };
+        // let t = 0.0f32.max(1.0f32.min((p - self.a).dot(&(self.b - self.a)) / l2));
+        // let projection = self.a + t * (self.b - self.a); // Projection falls on the segment
+
+        // return Segment::new(*p, projection);
+
+        let ax = self.a.x;
+        let ay = self.a.y;
+        let bx = self.b.x;
+        let by = self.b.y;
+        let bax = bx - ax;
+        let bay = by - ay;
+
+        let l2 = bax * bax + bay * bay;
         if l2 == 0.0 {
             return Segment::new(*p, self.a);
         };
-        let t = 0.0f32.max(1.0f32.min((p - self.a).dot(&(self.b - self.a)) / l2));
-        let projection = self.a + t * (self.b - self.a); // Projection falls on the segment
-
+        let pax = p.x - ax;
+        let pay = p.y - ay;
+        let dot_pa_ba = pax * bax + pay * bay;
+        let t = 0.0f32.max(1.0f32.min(dot_pa_ba / l2));
+        let projection = Point::new(ax + t * bax, ay + t * bay);
         return Segment::new(*p, projection);
     }
 
@@ -238,11 +256,11 @@ impl SegmentEXT for Segment {
         None
     }
 
-    fn nearest_points_on_line_segments(&self, other: &Segment) -> Segment {
+    fn nearest_points_on_line_segments(&self, othera: &Point, otherb: &Point, result: &mut Segment) {
         let eta = 1e-6;
-        let r = other.a - self.a;
+        let r = othera - self.a;
         let u = self.b - self.a;
-        let v = other.b - other.a;
+        let v = otherb - othera;
 
         let ru = r.dot(&u);
         let rv = r.dot(&v);
@@ -265,9 +283,8 @@ impl SegmentEXT for Segment {
         let s = ((t1 * uv + ru) / uu).clamp(0.0, 1.0);
         let t = ((s1 * uv - rv) / vv).clamp(0.0, 1.0);
 
-        let a = self.a + s * u;
-        let b = other.a + t * v;
-        return Segment::new(a, b);
+        result.a = self.a + s * u;
+        result.b = othera + t * v;
     }
 
     fn norm_squared(&self) -> f32 {
@@ -276,6 +293,110 @@ impl SegmentEXT for Segment {
 
     fn norm_scale(&self, _scale: f32) -> f32 {
         (self.a  - self.b ).norm()
+    }
+}
+
+
+// #[derive(Default, Debug, Clone, Copy)]
+// pub struct PPoint {
+//     pub x: f32,
+//     pub y: f32,
+
+// }
+// impl PPoint {
+//     pub fn new(x: f32, y: f32) -> Self {
+//         Self { x, y }
+//     }
+// }
+pub type PPoint = Point;
+
+#[derive(Clone, Copy)]
+pub struct PSegment {
+    pub a: PPoint,
+    pub b: PPoint,
+}
+impl PSegment {
+    pub fn new(a: PPoint, b: PPoint) -> Self {
+        Self { a, b }
+    }
+    
+    pub fn modify_by_points(&mut self, a: (f32, f32), b: (f32, f32)) {
+        self.a.x = a.0;
+        self.a.y = a.1;
+        self.b.x = b.0;
+        self.b.y = b.1;
+    }
+    #[inline(always)]
+    pub fn squared_distance_to_point2_norm_square(
+        ax: f32, ay: f32, bx: f32, by: f32, px: f32, py: f32
+    ) -> f32 {
+        let bax = bx - ax;
+        let bay = by - ay;
+        let l2 = bax * bax + bay * bay;
+        if l2 == 0.0 {
+            // return Segment::point2_norm_square(px, py, ax, ay);
+            let bax = ax - px;
+            let bay = ay - py;
+            return bax * bax + bay * bay;
+        };
+        let pax = px - ax;
+        let pay = py - ay;
+        let dot_pa_ba = pax * bax + pay * bay;
+        let t = 0.0f32.max(1.0f32.min(dot_pa_ba / l2));
+
+        // return Segment::point2_norm_square(px, py, ax + t * bax, ay + t * bay);
+        let bax = (ax + t * bax) - px;
+        let bay = (ay + t * bay) - py;
+        return bax * bax + bay * bay;
+    }
+    #[inline(always)]
+    pub fn point2_norm_square(ax: f32, ay: f32, bx: f32, by: f32) -> f32 {
+        let bax = bx - ax;
+        let bay = by - ay;
+        return bax * bax + bay * bay;
+    }
+
+    #[inline(always)]
+    pub fn nearest_points_on_line_segments(&self, othera: &PPoint, otherb: &PPoint, result: &mut PSegment) {
+        let eta = 1e-6;
+        
+        let rx = othera.x - self.a.x;
+        let ry = othera.y - self.a.y;
+        
+        let ux = self.b.x - self.a.x;
+        let uy = self.b.y - self.a.y;
+        
+        let vx = otherb.x - othera.x;
+        let vy = otherb.y - othera.y;
+        
+        let ru = rx * ux + ry * uy;
+        let rv = rx * vx + ry * vy;
+        let uu = ux * ux + uy * uy;
+        let uv = ux * vx + uy * vy;
+        let vv = vx * vx + vy * vy;
+
+        let det = uu * vv - uv * uv;
+        let s1;
+        let t1;
+
+        if det < eta * uu * vv {
+            s1 = (ru / uu).clamp(0.0, 1.0);
+            t1 = 0.0
+        } else {
+            s1 = ((ru * vv - rv * uv) / det).clamp(0.0, 1.0);
+            t1 = ((ru * uv - rv * uu) / det).clamp(0.0, 1.0);
+        }
+
+        let s = ((t1 * uv + ru) / uu).clamp(0.0, 1.0);
+        let t = ((s1 * uv - rv) / vv).clamp(0.0, 1.0);
+
+        // result.a = self.a + s * u;
+        // result.b = othera + t * v;
+        
+        result.a.x = self.a.x + s * ux;
+        result.a.y = self.a.y + s * uy;
+        result.b.x = othera.x + t * vx;
+        result.b.y = othera.y + t * vy;
     }
 }
 

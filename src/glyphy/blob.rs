@@ -1,4 +1,4 @@
-use parry2d::math::Vector;
+use parry2d::{math::Vector, shape::Segment};
 use std:: ops::Range;
 use std::collections::HashMap;
 // use std::collections::BTreeMap as HashMap;
@@ -12,7 +12,7 @@ use super::{
         aabb::{Aabb, Direction},
         arc::{Arc, ArcEndpoint},
         line::Line,
-        segment::SegmentEXT,
+        segment::{PPoint, PSegment, SegmentEXT},
         vector::VectorEXT,
     },
     sdf::glyphy_sdf_from_arc_list,
@@ -1150,7 +1150,16 @@ pub fn line_decode(encoded: [f32; 4], nominal_size: [f32; 2]) -> Line {
 
     return Line::from_normal_d(n, d * scale);
 }
-
+pub fn unsafe_vec_append_slice<T>(vec: &mut Vec<T>, slice: &[T]) {
+    unsafe {
+        let other = slice as *const [T];
+        let count = (*other).len();
+        vec.reserve(count);
+        let len = vec.len();
+        std::ptr::copy_nonoverlapping(other as *const T, vec.as_mut_ptr().add(len), count);
+        vec.set_len(len + count);
+    }
+}
 // 判断 每个 格子 最近的 圆弧
 pub fn recursion_near_arcs_of_cell<'a>(
     global_arcs: &Vec<Arc>,
@@ -1164,7 +1173,12 @@ pub fn recursion_near_arcs_of_cell<'a>(
     left_near: Option<(Vec<&'static Arc>, bool)>,
     right_near: Option<(Vec<&'static Arc>, bool)>,
     result_arcs: &mut Vec<(Vec<usize>, Aabb)>,
-    temps: &mut Vec<(Point, f32, Vec<Range<f32>>)>,
+    // temps: &mut Vec<(Point, f32, Vec<Range<f32>>)>,
+    temps: &mut Vec<(PPoint, f32)>,
+    // tempsegment: &mut Segment,
+    tempsegment: &mut PSegment,
+    startid: u64,
+    tempidxs: &mut Vec<usize>,
 ) {
     // let time = std::time::Instant::now();
     let cell_width = cell.width();
@@ -1185,14 +1199,20 @@ pub fn recursion_near_arcs_of_cell<'a>(
         left_near,
         right_near,
         temps,
+        tempsegment, tempidxs
     );
     let mut arcs: Vec<&Arc> =
         Vec::with_capacity(near_arcs.len() + top_near.len() + bottom_near.len() + right_near.len());
-    arcs.extend(&near_arcs);
-    arcs.extend(&top_near);
-    arcs.extend(&bottom_near);
-    arcs.extend(&left_near);
-    arcs.extend(&right_near);
+    // arcs.extend(&near_arcs);
+    // arcs.extend(&top_near);
+    // arcs.extend(&bottom_near);
+    // arcs.extend(&left_near);
+    // arcs.extend(&right_near);
+    unsafe_vec_append_slice(&mut arcs, near_arcs.as_slice());
+    unsafe_vec_append_slice(&mut arcs, top_near.as_slice());
+    unsafe_vec_append_slice(&mut arcs, bottom_near.as_slice());
+    unsafe_vec_append_slice(&mut arcs, left_near.as_slice());
+    unsafe_vec_append_slice(&mut arcs, right_near.as_slice());
     arcs.sort_by(|a, b| a.id.cmp(&b.id));
 
     arcs.dedup_by(|a, b| a.id == b.id);
@@ -1207,9 +1227,11 @@ pub fn recursion_near_arcs_of_cell<'a>(
     {
         let mut arcs_index = Vec::with_capacity(arcs.len());
         for arc in arcs {
-            let index = global_arcs.iter().position(|a| a.id == arc.id).unwrap();
+            // let index = global_arcs.iter().position(|a| a.id == arc.id).unwrap();
+            let index = arc.id - startid;
+            // println!("{:?}", (startid, arc.id));
             // log::debug!("arc: {:?}, global_arcs: {:?}", arc, global_arcs[index]);
-            arcs_index.push(index);
+            arcs_index.push(index as usize);
         }
         result_arcs.push((arcs_index, cell.clone()));
     } else {
@@ -1223,8 +1245,8 @@ pub fn recursion_near_arcs_of_cell<'a>(
             let col_area = cell.near_area(Direction::Col);
 
             let mut near_arcs = Vec::with_capacity(arcs.len());
-            let right_segment = ab1.bound(Direction::Right);
-            col_area.near_arcs(&arcs, &right_segment, &mut near_arcs, temps);
+            ab1.bound_to_ref(Direction::Right, tempsegment);
+            col_area.near_arcs(&arcs, &tempsegment, &mut near_arcs, temps, tempidxs);
 
             (
                 (ab1, ab2),
@@ -1247,8 +1269,8 @@ pub fn recursion_near_arcs_of_cell<'a>(
             let col_area = ab1.near_area(Direction::Row);
 
             let mut near_arcs = Vec::with_capacity(arcs.len());
-            let bottom_segment = ab1.bound(Direction::Bottom);
-            col_area.near_arcs(&arcs, &bottom_segment, &mut near_arcs, temps);
+            ab1.bound_to_ref(Direction::Bottom, tempsegment);
+            col_area.near_arcs(&arcs, &tempsegment, &mut near_arcs, temps, tempidxs);
 
             (
                 (ab1, ab2),
@@ -1280,6 +1302,9 @@ pub fn recursion_near_arcs_of_cell<'a>(
             right_near1,
             result_arcs,
             temps,
+            tempsegment,
+            startid,
+            tempidxs
         );
         recursion_near_arcs_of_cell(
             global_arcs,
@@ -1294,6 +1319,9 @@ pub fn recursion_near_arcs_of_cell<'a>(
             right_near2,
             result_arcs,
             temps,
+            tempsegment,
+            startid,
+            tempidxs
         );
     }
 }
@@ -1305,7 +1333,11 @@ fn compute_near_arc(
     mut bottom_near: Option<(Vec<&'static Arc>, bool)>,
     mut left_near: Option<(Vec<&'static Arc>, bool)>,
     mut right_near: Option<(Vec<&'static Arc>, bool)>,
-    temps: &mut Vec<(Point, f32, Vec<Range<f32>>)>,
+    // temps: &mut Vec<(Point, f32, Vec<Range<f32>>)>,
+    temps: &mut Vec<(PPoint, f32)>,
+    // tempsegment: &mut Segment,
+    tempsegment: &mut PSegment,
+    tempidxs: &mut Vec<usize>,
 ) -> (
     Vec<&'static Arc>,
     Vec<&'static Arc>,
@@ -1314,12 +1346,13 @@ fn compute_near_arc(
     Vec<&'static Arc>,
 ) {
     let c = cell.center();
+    let c = PPoint::new( c.x, c.y );
     // 最近的意思：某个半径的 圆内
     let radius_squared = cell.half_extents().norm_squared();
 
     let mut near_arcs: Vec<&'static Arc> = Vec::with_capacity(arcs.len());
     for arc in arcs {
-        if arc.squared_distance_to_point2(&c).norm_squared() <= radius_squared {
+        if arc.squared_distance_to_point2_and_norm_square(&c) <= radius_squared {
             near_arcs.push(*arc);
         }
     }
@@ -1331,14 +1364,14 @@ fn compute_near_arc(
             near
         } else {
             let mut near_arcs = Vec::with_capacity(near.len());
-            let top_segment = cell.bound(Direction::Top);
-            row_area.near_arcs(&near, &top_segment, &mut near_arcs, temps);
+            cell.bound_to_ref(Direction::Top, tempsegment);
+            row_area.near_arcs(&near, &tempsegment, &mut near_arcs, temps, tempidxs);
             near_arcs
         }
     } else {
         let mut top_near = Vec::with_capacity(arcs.len());
-        let top_segment = cell.bound(Direction::Top);
-        row_area.near_arcs(arcs, &top_segment, &mut top_near, temps);
+        cell.bound_to_ref(Direction::Top, tempsegment);
+        row_area.near_arcs(arcs, &tempsegment, &mut top_near, temps, tempidxs);
         top_near
     };
 
@@ -1347,14 +1380,14 @@ fn compute_near_arc(
             near
         } else {
             let mut near_arcs = Vec::with_capacity(near.len());
-            let bottom_segment = cell.bound(Direction::Bottom);
-            row_area.near_arcs(&near, &bottom_segment, &mut near_arcs, temps);
+            cell.bound_to_ref(Direction::Bottom, tempsegment);
+            row_area.near_arcs(&near, &tempsegment, &mut near_arcs, temps, tempidxs);
             near_arcs
         }
     } else {
         let mut near_arcs = Vec::with_capacity(arcs.len());
-        let bottom_segment = cell.bound(Direction::Bottom);
-        row_area.near_arcs(arcs, &bottom_segment, &mut near_arcs, temps);
+        cell.bound_to_ref(Direction::Bottom, tempsegment);
+        row_area.near_arcs(arcs, &tempsegment, &mut near_arcs, temps, tempidxs);
         near_arcs
     };
 
@@ -1365,14 +1398,14 @@ fn compute_near_arc(
             near
         } else {
             let mut near_arcs = Vec::with_capacity(near.len());
-            let left_segment = cell.bound(Direction::Left);
-            col_area.near_arcs(&near, &left_segment, &mut near_arcs, temps);
+            cell.bound_to_ref(Direction::Left, tempsegment);
+            col_area.near_arcs(&near, &tempsegment, &mut near_arcs, temps, tempidxs);
             near_arcs
         }
     } else {
         let mut near_arcs = Vec::with_capacity(arcs.len());
-        let left_segment = cell.bound(Direction::Left);
-        col_area.near_arcs(arcs, &left_segment, &mut near_arcs, temps);
+        cell.bound_to_ref(Direction::Left, tempsegment);
+        col_area.near_arcs(arcs, &tempsegment, &mut near_arcs, temps, tempidxs);
         near_arcs
     };
 
@@ -1381,14 +1414,14 @@ fn compute_near_arc(
             near
         } else {
             let mut near_arcs = Vec::with_capacity(near.len());
-            let right_segment = cell.bound(Direction::Right);
-            col_area.near_arcs(&near, &right_segment, &mut near_arcs, temps);
+            cell.bound_to_ref(Direction::Right, tempsegment);
+            col_area.near_arcs(&near, &tempsegment, &mut near_arcs, temps, tempidxs);
             near_arcs
         }
     } else {
         let mut near_arcs = Vec::with_capacity(arcs.len());
-        let right_segment = cell.bound(Direction::Right);
-        col_area.near_arcs(arcs, &right_segment, &mut near_arcs, temps);
+        cell.bound_to_ref(Direction::Right, tempsegment);
+        col_area.near_arcs(arcs, &tempsegment, &mut near_arcs, temps, tempidxs);
         near_arcs
     };
 

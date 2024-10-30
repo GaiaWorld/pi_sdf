@@ -3,6 +3,7 @@ use parry2d::{math::Vector, shape::Segment};
 use serde::de::{self, SeqAccess, Visitor};
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Serialize};
+use core::{f32, num};
 use std::fmt;
 use std::hash::Hasher;
 use std::sync::atomic::AtomicU64;
@@ -14,6 +15,7 @@ use crate::glyphy::util::{float_equals, xor};
 use crate::Point;
 
 use super::aabb::Aabb;
+use super::segment::{PPoint, PSegment};
 use super::{
     bezier::Bezier, line::Line, point::PointExt, segment::SegmentEXT, signed_vector::SignedVector,
     vector::VectorEXT,
@@ -100,12 +102,16 @@ impl ArcEndpoint {
 pub struct Arc {
     pub(crate) p0: Point,
     pub(crate) p1: Point,
+    // pub(crate) pp0: PPoint,
+    // pub(crate) pp1: PPoint,
     pub d: f32,
-
+    pub len: f32,
+    pub angle: f32,
     pub id: u64,
     pub radius: f32,
     pub(crate) center: Point,
     pub(crate) aabb: Aabb,
+    pub(crate) tangents: ((f32, f32), (f32, f32)),
 }
 
 impl Serialize for Arc {
@@ -186,21 +192,44 @@ impl Arc {
      * 构造函数
      */
     pub fn new(p0: Point, p1: Point, d: f32) -> Self {
+        // let pp0 = PPoint::new(p0.x, p0.y);
+        // let pp1 = PPoint::new(p1.x, p1.y);
         let mut aabb = Aabb::new_invalid();
         let id = ID.fetch_add(1, Ordering::Relaxed);
-        let mut arc = Self {
+        let tangents = Self::tangents_call(&p0, &p1, d);
+        let mut center = Point::default();
+        Self::extents_call(&p0, &p1, d, 0., &center, &tangents, &mut aabb);
+        let t = 1. / (2. * tan2atan(d));
+        let cx = (p1.x - p0.x) * t;
+        let cy = (p1.y - p0.y) * t;
+        center.x = (p0.x + p1.x) * 0.5 - cy;
+        center.y = (p0.y + p1.y) * 0.5 + cx;
+        let radius = Self::radius_call(&p0, &p1, d);
+        let angle = f32::atan(d).abs() * 4.;
+        let len = 2. * f32::consts::PI * radius / angle;
+
+        let arc = Self {
             id,
             p0,
             p1,
+            // pp0,
+            // pp1,
             d,
-            radius: 0.0,
-            center: Point::default(),
+            angle,
+            len,
+            radius,
+            center,
             aabb,
+            tangents,
         };
-        arc.extents(&mut aabb);
-        arc.aabb = aabb;
-        arc.center = arc.center();
-        arc.radius = arc.radius();
+        // arc.extents(&mut aabb);
+        // arc.aabb = aabb;
+        // arc.center = (arc.p0.midpoint(&arc.p1)).add_vector(
+        //     &(arc.p1 - (arc.p0))
+        //         .ortho()
+        //         .scale(1. / (2. * tan2atan(arc.d))),
+        // );
+        // arc.radius = arc.radius();
 
         arc
     }
@@ -253,6 +282,19 @@ impl Arc {
         };
 
         return Arc::new(p0, p1, (v1 - v2).tan());
+    }
+
+
+    pub fn grids(&self, gridw: f32, gridh: f32, result: &mut Vec<usize>) {
+        let start = self.p0 - self.center;
+        let end = self.p1 - self.center;
+        let count = (self.len / gridw.min(gridh)).ceil() as usize;
+        let perangle = self.angle / (count as f32);
+        let (sin, cos) = f32::sin_cos(perangle);
+        for i in 0..count+1 {
+            let x = cos * start.x - sin * start.y;
+            let y = sin * start.x + cos * start.y;
+        }
     }
 
     pub fn to_svg_command(&self) -> String {
@@ -324,19 +366,24 @@ impl Arc {
      * @returns {f32} 圆弧半径
      */
     pub fn radius(&self) -> f32 {
-        return ((self.p1 - (self.p0)).norm() / (2.0 * sin2atan(self.d))).abs();
+        let x = self.p1.x - self.p0.x;
+        let y = self.p1.y - self.p0.y;
+        return (f32::sqrt(x * x + y * y) / (2.0 * sin2atan(self.d))).abs();
+        // return ((self.p1 - (self.p0)).norm() / (2.0 * sin2atan(self.d))).abs();
+    }
+    pub fn radius_call(p0: &PPoint, p1: &PPoint, d: f32) -> f32 {
+        let x = p1.x - p0.x;
+        let y = p1.y - p0.y;
+        return (f32::sqrt(x * x + y * y) / (2.0 * sin2atan(d))).abs();
+        // return ((p1 - (p0)).norm() / (2.0 * sin2atan(d))).abs();
     }
 
     /**
      * 计算圆弧的圆心
      * @returns {Point} 圆弧的圆心
      */
-    pub fn center(&self) -> Point {
-        return (self.p0.midpoint(&self.p1)).add_vector(
-            &(self.p1 - (self.p0))
-                .ortho()
-                .scale(1. / (2. * tan2atan(self.d))),
-        );
+    pub fn center(&self) -> &Point {
+        return &self.center;
     }
 
     /**
@@ -356,16 +403,41 @@ impl Arc {
      *
      * 将有向线段 AC 分解到 半弦 和 半弦 垂线上，分别得到下面的 result_dp 和 pp
      */
-    pub fn tangents(&self) -> (Vector<f32>, Vector<f32>) {
-        let dp = (self.p1 - self.p0).scale(0.5);
-        let pp = dp.ortho().scale(-sin2atan(self.d));
+    pub fn tangents_call(p0: &PPoint, p1: &PPoint, d: f32) -> ((f32, f32), (f32, f32)) {
+        // let dp = (p1 - p0).scale(0.5);
+        // let pp = dp.ortho().scale(-sin2atan(d));
+        // let result_dp = dp.scale(cos2atan(d));
+        // return (
+        //     result_dp + pp, // 起点 切线向量，注：没有单位化
+        //     result_dp - pp, // 终点 切线向量，注：没有单位化
+        // );
 
-        let result_dp = dp.scale(cos2atan(self.d));
+        let dpx = (p1.x - p0.x) * (0.5);
+        let dpy = (p1.y - p0.y) * (0.5);
+        let sd = -sin2atan(d);
+        let ppx = -dpy * (sd);
+        let ppy = dpx * (sd);
+
+        let cd = cos2atan(d);
+        let result_dpx = dpx * cd;
+        let result_dpy = dpy * cd;
 
         return (
-            result_dp + pp, // 起点 切线向量，注：没有单位化
-            result_dp - pp, // 终点 切线向量，注：没有单位化
+            (result_dpx + ppx, result_dpy + ppy), // 起点 切线向量，注：没有单位化
+            (result_dpx - ppx, result_dpy - ppy), // 终点 切线向量，注：没有单位化
         );
+    }
+    pub fn tangents(&self) -> ((f32, f32), (f32, f32)) {
+        // let dp = (self.p1 - self.p0).scale(0.5);
+        // let pp = dp.ortho().scale(-sin2atan(self.d));
+
+        // let result_dp = dp.scale(cos2atan(self.d));
+
+        // return (
+        //     result_dp + pp, // 起点 切线向量，注：没有单位化
+        //     result_dp - pp, // 终点 切线向量，注：没有单位化
+        // );
+        Self::tangents_call(&self.p0, &self.p1, self.d)
     }
 
     /**
@@ -386,6 +458,31 @@ impl Arc {
         return Bezier::new(self.p0, p0s, p1s, self.p1);
     }
 
+    pub fn wedge_contains_point_call(d: f32, p0: &Point, p1: &Point, p: &Point, tangents: &((f32, f32), (f32, f32))) -> bool {
+        let t = tangents;
+        let dx1 = p.x - p0.x;
+        let dy1 = p.y - p0.y;
+        let dx2 = p.x - p1.x;
+        let dy2 = p.y - p1.y;
+        let dot1 = dx1 * t.0.0 + dy1 * t.0.1;
+        let dot2 = dx2 * t.1.0 + dy2 * t.1.1;
+        if d.abs() <= 1. {
+            // 小圆弧，夹角 小于等于 PI
+            // 在 夹角内，意味着 下面两者 同时成立：
+            //     向量 <P0, P> 和 起点切线 成 锐角
+            //     向量 <P1, P> 和 终点切线 是 钝角
+            // return (p - self.p0).dot(&t.0) >= 0.0 && (p - (self.p1)).dot(&t.1) <= 0.0;
+            return dot1 >= 0.0 && dot2 <= 0.0;
+        } else {
+            // 大圆弧，夹角 大于 PI
+            // 如果 点 在 小圆弧 内，那么：下面两者 同时成立
+            //     向量 <P0, P> 和 起点切线 成 钝角
+            //     向量 <P1, P> 和 终点切线 是 锐角
+            // 所以这里要 取反
+            // return (p - (self.p0)).dot(&t.0) >= 0. || (p - (self.p1)).dot(&t.1) <= 0.;
+            return dot1 >= 0.0 && dot2 <= 0.0;
+        }
+    }
     /**
      * 判断 p 是否包含在 圆弧对扇形的夹角内。
      *
@@ -393,21 +490,28 @@ impl Arc {
      *
      */
     pub fn wedge_contains_point(&self, p: &Point) -> bool {
-        let t = self.tangents();
-
+        let t = &self.tangents;
+        let dx1 = p.x - self.p0.x;
+        let dy1 = p.y - self.p0.y;
+        let dx2 = p.x - self.p1.x;
+        let dy2 = p.y - self.p1.y;
+        let dot1 = dx1 * t.0.0 + dy1 * t.0.1;
+        let dot2 = dx2 * t.1.0 + dy2 * t.1.1;
         if self.d.abs() <= 1. {
             // 小圆弧，夹角 小于等于 PI
             // 在 夹角内，意味着 下面两者 同时成立：
             //     向量 <P0, P> 和 起点切线 成 锐角
             //     向量 <P1, P> 和 终点切线 是 钝角
-            return (p - self.p0).dot(&t.0) >= 0.0 && (p - (self.p1)).dot(&t.1) <= 0.0;
+            // return (p - self.p0).dot(&t.0) >= 0.0 && (p - (self.p1)).dot(&t.1) <= 0.0;
+            return dot1 >= 0.0 && dot2 <= 0.0;
         } else {
             // 大圆弧，夹角 大于 PI
             // 如果 点 在 小圆弧 内，那么：下面两者 同时成立
             //     向量 <P0, P> 和 起点切线 成 钝角
             //     向量 <P1, P> 和 终点切线 是 锐角
             // 所以这里要 取反
-            return (p - (self.p0)).dot(&t.0) >= 0. || (p - (self.p1)).dot(&t.1) <= 0.;
+            // return (p - (self.p0)).dot(&t.0) >= 0. || (p - (self.p1)).dot(&t.1) <= 0.;
+            return dot1 >= 0.0 && dot2 <= 0.0;
         }
     }
 
@@ -473,6 +577,31 @@ impl Arc {
         // 点 到 线段 的 距离 的 平方
         return arc_segment.squared_distance_to_point2(p);
     }
+    /**
+     * 计算点到圆弧的平方距离
+     */
+    
+    #[inline(always)]
+    pub fn squared_distance_to_point2_and_norm_square(&self, p: &PPoint) -> f32 {
+        // let ax = self.p0.x;
+        // let ay = self.p0.y;
+        // let bx = self.p1.x;
+        // let by = self.p1.y;
+        // let px = p.x;
+        // let py = p.y;
+        
+        // return Segment::squared_distance_to_point2_norm_square(ax, ay, bx, by, px, py);
+        let p1p0 = self.p1 - self.p0;
+        let pp0 = p - self.p0;
+        let l2 = p1p0.norm_squared(); // i.e. |w-v|^2 -  avoid a sqrt
+        if l2 == 0.0 {
+            return pp0.norm_squared();
+            // return Segment::new(*p, self.p0);
+        }
+        let t = 0.0f32.max(1.0f32.min(pp0.dot(&p1p0) / l2));
+        // let projection = self.p0 + t * (self.p1 - self.p0); // Projection falls on the segment
+        (pp0 - t * p1p0).norm_squared()
+    }
 
     /**
      * 计算点到圆弧的扩展距离
@@ -508,18 +637,38 @@ impl Arc {
      * 计算圆弧的包围盒
      * @returns {Array<Point>} 包围盒的顶点数组
      */
+    pub fn extents_call(p0: &Point, p1: &Point, d: f32, radius: f32, c: &Point, tangents: &((f32, f32), (f32, f32)), e: &mut Aabb) {
+        e.clear();
+        e.add(*p0);
+        e.add(*p1);
+
+        let r = radius;
+        let p = [
+            Point::new(-r + c.x, 0. + c.y),
+            Point::new( r + c.x, 0. + c.y),
+            Point::new(0. + c.x, -r + c.y),
+            Point::new(0. + c.x,  r + c.y),
+        ];
+
+        for i in 0..4 {
+            if Self::wedge_contains_point_call(d, p0, p1, &p[i], tangents) {
+                e.add(p[i]);
+            }
+        }
+    }
     pub fn extents(&self, e: &mut Aabb) {
         e.clear();
         e.add(self.p0);
         e.add(self.p1);
 
         let c = self.center;
+
         let r = self.radius;
         let p = [
-            c.add_vector(&Vector::new(-1., 0.).scale(r)),
-            c.add_vector(&Vector::new(1., 0.).scale(r)),
-            c.add_vector(&Vector::new(0., -1.).scale(r)),
-            c.add_vector(&Vector::new(0., 1.).scale(r)),
+            Point::new(-r + c[0], 0. + c[1]),
+            Point::new( r + c[0], 0. + c[1]),
+            Point::new(0. + c[0], -r + c[1]),
+            Point::new(0. + c[0],  r + c[1]),
         ];
 
         for i in 0..4 {
@@ -529,49 +678,62 @@ impl Arc {
         }
     }
 
-    pub fn projection_to_bound(
+    pub fn projection_to_bound_call2(
         &self,
         aabb: &Aabb,
-        segment: &Segment,
-    ) -> (Range<f32>, Segment, f32) {
+        segment: &PSegment,
+        result: &mut PSegment,
+    ) -> (Range<f32>, f32) {
         if segment.a.y == segment.b.y {
-            self.projection_to_row_bound(aabb, segment)
+            self.projection_to_row_bound_call2(aabb, segment, result)
         } else {
-            self.projection_to_col_bound(aabb, segment)
+            self.projection_to_col_bound_call2(aabb, segment, result)
         }
     }
 
-    pub fn projection_to_row_bound(
+    pub fn projection_to_row_bound_call2(
         &self,
         aabb: &Aabb,
-        segment: &Segment,
-    ) -> (Range<f32>, Segment, f32) {
-        let s = segment.nearest_points_on_line_segments(&Segment::new(self.p0, self.p1));
-        if let Some(ab) = aabb.intersection(&self.aabb) {
-            ((ab.mins.x..ab.maxs.x), s, (s.a - s.b).norm_squared())
-        } else {
+        segment: &PSegment,
+        result: &mut PSegment,
+    ) -> (Range<f32>, f32) {
+        segment.nearest_points_on_line_segments(&self.p0, &self.p1, result);
+
+        let norm_squared = (result.a - result.b).norm_squared();
+        let mins = aabb.mins.sup(&self.aabb.mins);
+        let maxs = aabb.maxs.inf(&self.aabb.maxs);
+
+        if mins.x > maxs.x || mins.y > maxs.y {
             if self.p0.x < aabb.mins.x {
-                ((aabb.mins.x..aabb.mins.x), s, (s.a - s.b).norm_squared())
+                ((aabb.mins.x..aabb.mins.x), norm_squared)
             } else {
-                ((aabb.maxs.x..aabb.maxs.x), s, (s.a - s.b).norm_squared())
+                ((aabb.maxs.x..aabb.maxs.x), norm_squared)
             }
+        } else {
+            ((mins.x..maxs.x), norm_squared)
         }
     }
 
-    pub fn projection_to_col_bound(
+    pub fn projection_to_col_bound_call2(
         &self,
         aabb: &Aabb,
-        segment: &Segment,
-    ) -> (Range<f32>, Segment, f32) {
-        let s = segment.nearest_points_on_line_segments(&Segment::new(self.p0, self.p1));
-        if let Some(ab) = aabb.intersection(&self.aabb) {
-            ((ab.mins.y..ab.maxs.y), s, (s.a - s.b).norm_squared())
-        } else {
+        segment: &PSegment,
+        result: &mut PSegment,
+    ) -> (Range<f32>, f32) {
+        segment.nearest_points_on_line_segments(&self.p0, &self.p1, result);
+
+        let norm_squared = (result.a - result.b).norm_squared();
+        let mins = aabb.mins.sup(&self.aabb.mins);
+        let maxs = aabb.maxs.inf(&self.aabb.maxs);
+
+        if mins.x > maxs.x || mins.y > maxs.y {
             if self.p0.y < aabb.mins.y {
-                ((aabb.mins.y..aabb.mins.y), s, (s.a - s.b).norm_squared())
+                ((aabb.mins.y..aabb.mins.y), norm_squared)
             } else {
-                ((aabb.maxs.y..aabb.maxs.y), s, (s.a - s.b).norm_squared())
+                ((aabb.maxs.y..aabb.maxs.y), norm_squared)
             }
+        } else {
+            ((mins.y..maxs.y), norm_squared)
         }
     }
 }

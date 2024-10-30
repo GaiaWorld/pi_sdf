@@ -20,7 +20,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use crate::{
     glyphy::{
         blob::{travel_data, BlobArc},
-        geometry::{aabb::Aabb, arcs::GlyphyArcAccumulator},
+        geometry::{aabb::Aabb, arc::ID, arcs::GlyphyArcAccumulator},
         sdf::{glyphy_sdf_from_arc_list2, glyphy_sdf_from_arc_list3},
         util::float2_equals,
     },
@@ -99,7 +99,7 @@ impl OutlineInfo {
                 Point::new(self.extents[2], self.extents[3]),
             ),
             scale,
-            &self.endpoints,
+            &self.endpoints
         )
     }
 
