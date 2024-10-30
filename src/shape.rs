@@ -13,7 +13,8 @@ use serde::{Deserialize, Serialize};
 // use usvg::tiny_skia_path::PathSegment;
 
 use crate::glyphy::blob::recursion_near_arcs_of_cell;
-use crate::glyphy::geometry::arc::Arc;
+use crate::glyphy::geometry::arc::{Arc, ID};
+use crate::glyphy::geometry::segment::{PPoint, PSegment};
 use crate::glyphy::util::GLYPHY_INFINITY;
 use crate::utils::{compute_cell_range, CellInfo, LayoutInfo, OutlineSinkExt, SdfInfo2, TexInfo2};
 use crate::{
@@ -1373,6 +1374,7 @@ pub fn compute_near_arcs<'a>(view_box: Aabb, endpoints: &Vec<ArcEndpoint>, scale
     let mut min_width = f32::INFINITY;
     let mut min_height = f32::INFINITY;
 
+    let startid = ID.load(std::sync::atomic::Ordering::SeqCst);
     let mut p0 = Point::new(0., 0.);
     // log::debug!("extents2: {:?}", extents);
     let mut near_arcs = Vec::with_capacity(endpoints.len());
@@ -1390,9 +1392,11 @@ pub fn compute_near_arcs<'a>(view_box: Aabb, endpoints: &Vec<ArcEndpoint>, scale
         near_arcs.push(arc);
         arcs.push(unsafe { std::mem::transmute(near_arcs.last().unwrap()) });
     }
-
+    // let mut tempsegment = parry2d::shape::Segment::new(Point::new(0., 0.), Point::new(0., 0.));
+    let mut tempsegment = PSegment::new(PPoint::new(0., 0.), PPoint::new(0., 0.));
     let mut result_arcs = vec![];
     let mut temp = Vec::with_capacity(arcs.len());
+    let mut tempidxs = vec![];
     // log::debug!("arcs:{:?}", arcs.len());
     recursion_near_arcs_of_cell(
         &near_arcs,
@@ -1407,6 +1411,9 @@ pub fn compute_near_arcs<'a>(view_box: Aabb, endpoints: &Vec<ArcEndpoint>, scale
         None,
         &mut result_arcs,
         &mut temp,
+        &mut tempsegment,
+        startid,
+        &mut tempidxs
     );
 
     CellInfo {

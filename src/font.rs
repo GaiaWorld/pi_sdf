@@ -1,4 +1,4 @@
-use crate::utils::{compute_cell_range, CellInfo};
+use crate::{glyphy::geometry::{arc::ID, segment::{PPoint, PSegment}}, utils::{compute_cell_range, CellInfo}};
 use allsorts::{
     binary::read::ReadScope,
     font::MatchingPresentation,
@@ -223,6 +223,7 @@ impl FontFace {
 
         let mut p0 = Point::new(0., 0.);
 
+        let startid = ID.load(std::sync::atomic::Ordering::SeqCst);
         // 将圆弧控制点变成圆弧
         let mut near_arcs = Vec::with_capacity(endpoints.len());
         let mut arcs = Vec::with_capacity(endpoints.len());
@@ -239,8 +240,11 @@ impl FontFace {
             arcs.push(unsafe { std::mem::transmute(near_arcs.last().unwrap()) });
         }
 
+        // let mut tempsegment = parry2d::shape::Segment::new(Point::new(0., 0.), Point::new(0., 0.));
+        let mut tempsegment = PSegment::new(PPoint::new(0., 0.), PPoint::new(0., 0.));
         let mut result_arcs = vec![];
         let mut temp = Vec::with_capacity(arcs.len());
+        let mut tempidx = vec![];
         let (ab1, ab2) = extents.half(Direction::Col);
         // 二分法递归细分格子，知道格子周围的圆弧数量小于二或者小于32/1停止
         recursion_near_arcs_of_cell(
@@ -256,6 +260,9 @@ impl FontFace {
             None,
             &mut result_arcs,
             &mut temp,
+            &mut tempsegment,
+            startid,
+            &mut tempidx
         );
         recursion_near_arcs_of_cell(
             &near_arcs,
@@ -270,6 +277,9 @@ impl FontFace {
             None,
             &mut result_arcs,
             &mut temp,
+            &mut tempsegment,
+            startid,
+            &mut tempidx
         );
         CellInfo {
             extents,

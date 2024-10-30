@@ -60,5 +60,9 @@ opt-level = 3
 [features]
 debug = []
 
+[[example]]
+name = "performance"
+path = "examples/compute_arc.rs"
+
 # [patch.yn]
 # pi_wgpu = { path = "../pi_wgpu", }

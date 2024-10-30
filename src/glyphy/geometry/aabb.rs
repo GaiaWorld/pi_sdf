@@ -1,5 +1,5 @@
 use derive_deref_rs::Deref;
-use parry2d::{bounding_volume::Aabb as AabbInner, shape::Segment};
+use parry2d::{bounding_volume::Aabb as AabbInner, math::Vector, shape::Segment};
 use serde::{
     de::{self, MapAccess, SeqAccess, Visitor},
     ser::SerializeStruct,
@@ -12,7 +12,7 @@ use crate::{
     Point,
 };
 
-use super::arc::Arc;
+use super::{arc::Arc, segment::{PPoint, PSegment}};
 
 pub enum Direction {
     Top,
@@ -158,10 +158,12 @@ impl Aabb {
     }
 
     pub fn set(&mut self, other: &Aabb) {
-        self.mins.x = other.mins.x;
-        self.mins.y = other.mins.y;
-        self.maxs.x = other.maxs.x;
-        self.maxs.y = other.maxs.y;
+        self.mins.clone_from(&other.mins);
+        self.maxs.clone_from(&other.maxs);
+        // self.mins.x = other.mins.x;
+        // self.mins.y = other.mins.y;
+        // self.maxs.x = other.maxs.x;
+        // self.maxs.y = other.maxs.y;
     }
 
     pub fn add(&mut self, p: Point) {
@@ -196,26 +198,28 @@ impl Aabb {
             return;
         }
 
-        self.mins.x = if self.mins.x < other.mins.x {
-            self.mins.x
-        } else {
-            other.mins.x
-        };
-        self.mins.y = if self.mins.y < other.mins.y {
-            self.mins.y
-        } else {
-            other.mins.y
-        };
-        self.maxs.x = if self.maxs.x > other.maxs.x {
-            self.maxs.x
-        } else {
-            other.maxs.x
-        };
-        self.maxs.y = if self.maxs.y > other.maxs.y {
-            self.maxs.y
-        } else {
-            other.maxs.y
-        };
+        self.mins = self.mins.inf(&other.mins);
+        self.maxs = self.maxs.sup(&other.maxs);
+        // self.mins.x = if self.mins.x < other.mins.x {
+        //     self.mins.x
+        // } else {
+        //     other.mins.x
+        // };
+        // self.mins.y = if self.mins.y < other.mins.y {
+        //     self.mins.y
+        // } else {
+        //     other.mins.y
+        // };
+        // self.maxs.x = if self.maxs.x > other.maxs.x {
+        //     self.maxs.x
+        // } else {
+        //     other.maxs.x
+        // };
+        // self.maxs.y = if self.maxs.y > other.maxs.y {
+        //     self.maxs.y
+        // } else {
+        //     other.maxs.y
+        // };
     }
 
     pub fn extend_by(&mut self, x: f32, y: f32) {
@@ -279,51 +283,72 @@ impl Aabb {
         }
     }
 
+    // pub fn bound_to_ref(&self, direction: Direction, mut result: &mut Segment) {
+    pub fn bound_to_ref(&self, direction: Direction, mut result: &mut PSegment) {
+        match direction {
+            Direction::Top => result.modify_by_points((self.mins.x, self.mins.y), (self.maxs.x, self.mins.y)),
+            Direction::Bottom => result.modify_by_points((self.mins.x, self.maxs.y), (self.maxs.x, self.maxs.y)),
+            Direction::Left => result.modify_by_points((self.mins.x, self.mins.y), (self.mins.x, self.maxs.y)),
+            Direction::Right => result.modify_by_points((self.maxs.x, self.mins.y), (self.maxs.x, self.maxs.y)),
+            _ => panic!("bound not surport col or row!!!"),
+        }
+    }
+
+
     pub fn near_arcs(
         &self,
         arcs: &Vec<&'static Arc>,
-        segment: &Segment,
+        // segment: &Segment,
+        segment: &PSegment,
         result_arcs: &mut Vec<&'static Arc>,
-        temps: &mut Vec<(Point, f32, Vec<Range<f32>>)>,
+        temps: &mut Vec<(PPoint, f32)>,
+        delete_index: &mut Vec<usize>,
     ) {
         // let mut temps = Vec::with_capacity(arcs.len());
         temps.clear();
         // log::debug!("segment: {:?}", segment);
-        for i in 0..arcs.len() {
-            let (rang, s, min_dist) = arcs[i].projection_to_bound(self, &segment);
+        // let mut temp = segment.clone();
+        let mut temp = segment.clone();
+        let mut isfirst = true;
+        let mut p1: Point = Point::new(0., 0.);
+        let mut p2: Point = Point::new(0., 0.);
+        for arc in arcs.iter() {
+            let (rang, min_dist) = arc.projection_to_bound_call2(self, segment, &mut temp);
+
             // log::debug!(
             //     "arcs: {:?}, rang: {:?}, dist: {},p: {}",
             //     arcs[i], rang, min_dist, p
             // );
-            let p = s.a;
-            if i == 0 {
-                result_arcs.push(&arcs[i]);
-                temps.push((p, min_dist, vec![rang]));
+            // let p = &temp.a;
+            let p = &temp.a;
+            if isfirst {
+                result_arcs.push(*arc);
+                temps.push((*p, min_dist));
+                isfirst = false;
             } else {
                 let mut is_push = true;
 
-                for j in 0..result_arcs.len() {
-                    let result_arc = result_arcs[j];
-                    let dist = result_arc.squared_distance_to_point2(&p).norm_squared();
+                for result_arc in result_arcs.iter() {
+                    let dist = result_arc.squared_distance_to_point2_and_norm_square(p);
                     // log::debug!("dist: {}", dist);
                     if min_dist >= dist {
-                        let (p1, p2) = if segment.a.x == segment.b.x {
-                            (
-                                Point::new(segment.a.x, rang.start),
-                                Point::new(segment.a.x, rang.end),
-                            )
+                        if segment.a.x == segment.b.x {
+                            p1.x = segment.a.x;
+                            p1.y = rang.start;
+                            p2.x = segment.a.x;
+                            p2.y = rang.end;
                         } else {
-                            (
-                                Point::new(rang.start, segment.a.y),
-                                Point::new(rang.end, segment.a.y),
-                            )
+                            p1.x = rang.start;
+                            p1.y = segment.a.y;
+                            p2.x = rang.end;
+                            p2.y = segment.a.y;
                         };
 
-                        let d11 = result_arc.squared_distance_to_point2(&p1).norm_squared();
-                        let d12 = result_arc.squared_distance_to_point2(&p2).norm_squared();
-
-                        let d21 = arcs[i].squared_distance_to_point2(&p1).norm_squared();
-                        let d22 = arcs[i].squared_distance_to_point2(&p2).norm_squared();
+                        let d11 = result_arc.squared_distance_to_point2_and_norm_square(&p1);
+                        let d12 = result_arc.squared_distance_to_point2_and_norm_square(&p2);
+                        
+                        let d21 = arc.squared_distance_to_point2_and_norm_square(&p1);
+                        let d22 = arc.squared_distance_to_point2_and_norm_square(&p2);
 
                         if (d11 < d21 && d12 < d22) || (d11 < d22 && d12 < d21) {
                             is_push = false;
@@ -331,58 +356,31 @@ impl Aabb {
                         }
                     }
                 }
-                let mut delete_index = vec![];
+                
                 if is_push {
+                    delete_index.clear();
                     for j in 0..result_arcs.len() {
                         let p = temps[j].0;
                         let dist = temps[j].1;
-                        let d = arcs[i].squared_distance_to_point2(&p).norm_squared();
+                        // let d = arc.squared_distance_to_point2(&p).norm_squared();
+                        let d = arc.squared_distance_to_point2_and_norm_square(&p);
                         // log::debug!("dist: {}, d: {}", dist, d);
                         // 浮点误差
                         if dist - d > 0.01 {
-                            // let rangs = &mut temps[j].2;
-                            // let mut new_rang = vec![];
-                            // for r in rangs.iter() {
-                            //     if rang.contains(&r.start) && rang.contains(&r.end) {
-                            //         continue;
-                            //     } else if rang.contains(&r.start) {
-                            //         if (rang.end - r.end).abs() > 0.1 {
-                            //             new_rang.push(rang.end..r.end)
-                            //         }
-                            //     } else if rang.contains(&r.end) {
-                            //         if (r.start - rang.start).abs() > 0.1 {
-                            //             new_rang.push(r.start..rang.start);
-                            //         }
-                            //     } else if r.contains(&rang.end) && r.contains(&rang.start) {
-                            //         if (r.start - rang.start).abs() > 0.1 {
-                            //             new_rang.push(r.start..rang.start);
-                            //         }
-
-                            //         if (r.end - rang.end).abs() > 0.1 {
-                            //             new_rang.push(rang.end..r.end);
-                            //         }
-                            //     } else {
-                            //         if (r.start - r.end).abs() > 0.1 {
-                            //             new_rang.push(r.clone());
-                            //         }
-                            //     }
-                            // }
                             delete_index.push(j);
                         }
                     }
-                }
 
-                // log::debug!("delete_index: {:?}", delete_index);
-                for i in (0..delete_index.len()).rev() {
-                    let _r = result_arcs.remove(delete_index[i]);
-                    temps.remove(delete_index[i]);
-                    // log::debug!("remove : {:?}", r);
-                }
-
-                if is_push {
-                    // log::debug!("is_push");
-                    result_arcs.push(&arcs[i]);
-                    temps.push((p, min_dist, vec![rang]));
+                    let len = delete_index.len();
+                    for i in 0..len {
+                        let idx =  delete_index[len - i - 1];
+                        let _r = result_arcs.remove(idx);
+                        temps.remove(idx);
+                        // log::debug!("remove : {:?}", r);
+                    }
+                    
+                    result_arcs.push(*arc);
+                    temps.push((*p, min_dist));
                 }
             }
         }
