@@ -82,12 +82,12 @@ pub struct SdfInfo2 {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OutlineInfo {
     pub(crate) char: char,
-    pub(crate) endpoints: Vec<ArcEndpoint>,
+    pub endpoints: Vec<ArcEndpoint>,
     pub bbox: Vec<f32>,
     pub advance: u16,
     pub units_per_em: u16,
     pub extents: Vec<f32>,
-    #[cfg(feature = "debug")]
+    // #[cfg(feature = "debug")]
     pub svg_paths: Vec<String>,
 }
 
@@ -266,7 +266,7 @@ pub struct GlyphVisitor {
     pub(crate) accumulate: GlyphyArcAccumulator,
     #[cfg(feature = "debug")]
     pub(crate) path_str: String,
-    #[cfg(feature = "debug")]
+    // #[cfg(feature = "debug")]
     pub(crate) svg_paths: Vec<String>,
     pub(crate) svg_endpoints: Vec<[f32; 2]>,
 
@@ -289,7 +289,7 @@ impl GlyphVisitor {
             accumulate,
             #[cfg(feature = "debug")]
             path_str: "".to_string(),
-            #[cfg(feature = "debug")]
+            // #[cfg(feature = "debug")]
             svg_paths: vec![],
             svg_endpoints: vec![],
             scale,

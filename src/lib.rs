@@ -65,6 +65,7 @@ pub struct DebugCellInfo {
     pub is_area: bool,
 }
 
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 impl DebugCellInfo {
     pub fn get_info(&self, index: usize) -> Option<Vec<f32>> {
         self.infos.get(index).map(|v| v.to_vec())

@@ -41,9 +41,9 @@ fn main() {
     let time = std::time::Instant::now();
     let mut outline_info = ft_face.to_outline('魔');
 
-    // loop {
+    loop {
         let time = std::time::Instant::now();
         let result_arcs = outline_info.compute_near_arcs(2.0);
         println!("{:?}", (std::time::Instant::now() - time).as_micros());
-    // }
+    }
 }

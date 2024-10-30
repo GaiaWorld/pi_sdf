@@ -11,7 +11,10 @@ use crate::glyphy::arc_bezier::{
 use crate::glyphy::geometry::point::PointExt;
 use crate::glyphy::util::{is_zero, GLYPHY_INFINITY, GLYPHY_MAX_D};
 use crate::Point;
+// #[cfg(target_arch = "wasm32")]
+// use wasm_bindgen::prelude::wasm_bindgen;
 
+// #[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
 #[derive(Clone)]
 pub struct GlyphyArcAccumulator {
     pub(crate) tolerance: f32,

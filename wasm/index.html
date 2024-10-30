@@ -67,9 +67,7 @@
 
         let cell_canvas = document.getElementById("cell-canvas");
         let ctx = cell_canvas.getContext("2d")
-        // let width = cell_canvas.width;
-        // let height = cell_canvas.height;
-        // drawCell(ctx, width, height);
+
 
         const start = () => {
             ctx.clearRect(0, 0, cell_canvas.width, cell_canvas.height);
@@ -85,7 +83,7 @@
                 if (!pxrangeInput) {
                     throw new Error("请输入需计算sdf梯度递减值");
                 }
-                if (!scaleInput) {
+                if (!scaleInput && scaleInput !== 0) {
                     throw new Error("请输入需计算晶格缩放大小");
                 }
                 if (!fileInput) {
@@ -99,18 +97,53 @@
 
                     let outline = font_face.to_outline(charInput);
                     console.log(outline);
+
                     let cell_info = compute_near_arcs(outline, scaleInput);
                     console.log(cell_info);
+
                     cell_canvas.width = cell_info.extents.max_x - cell_info.extents.min_x;
                     cell_canvas.height = cell_info.extents.max_y - cell_info.extents.min_y;
-                    ctx.translate(-cell_info.extents.min_x, -cell_info.extents.min_y);
-                    drawCell(ctx, cell_info.extents);
+                    ctx.scale(1, -1);
+                    ctx.translate(-cell_info.extents.min_x, -cell_info.extents.max_y);
+
+                    // drawGrid(ctx, cell_info.extents);
+
                     drawFontOutline(ctx, cell_canvas.width, outline, cell_info.extents);
+
+                    drawArcPoint(ctx, outline.endpoints);
+
                     let sdfinfo = compute_sdf_tex(outline, cell_info, sizeInput, pxrangeInput);
-                    console.log(sdfinfo);
+
+                    drawSdfTex(sdfinfo);
+
+                    let scale = cell_canvas.width / 900;
+                    cell_canvas.addEventListener('click', function (e) {
+                        ctx.clearRect(cell_info.extents.min_x, cell_info.extents.min_y, cell_canvas.width, cell_canvas.height);
+
+                        drawFontOutline(ctx, cell_canvas.width, outline, cell_info.extents);
+
+                        drawArcPoint(ctx, outline.endpoints);
+
+                        let x = e.layerX * scale + cell_info.extents.min_x;
+                        let y = (900 - e.layerY) * scale + cell_info.extents.min_y;
+                        drawCell(ctx, x, y, cell_info);
+                    });
+                    // ctx.save();
                 };
                 reader.readAsArrayBuffer(file);
             });
+        }
+
+        function drawArcPoint(ctx, points) {
+            ctx.fillStyle = 'red';
+            for (let index = 0; index < points.length; index++) {
+                const p = points[index];
+                let xy = p.get_xy();
+                ctx.beginPath();
+                ctx.arc(xy[0], xy[1], 5, 0, Math.PI * 2);
+                ctx.closePath();
+                ctx.fill();
+            }
         }
 
         function drawFontOutline(ctx, canvas_width, outline, extents) {
@@ -128,28 +161,152 @@
                 paths.addPath(path)
             }
             ctx.fill(paths);
+
         }
 
 
-        function drawCell(ctx, extents) {
+        function drawGrid(ctx, extents) {
             // 设置笔触样式和线宽
-            ctx.strokeStyle = 'red';
+            ctx.strokeStyle = 'black';
             ctx.lineWidth = 1;
             let width = extents.max_x - extents.min_x;
             let height = extents.max_y - extents.min_y;
             let step = width / 32;
             for (let i = 0; i < 32; i++) {
+                ctx.beginPath();
                 ctx.moveTo(i * step + extents.min_x, extents.min_y);
                 ctx.lineTo(i * step + extents.min_x, extents.max_y);
+                ctx.closePath();
+                ctx.stroke();
             }
 
             step = height / 32;
             for (let i = 0; i < 32; i++) {
+                ctx.beginPath();
                 ctx.moveTo(extents.min_x, i * step + extents.min_y);
                 ctx.lineTo(extents.max_x, i * step + extents.min_y);
+                ctx.closePath();
+                ctx.stroke();
             }
-            ctx.stroke();
         }
+
+        let vertex_buffer, gl, shader_program, tex;
+
+        function drawSdfTex(sdfTex) {
+            let canvas = document.getElementById("sdf-canvas");
+            gl = canvas.getContext("webgl")
+
+            vertex_buffer = createVertex(gl);
+            shader_program = createShaderProgram(gl);
+            tex = createTexture(gl, sdfTex);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
+            let a_Position = gl.getAttribLocation(shader_program, "a_Position");
+            gl.vertexAttribPointer(a_Position, 3, gl.FLOAT, gl.FALSE, 4 * 4, 0);
+            gl.enableVertexAttribArray(a_Position);
+
+            // let a_TexCoord = gl.getAttribLocation(shader_program, "a_TexCood");
+            // gl.vertexAttribPointer(a_TexCoord, 2, gl.FLOAT, gl.FALSE, 4 * 4, 2 * 4);
+            // gl.enableVertexAttribArray(a_TexCoord);
+
+            let sampleTexIndex = gl.getUniformLocation(shader_program, "uSampler");
+            gl.uniform1i(sampleTexIndex, 0);
+
+            requestAnimationFrame(onDraw);
+        }
+
+        function onDraw() {
+            gl.clearColor(0.0, 0.0, 0.0, 1.0); // Clear to black, fully opaque
+            // gl.clearDepth(1.0); // Clear everything
+            // gl.enable(gl.DEPTH_TEST); // Enable depth testing
+            // gl.depthFunc(gl.LEQUAL); // Near things obscure far things
+
+            // Clear the canvas before we start drawing on it.
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+            gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
+            gl.useProgram(shader_program);
+
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, tex);
+
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 6);
+
+            requestAnimationFrame(onDraw);
+        }
+
+        function createVertex(gl) {
+            let vertices = new Float32Array([
+                -1.0, -1.0, 0.0, 0.0,
+                1.0, -1.0, 1.0, 0.0,
+                1.0, 1.0, 0.0, 1.0,
+                -1.0, -1.0, 0.0, 0.0,
+                1.0, 1.0, 1.0, 1.0,
+                -1.0, 1.0, 0.0, 1.0,]);
+
+            let vertex_buffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, vertex_buffer);
+            gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+            return vertex_buffer;
+        }
+
+        function createShaderProgram(gl) {
+            let vertCode = `
+                    attribute  vec4 a_Position;
+                    varying highp vec2 a_TexCood;
+                    void main()
+                    {
+                        a_TexCood = vec2(a_Position.z, a_Position.w);
+                        gl_Position = vec4(a_Position.x, a_Position.y, 0.0, 1.0);
+                    }
+                `;
+            let vertShader = gl.createShader(gl.VERTEX_SHADER);
+            gl.shaderSource(vertShader, vertCode);
+            gl.compileShader(vertShader);
+
+            var fragCode = `
+                varying highp vec2 a_TexCood;
+                uniform sampler2D uSampler;
+
+                void main(void) {
+                    highp vec4 texelColor = texture2D(uSampler, a_TexCood);
+
+                    gl_FragColor = vec4(texelColor.r, 0.0, 0.0, 1.0);
+                }
+            `;
+
+            let fragShader = gl.createShader(gl.FRAGMENT_SHADER);
+            gl.shaderSource(fragShader, fragCode);
+            gl.compileShader(fragShader);
+
+
+            var shaderProgram = gl.createProgram();
+            gl.attachShader(shaderProgram, vertShader);
+            gl.attachShader(shaderProgram, fragShader);
+            gl.linkProgram(shaderProgram);
+
+            if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+                const info = gl.getProgramInfoLog(shaderProgram);
+                throw new Error(`Could not compile WebGL program. \n\n${info}`);
+            }
+
+            gl.useProgram(shaderProgram);
+            return shaderProgram;
+        }
+
+        function createTexture(gl, sdfTex) {
+            var texture = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            console.log(sdfTex.sdf_tex)
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.LUMINANCE, sdfTex.tex_size, sdfTex.tex_size, 0, gl.LUMINANCE, gl.UNSIGNED_BYTE, sdfTex.sdf_tex);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+
+            return texture;
+        }
+
     </script>
 
 </body>

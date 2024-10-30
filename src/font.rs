@@ -388,7 +388,7 @@ impl FontFace {
         let GlyphVisitor {
             accumulate: GlyphyArcAccumulator { result, .. },
             bbox,
-            #[cfg(feature = "debug")]
+            // #[cfg(feature = "debug")]
             svg_paths,
             ..
         } = sink;
@@ -400,7 +400,7 @@ impl FontFace {
             units_per_em: self.units_per_em,
             char: ch,
             extents: vec![bbox.mins.x, bbox.mins.y, bbox.maxs.x, bbox.maxs.y],
-            #[cfg(feature = "debug")]
+            // #[cfg(feature = "debug")]
             svg_paths,
         }
     }

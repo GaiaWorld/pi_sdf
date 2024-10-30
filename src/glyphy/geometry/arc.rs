@@ -97,13 +97,13 @@ impl ArcEndpoint {
 //    d > 0，和 (终 - 起).otho() 同向
 //    d < 0，和 上面 相反
 
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Clone)]
 pub struct Arc {
     pub(crate) p0: Point,
     pub(crate) p1: Point,
-    // pub(crate) pp0: PPoint,
-    // pub(crate) pp1: PPoint,
+    // #[cfg(feature = "debug")]
+    pub points: Vec<f32>,
     pub d: f32,
     pub len: f32,
     pub angle: f32,
@@ -212,8 +212,8 @@ impl Arc {
             id,
             p0,
             p1,
-            // pp0,
-            // pp1,
+            // 
+            points: vec![],
             d,
             angle,
             len,
@@ -222,6 +222,12 @@ impl Arc {
             aabb,
             tangents,
         };
+
+        #[cfg(feature = "debug")]
+        {
+            arc.points = vec![p0.x, p0.y, p1.x, p1.y];
+        }
+       
         // arc.extents(&mut aabb);
         // arc.aabb = aabb;
         // arc.center = (arc.p0.midpoint(&arc.p1)).add_vector(
