@@ -1,6 +1,6 @@
 use core::fmt;
-// use std::collections::HashMap;
-use std::collections::BTreeMap as HashMap;
+use std::collections::HashMap;
+// use std::collections::BTreeMap as HashMap;
 
 use ab_glyph_rasterizer::Rasterizer;
 use allsorts::{
@@ -724,51 +724,6 @@ pub fn compute_cell_range(mut bbox: Aabb, scale: f32) -> Aabb {
 
     bbox
 }
-
-// #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
-// pub fn get_char_arc_debug(char: String) -> BlobArc {
-//     // console_error_panic_hook::set_once();
-
-//     let _ = console_log::init_with_level(log::Level::Debug);
-//     // let buffer = include_bytes!("../source/msyh.ttf").to_vec();
-//     let buffer: Vec<u8> = vec![];
-//     // log::debug!("1111111111");
-//     #[cfg(not(target_arch = "wasm32"))]
-//     let mut ft_face = FontFace::new(Share::new(buffer));
-//     #[cfg(target_arch = "wasm32")]
-//     let mut ft_face = FontFace::new(buffer);
-
-//     // log::debug!("22222222char: {}", char);
-//     let char = char.chars().next().unwrap();
-//     // log::debug!("13333333");
-//     let result = ft_face.to_outline(char);
-//     let (arcs, _map) = FontFace::encode_uint_arc(ft_face.max_box.clone(), result);
-//     // log::debug!("44444444444");
-
-//     let mut shapes = SvgScenes::new(Aabb::new(Point::new(0.0, 0.0), Point::new(400.0, 400.0)));
-//     // 矩形
-//     let mut rect = Rect::new(120.0, 70.0, 100.0, 50.0);
-//     // 填充颜色 默认0. 0. 0. 0.
-//     rect.attribute.set_fill_color(0, 0, 255);
-//     // 描边颜色 默认 0. 0. 0.
-//     rect.attribute.set_stroke_color(0, 0, 0);
-//     // 描边宽度，默认0.0
-//     rect.attribute.set_stroke_width(2.0);
-//     shapes.add_shape(rect.get_hash(), rect.get_svg_info(), rect.get_attribute());
-//     arcs
-// }
-
-// #[cfg_attr(target_arch="wasm32", wasm_bindgen)]
-// pub fn compute_svg_debug() -> BlobArc {
-//     // console_error_panic_hook::set_once();
-
-//     let _ = console_log::init_with_level(log::Level::Debug);
-//     let buffer = include_bytes!("../svg.svg").to_vec();
-//     let mut svg = Svg::new(buffer);
-//     let sink = compute_endpoints();
-//     let (arcs, _) = svg.compute_near_arc(sink[0].accumulate.result.clone());
-//     arcs
-// }
 
 pub fn to_arc_cmds(endpoints: &Vec<ArcEndpoint>) -> (Vec<Vec<String>>, Vec<[f32; 2]>) {
     let mut _cmd = vec![];
