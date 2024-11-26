@@ -195,7 +195,7 @@ impl Arc {
         // let pp0 = PPoint::new(p0.x, p0.y);
         // let pp1 = PPoint::new(p1.x, p1.y);
         let mut aabb = Aabb::new_invalid();
-        let id = ID.fetch_add(1, Ordering::Relaxed);
+        // let id = ID.fetch_add(1, Ordering::Relaxed);
         let tangents = Self::tangents_call(&p0, &p1, d);
         let mut center = Point::default();
         Self::extents_call(&p0, &p1, d, 0., &center, &tangents, &mut aabb);
@@ -209,7 +209,7 @@ impl Arc {
         let len = 2. * f32::consts::PI * radius / angle;
 
         let arc = Self {
-            id,
+            id: 0,
             p0,
             p1,
             // 

@@ -43,7 +43,7 @@
 
     <script type="module">
         import init from './pkg/pi_sdf.js';
-        import { FontFace, compute_near_arcs, compute_sdf_tex } from './pkg/pi_sdf.js';
+        import { FontFace, compute_near_arcs, compute_sdf_tex, test } from './pkg/pi_sdf.js';
 
         const fontFile = document.getElementById('font-file');
         let fileInput;
@@ -96,79 +96,80 @@
             ctx.clearRect(0, 0, cell_canvas.width, cell_canvas.height);
 
             init().then(() => {
-                if (!charInput) {
-                    throw new Error("请输入需计算的字符");
-                }
-                if (!sizeInput) {
-                    throw new Error("请输入需计算sdf纹理的大小");
-                }
-                if (!pxrangeInput) {
-                    throw new Error("请输入需计算sdf梯度递减值");
-                }
-                if (!scaleInput && scaleInput !== 0) {
-                    throw new Error("请输入需计算晶格缩放大小");
-                }
-                if (!fileInput) {
-                    throw new Error("请输入字体文件");
-                }
-                var file = fileInput.target.files[0];
-                var reader = new FileReader();
-                reader.onload = function (event) {
+                window.test = test;
+                // if (!charInput) {
+                //     throw new Error("请输入需计算的字符");
+                // }
+                // if (!sizeInput) {
+                //     throw new Error("请输入需计算sdf纹理的大小");
+                // }
+                // if (!pxrangeInput) {
+                //     throw new Error("请输入需计算sdf梯度递减值");
+                // }
+                // if (!scaleInput && scaleInput !== 0) {
+                //     throw new Error("请输入需计算晶格缩放大小");
+                // }
+                // if (!fileInput) {
+                //     throw new Error("请输入字体文件");
+                // }
+                // var file = fileInput.target.files[0];
+                // var reader = new FileReader();
+                // reader.onload = function (event) {
 
-                    var fileContent = event.target.result;
-                    let font_face = FontFace.new(new Uint8Array(fileContent));
+                //     var fileContent = event.target.result;
+                //     let font_face = FontFace.new(new Uint8Array(fileContent));
 
-                    let outline = font_face.to_outline(charInput);
-                    console.log(outline);
+                //     let outline = font_face.to_outline(charInput);
+                //     console.log(outline);
 
-                    let cell_info = compute_near_arcs(outline, scaleInput);
-                    console.log(cell_info);
+                //     let cell_info = compute_near_arcs(outline, scaleInput);
+                //     console.log(cell_info);
 
-                    cell_canvas.width = cell_info.extents.max_x - cell_info.extents.min_x;
-                    cell_canvas.height = cell_info.extents.max_y - cell_info.extents.min_y;
-                    // ctx.save();
-                    drawGrid(ctx);
+                //     cell_canvas.width = cell_info.extents.max_x - cell_info.extents.min_x;
+                //     cell_canvas.height = cell_info.extents.max_y - cell_info.extents.min_y;
+                //     // ctx.save();
+                //     drawGrid(ctx);
 
-                    ctx.scale(1, -1);
-                    ctx.translate(-cell_info.extents.min_x, -cell_info.extents.max_y);
+                //     ctx.scale(1, -1);
+                //     ctx.translate(-cell_info.extents.min_x, -cell_info.extents.max_y);
 
-                    ctx.scale(1, 1);
-                    ctx.translate(0, 0);
-                    drawFontOutline(ctx, cell_canvas.width, outline, cell_info.extents);
+                //     ctx.scale(1, 1);
+                //     ctx.translate(0, 0);
+                //     drawFontOutline(ctx, cell_canvas.width, outline, cell_info.extents);
 
-                    drawArcPoint(ctx, outline.endpoints);
+                //     drawArcPoint(ctx, outline.endpoints);
 
-                    let sdfinfo = compute_sdf_tex(outline, cell_info, sizeInput, pxrangeInput);
-                    if (is_first) {
-                        is_first = false;
-                        drawSdfTex(sdfinfo);
-                    }else{
-                        tex = createTexture(gl, sdfinfo);
-                    }
+                //     let sdfinfo = compute_sdf_tex(outline, cell_info, sizeInput, pxrangeInput);
+                //     if (is_first) {
+                //         is_first = false;
+                //         drawSdfTex(sdfinfo);
+                //     }else{
+                //         tex = createTexture(gl, sdfinfo);
+                //     }
 
 
-                    let scale = cell_canvas.width / 900;
-                    cell_canvas.addEventListener('click', function (e) {
-                        ctx.clearRect(cell_info.extents.min_x, cell_info.extents.min_y, cell_canvas.width, cell_canvas.height);
+                //     let scale = cell_canvas.width / 900;
+                //     cell_canvas.addEventListener('click', function (e) {
+                //         ctx.clearRect(cell_info.extents.min_x, cell_info.extents.min_y, cell_canvas.width, cell_canvas.height);
 
-                        ctx.setTransform(1, 0, 0, 1, 0, 0);
+                //         ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-                        drawGrid(ctx);
+                //         drawGrid(ctx);
 
-                        ctx.scale(1, -1);
-                        ctx.translate(-cell_info.extents.min_x, -cell_info.extents.max_y);
+                //         ctx.scale(1, -1);
+                //         ctx.translate(-cell_info.extents.min_x, -cell_info.extents.max_y);
 
-                        drawFontOutline(ctx, cell_canvas.width, outline, cell_info.extents);
+                //         drawFontOutline(ctx, cell_canvas.width, outline, cell_info.extents);
 
-                        drawArcPoint(ctx, outline.endpoints);
+                //         drawArcPoint(ctx, outline.endpoints);
 
-                        let x = e.layerX * scale + cell_info.extents.min_x;
-                        let y = (900 - e.layerY) * scale + cell_info.extents.min_y;
-                        drawCell(ctx, x, y, cell_info);
+                //         let x = e.layerX * scale + cell_info.extents.min_x;
+                //         let y = (900 - e.layerY) * scale + cell_info.extents.min_y;
+                //         drawCell(ctx, x, y, cell_info);
 
-                    });
-                };
-                reader.readAsArrayBuffer(file);
+                //     });
+                // };
+                // reader.readAsArrayBuffer(file);
             });
         }
 

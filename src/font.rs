@@ -223,23 +223,27 @@ impl FontFace {
 
         let mut p0 = Point::new(0., 0.);
 
-        let startid = ID.load(std::sync::atomic::Ordering::SeqCst);
+        // let startid = ID.load(std::sync::atomic::Ordering::SeqCst);
         // 将圆弧控制点变成圆弧
         let mut near_arcs = Vec::with_capacity(endpoints.len());
         let mut arcs = Vec::with_capacity(endpoints.len());
+        let mut id = 0;
         for i in 0..endpoints.len() {
             let endpoint = &endpoints[i];
             if endpoint.d == GLYPHY_INFINITY {
                 p0 = Point::new(endpoint.p[0], endpoint.p[1]);
                 continue;
             }
-            let arc = Arc::new(p0, Point::new(endpoint.p[0], endpoint.p[1]), endpoint.d);
+            let mut arc = Arc::new(p0, Point::new(endpoint.p[0], endpoint.p[1]), endpoint.d);
+            arc.id = id;
+            id += 1;
             p0 = Point::new(endpoint.p[0], endpoint.p[1]);
 
             near_arcs.push(arc);
             arcs.push(unsafe { std::mem::transmute(near_arcs.last().unwrap()) });
         }
 
+        // println!("near_arcs: {}, startid: {}, endid: {:?}", near_arcs.len(), , near_arcs.last().unwrap().id);
         // let mut tempsegment = parry2d::shape::Segment::new(Point::new(0., 0.), Point::new(0., 0.));
         let mut tempsegment = PSegment::new(PPoint::new(0., 0.), PPoint::new(0., 0.));
         let mut result_arcs = vec![];
@@ -248,7 +252,7 @@ impl FontFace {
         let (ab1, ab2) = extents.half(Direction::Col);
         // 二分法递归细分格子，知道格子周围的圆弧数量小于二或者小于32/1停止
         recursion_near_arcs_of_cell(
-            &near_arcs,
+            // &near_arcs,
             &extents,
             &ab1,
             &arcs,
@@ -261,11 +265,11 @@ impl FontFace {
             &mut result_arcs,
             &mut temp,
             &mut tempsegment,
-            startid,
+            // startid,
             &mut tempidx
         );
         recursion_near_arcs_of_cell(
-            &near_arcs,
+            // &near_arcs,
             &extents,
             &ab2,
             &arcs,
@@ -278,7 +282,7 @@ impl FontFace {
             &mut result_arcs,
             &mut temp,
             &mut tempsegment,
-            startid,
+            // startid,
             &mut tempidx
         );
         CellInfo {

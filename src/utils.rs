@@ -93,14 +93,17 @@ pub struct OutlineInfo {
 
 impl OutlineInfo {
     pub fn compute_near_arcs(&self, scale: f32) -> CellInfo {
-        FontFace::compute_near_arcs(
+       
+        let r = FontFace::compute_near_arcs(
             Aabb::new(
                 Point::new(self.extents[0], self.extents[1]),
                 Point::new(self.extents[2], self.extents[3]),
             ),
             scale,
             &self.endpoints
-        )
+        );
+        // println!("char: {} CellInfo: {:?}", self.char, (&r.arcs.len(), &r.info));
+        r
     }
 
     pub fn compute_layout(&self, tex_size: usize, pxrange: u32, cur_off: u32) -> LayoutInfo {

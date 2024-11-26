@@ -19,7 +19,18 @@ pub type Matrix4 = parry2d::na::Matrix4<f32>;
 pub type Vector3 = parry2d::na::Vector3<f32>;
 pub type Vector2 = parry2d::na::Vector2<f32>;
 pub type Orthographic3 = parry2d::na::Orthographic3<f32>;
+// #[cfg(target_arch = "wasm32")]
+// use lol_alloc::{FreeListAllocator, LockedAllocator};
+// #[cfg(target_arch = "wasm32")]
+// #[global_allocator]
+// static ALLOCATOR: LockedAllocator<FreeListAllocator> = LockedAllocator::new(FreeListAllocator::new(/* 64*1024*1024 */));
 
+#[global_allocator]
+static ALLOCATOR: talc::Talck<talc::locking::AssumeUnlockable, talc::ClaimOnOom> = unsafe {
+    static mut MEMORY: [u8; 32 * 1024 * 1024] = [0; 32 * 1024 * 1024];
+    let span = talc::Span::from_const_array(std::ptr::addr_of!(MEMORY));
+    talc::Talc::new(talc::ClaimOnOom::new(span)).lock()
+};
 // use font::FontFace;
 use glyphy::geometry::{aabb::Aabb, arc::Arc};
 // use pi_share::Share;
@@ -143,4 +154,16 @@ pub fn compute_sdf_tex(
     };
 
     outline_info.compute_sdf_tex(info, tex_size, pxrange, false, pxrange)
+}
+
+static mut AAR: Vec<Vec<u8>> = Vec::new();
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
+pub fn test(i: i32) {
+    // log::error!("================ i: {}", i);\
+    // let r = vec![0; 1024];
+    let mut r2 = Vec::new();
+    for j in 0..i {
+        r2.push((j % 255) as u8);
+    }
+    unsafe { AAR.push(r2) };
 }

@@ -1,5 +1,5 @@
-set RUSTFLAGS=--cfg=web_sys_unstable_apis
-set RUSTFLAGS=-Zlocation-detail=none
+@REM set RUSTFLAGS=--cfg=web_sys_unstable_apis
+@REM set RUSTFLAGS=-Zlocation-detail=none
 set RUST_LOG=info
 call cfg.bat
 cd ../

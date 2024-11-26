@@ -26,6 +26,9 @@ bitcode = {version= "0.6", features = [ "serde" ]}
 web-sys = {version = "0.3", features = ["Window", "Performance"]}
 pi_share = "0.4"
 lyon_geom = "1.0"
+# lol_alloc = {path = "../lol_alloc"}
+# lol_alloc = "0.4"
+talc = "=4.4.0"
 
 [target."cfg(target_arch = \"wasm32\")".dependencies]
 getrandom = {version = "0.2", features = ["js"]}
@@ -54,7 +57,7 @@ pi_assets = "0.14"
 lto = true
 # panic = "abort"
 # codegen-units = 1
-# opt-level = 3
+# opt-level = 
 # debug = true
 
 [features]

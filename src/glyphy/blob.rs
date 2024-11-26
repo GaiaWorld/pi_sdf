@@ -1162,7 +1162,7 @@ pub fn unsafe_vec_append_slice<T>(vec: &mut Vec<T>, slice: &[T]) {
 }
 // 判断 每个 格子 最近的 圆弧
 pub fn recursion_near_arcs_of_cell<'a>(
-    global_arcs: &Vec<Arc>,
+    // global_arcs: &Vec<Arc>,
     extents: &Aabb,
     cell: &Aabb,
     arcs: &Vec<&'static Arc>,
@@ -1177,7 +1177,7 @@ pub fn recursion_near_arcs_of_cell<'a>(
     temps: &mut Vec<(PPoint, f32)>,
     // tempsegment: &mut Segment,
     tempsegment: &mut PSegment,
-    startid: u64,
+    // startid: u64,
     tempidxs: &mut Vec<usize>,
 ) {
     // let time = std::time::Instant::now();
@@ -1228,7 +1228,8 @@ pub fn recursion_near_arcs_of_cell<'a>(
         let mut arcs_index = Vec::with_capacity(arcs.len());
         for arc in arcs {
             // let index = global_arcs.iter().position(|a| a.id == arc.id).unwrap();
-            let index = arc.id - startid;
+            let index = arc.id;
+            // println!("arc.id: {}, startid: {}, len: {}", arc.id, startid, global_arcs.len());
             // println!("{:?}", (startid, arc.id));
             // log::debug!("arc: {:?}, global_arcs: {:?}", arc, global_arcs[index]);
             arcs_index.push(index as usize);
@@ -1290,7 +1291,7 @@ pub fn recursion_near_arcs_of_cell<'a>(
         };
         // log::debug!("cell1: {:?}, cell2: {:?}, cell: {:?}", cell1, cell2, cell);
         recursion_near_arcs_of_cell(
-            global_arcs,
+            // global_arcs,
             extents,
             &cell1,
             &near_arcs,
@@ -1303,11 +1304,11 @@ pub fn recursion_near_arcs_of_cell<'a>(
             result_arcs,
             temps,
             tempsegment,
-            startid,
+            // startid,
             tempidxs
         );
         recursion_near_arcs_of_cell(
-            global_arcs,
+            // global_arcs,
             extents,
             &cell2,
             &near_arcs,
@@ -1320,7 +1321,7 @@ pub fn recursion_near_arcs_of_cell<'a>(
             result_arcs,
             temps,
             tempsegment,
-            startid,
+            // startid,
             tempidxs
         );
     }

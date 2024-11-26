@@ -81,7 +81,7 @@ export default __wbg_init;`
 
 Promise.resolve().then(() => {
 	window["__wasm"] = __wbg_init(module.wasmModule);
-})`);
+})`).replace("fatal: true", "fatal: false");;
 		// data = data.replace(`Module["noExitRuntime"]=true;run();`, `Module["noExitRuntime"] = true;
 		// //PI_START
 		// run();

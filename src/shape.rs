@@ -1371,26 +1371,29 @@ pub fn extents(mut binding_box: Aabb) -> Aabb {
     binding_box
 }
 
-pub fn compute_near_arcs<'a>(view_box: Aabb, endpoints: &Vec<ArcEndpoint>, scale: f32) -> CellInfo {
+pub fn compute_near_arcs(view_box: Aabb, endpoints: &Vec<ArcEndpoint>, scale: f32) -> CellInfo {
     let extents = compute_cell_range(view_box, scale);
     // log::debug!("extents: {:?}", extents);
     // let extents = compute_cell_range(extents, scale);
     let mut min_width = f32::INFINITY;
     let mut min_height = f32::INFINITY;
 
-    let startid = ID.load(std::sync::atomic::Ordering::SeqCst);
+    // let startid = ID.load(std::sync::atomic::Ordering::SeqCst);
     let mut p0 = Point::new(0., 0.);
     // log::debug!("extents2: {:?}", extents);
     let mut near_arcs = Vec::with_capacity(endpoints.len());
     let mut arcs = Vec::with_capacity(endpoints.len());
     // log::debug!("endpoints: {:?}", endpoints);
+    let mut id = 0;
     for i in 0..endpoints.len() {
         let endpoint = &endpoints[i];
         if endpoint.d == GLYPHY_INFINITY {
             p0 = Point::new(endpoint.p[0], endpoint.p[1]);
             continue;
         }
-        let arc = Arc::new(p0, Point::new(endpoint.p[0], endpoint.p[1]), endpoint.d);
+        let mut arc = Arc::new(p0, Point::new(endpoint.p[0], endpoint.p[1]), endpoint.d);
+        arc.id = id;
+        id += 1;
         p0 = Point::new(endpoint.p[0], endpoint.p[1]);
 
         near_arcs.push(arc);
@@ -1403,7 +1406,7 @@ pub fn compute_near_arcs<'a>(view_box: Aabb, endpoints: &Vec<ArcEndpoint>, scale
     let mut tempidxs = vec![];
     // log::debug!("arcs:{:?}", arcs.len());
     recursion_near_arcs_of_cell(
-        &near_arcs,
+        // &near_arcs,
         &extents,
         &extents,
         &arcs,
@@ -1416,7 +1419,7 @@ pub fn compute_near_arcs<'a>(view_box: Aabb, endpoints: &Vec<ArcEndpoint>, scale
         &mut result_arcs,
         &mut temp,
         &mut tempsegment,
-        startid,
+        // id,
         &mut tempidxs
     );
 
