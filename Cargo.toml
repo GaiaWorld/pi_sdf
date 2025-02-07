@@ -1,6 +1,6 @@
 [package]
 name = "pi_sdf"
-version = "0.1.21"
+version = "0.1.20"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -45,7 +45,7 @@ winit = { registry = "yn", version = "0.27" }
 tracing = "0.1"
 tracing-subscriber = "0.3"
 naga = "0.19"
-pi_wgpu = { registry = "yn", version = "0.1" }
+pi_wgpu = { registry = "yn", version = "0.1"}
 serde_json = "1.0"
 image = "0.24"
 brotli = "6.0"
