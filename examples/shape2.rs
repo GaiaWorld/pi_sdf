@@ -1,6 +1,5 @@
 use std::{mem::transmute, sync::Arc};
 
-use image::ColorType;
 use parry2d::na::{self};
 use pi_assets::allocator::Allocator;
 use tracing::Level;
@@ -8,7 +7,7 @@ use tracing_subscriber::fmt::Subscriber;
 
 // use nalgebra::Vector3;
 use pi_sdf::{font::FontFace, glyphy::blob::TexData, utils::create_indices};
-use pi_wgpu::{self as wgpu, Surface};
+use pi_wgpu::{self as wgpu, Backend, Dx12Compiler, InstanceDescriptor, Surface};
 use wgpu::{util::DeviceExt, BlendState, ColorTargetState};
 use winit::{
     event::{Event, WindowEvent},
@@ -26,6 +25,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     // let instance = wgpu::Instance::new(InstanceDescriptor {
     //     backends: Backend::Gl.into(),
     //     dx12_shader_compiler: Dx12Compiler::default(),
+    //     ..Default::default()
     // });
 
     let surface = instance.create_surface(window.as_ref()).unwrap();
@@ -39,9 +39,8 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         })
         .await
         .expect("Failed to find an appropriate adapter");
-
+    let mut allocator = Allocator::new(128 * 1024 * 1024);
     // Create the logical device and command queue
-    let mut allocator = Allocator::new(128 * 1024*1024);
     let (device, queue) = adapter
         .request_device(
             &wgpu::DeviceDescriptor {
@@ -52,7 +51,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
                     .using_resolution(adapter.limits()),
             },
             None,
-            &mut allocator
+            // &mut allocator,
         )
         .await
         .expect("Failed to create device");
@@ -60,7 +59,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     let vs = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: None,
         source: wgpu::ShaderSource::Glsl {
-            shader: include_str!("../source/outer_glow.vs").into(),
+            shader: include_str!("../source/glyphy1.vs").into(),
             stage: naga::ShaderStage::Vertex,
             defines: Default::default(),
         },
@@ -70,47 +69,50 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     let fs = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: None,
         source: wgpu::ShaderSource::Glsl {
-            shader: include_str!("../source/outer_glow.fs").into(),
+            shader: include_str!("../source/glyphy1.fs").into(),
             stage: naga::ShaderStage::Fragment,
             defines: Default::default(),
         },
     });
-
+    let scale = 1.0;
+    // 加载字体文件
     let buffer = std::fs::read("./source/msyh.ttf").unwrap();
     // let buffer = std::fs::read("./source/msyh.ttf").unwrap();
     let mut ft_face = FontFace::new(Arc::new(buffer));
-    
-    
-    log::debug!("max_box_normaliz: {:?}", ft_face.max_box_normaliz());
-    let pxrange = 40;
-    let time = std::time::Instant::now();
-    let  outline_info = ft_face.to_outline('魔');
-    let result_arcs = outline_info.compute_near_arcs(2.0); 
-    // log::debug!("bbox: {:?}", outline_info.bbox);
-    let glpyh_info = outline_info.compute_sdf_tex(result_arcs.clone(),  32, pxrange, true, pxrange);
-    log::debug!("time: {:?}", time.elapsed());
-    // log::debug!("glpyh_info: {:?}", glpyh_info);
-    let tex_size = glpyh_info.tex_size;
-    let _ = image::save_buffer("outer_glow.png", &glpyh_info.sdf_tex, tex_size as u32, tex_size as u32, ColorType::L8);
+    let outline = ft_face.to_outline('魔');
+    let cell_info = outline.compute_near_arcs(scale);
+    let blob_arc = cell_info.encode_blob_arc();
+    let sdf_tex = blob_arc.encode_tex();
+    let pxrange = 5.0;
+    let sdf_tex_size = 32.0;
+    // let verties = ft_face.verties(32.0, &mut [2.]);
+    let width = cell_info.extents.width();
+    let height = cell_info.extents.height();
 
-    
-    // let buffer = include_bytes!("../source/sdf.png").to_vec();
-    // let image_buf = image::load_from_memory(&buffer).unwrap();
-    // let tex_size: u32 = image_buf.width();
-    // let pixmap = image_buf.into_bytes();
-
-
-    let font_size = 64.0f32;
-    let translation = vec![font_size, font_size, 10.0, 10.0];
-
-    let vertexs = [
-        0.0f32, 0.0, 0.0, 0.0, 
-        0.0, 1.0, 0.0, 1.0, 
-        1.0, 0.0, 1.0, 0.0, 
-        1.0, 1.0, 1.0, 1.0,
+    let size = sdf_tex_size * (scale + 1.0); //
+    let px_distance = sdf_tex.tex_info.grid_w / size;
+    let distance = (1.0 / px_distance) / pxrange;
+    log::debug!("px_distance: {:?}", (px_distance, distance));
+    let size_2 = size * 0.5;
+    let verties = [
+        0.0,
+        0.0,
+        (size_2 - sdf_tex_size * 0.5 - pxrange) / size,
+        (size_2 - sdf_tex_size * 0.5 - pxrange) / size,
+        0.0,
+        1.0,
+        (size_2 - sdf_tex_size * 0.5 - pxrange) / size,
+        (size_2 + sdf_tex_size * 0.5 + pxrange) / size,
+        1.0,
+        0.0,
+        (size_2 + sdf_tex_size * 0.5 + pxrange) / size,
+        (size_2 - sdf_tex_size * 0.5 - pxrange) / size,
+        1.0,
+        1.0,
+        (size_2 + sdf_tex_size * 0.5 + pxrange) / size,
+        (size_2 + sdf_tex_size * 0.5 + pxrange) / size,
     ]; // 获取网格数据
-    log::debug!("vertexs: {:?}", vertexs);
-
+    log::debug!("verties: {:?}", verties);
     let view_matrix = na::Matrix4::<f32>::identity(); // 视口矩阵
     let view_matrix_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Index Buffer"),
@@ -137,12 +139,6 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         "proj_matrix.as_slice(): {:?}",
         proj_matrix.as_matrix().as_slice()
     );
-    let line = [font_size / 32.0 * 10.0, 0.5, 2.0, 0.0];
-    let line_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("Index Buffer"),
-        contents: bytemuck::cast_slice(&line),
-        usage: wgpu::BufferUsages::UNIFORM,
-    });
 
     let bind_group_layout0 = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: None,
@@ -164,16 +160,6 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
                     ty: wgpu::BufferBindingType::Uniform,
                     has_dynamic_offset: false,
                     min_binding_size: wgpu::BufferSize::new(64),
-                },
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 2,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: wgpu::BufferSize::new(16),
                 },
                 count: None,
             },
@@ -199,54 +185,50 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
                     size: wgpu::BufferSize::new(64),
                 }),
             },
-            wgpu::BindGroupEntry {
-                binding: 2,
-                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                    buffer: &line_buffer,
-                    offset: 0,
-                    size: wgpu::BufferSize::new(16),
-                }),
-            },
         ],
         label: None,
     });
 
+    let tex_size = (
+        sdf_tex.tex_info.grid_w as u32,
+        sdf_tex.tex_info.grid_h as u32,
+    );
     // 创建索引纹理
-    let sdf_tex = &glpyh_info.sdf_tex;
+    let index_tex = &sdf_tex.index_tex;
     let index_texture_extent = wgpu::Extent3d {
-        width: tex_size as u32,
-        height: tex_size as u32,
+        width: tex_size.0 as u32,
+        height: tex_size.1 as u32,
         depth_or_array_layers: 1,
     };
 
-    let sdf_tex_sampler = device.create_sampler(&&wgpu::SamplerDescriptor {
-        label: None,
-        min_filter: wgpu::FilterMode::Linear,
-        mag_filter: wgpu::FilterMode::Linear,
-        // mipmap_filter: wgpu::FilterMode::Linear,
-        ..Default::default()
-    });
-    let sdf_texture = device.create_texture(&wgpu::TextureDescriptor {
+    let index_tex_sampler = device.create_sampler(&wgpu::SamplerDescriptor::default());
+    let index_texture = device.create_texture(&wgpu::TextureDescriptor {
         label: None,
         size: index_texture_extent,
         mip_level_count: 1,
         sample_count: 1,
         dimension: wgpu::TextureDimension::D2,
-        format: wgpu::TextureFormat::R8Unorm,
+        format: wgpu::TextureFormat::Rg8Unorm,
         usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
         view_formats: &[],
     });
-    let sdf_texture_view = sdf_texture.create_view(&wgpu::TextureViewDescriptor::default());
+    let index_texture_view = index_texture.create_view(&wgpu::TextureViewDescriptor::default());
     queue.write_texture(
-        sdf_texture.as_image_copy(),
-        sdf_tex,
+        index_texture.as_image_copy(),
+        index_tex,
         wgpu::ImageDataLayout {
             offset: 0,
-            bytes_per_row: Some(tex_size as u32),
+            bytes_per_row: Some(tex_size.0 as u32 * 2),
             rows_per_image: None,
         },
         index_texture_extent,
     );
+
+    let u_data_tex_width_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("u_data_tex_width_buffer"),
+        contents: bytemuck::cast_slice(&[index_tex.len() as f32]),
+        usage: wgpu::BufferUsages::UNIFORM,
+    });
 
     let bind_group_layout1 = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: None,
@@ -254,7 +236,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
             wgpu::BindGroupLayoutEntry {
                 binding: 0,
                 visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
                 count: None,
             },
             wgpu::BindGroupLayoutEntry {
@@ -262,7 +244,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
                 visibility: wgpu::ShaderStages::FRAGMENT,
                 ty: wgpu::BindingType::Texture {
                     multisampled: false,
-                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                    sample_type: wgpu::TextureSampleType::Float { filterable: false },
                     view_dimension: wgpu::TextureViewDimension::D2,
                 },
                 count: None,
@@ -275,11 +257,102 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         entries: &[
             wgpu::BindGroupEntry {
                 binding: 0,
-                resource: wgpu::BindingResource::Sampler(&sdf_tex_sampler),
+                resource: wgpu::BindingResource::Sampler(&index_tex_sampler),
             },
             wgpu::BindGroupEntry {
                 binding: 1,
-                resource: wgpu::BindingResource::TextureView(&sdf_texture_view),
+                resource: wgpu::BindingResource::TextureView(&index_texture_view),
+            },
+        ],
+        label: None,
+    });
+
+    let data_tex = &sdf_tex.data_tex;
+    let data_texture_extent = wgpu::Extent3d {
+        width: sdf_tex.data_tex.len() as u32 / 4,
+        height: 1,
+        depth_or_array_layers: 1,
+    };
+    log::debug!("sdf_tex.data_tex: {:?}", sdf_tex.data_tex);
+    let data_tex_sampler = device.create_sampler(&wgpu::SamplerDescriptor::default());
+    let data_texture = device.create_texture(&wgpu::TextureDescriptor {
+        label: None,
+        size: data_texture_extent,
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: wgpu::TextureFormat::Rgba8Unorm,
+        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+        view_formats: &[],
+    });
+
+    let data_tex_size_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("u_weight_and_offset_buffer"),
+        contents: bytemuck::cast_slice(&[(sdf_tex.data_tex.len() / 4) as f32, 1 as f32]),
+        usage: wgpu::BufferUsages::UNIFORM,
+    });
+
+    let data_texture_view = data_texture.create_view(&wgpu::TextureViewDescriptor::default());
+    queue.write_texture(
+        data_texture.as_image_copy(),
+        data_tex,
+        wgpu::ImageDataLayout {
+            offset: 0,
+            bytes_per_row: Some(data_tex.len() as u32),
+            rows_per_image: None,
+        },
+        data_texture_extent,
+    );
+
+    let bind_group_layout2 = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: None,
+        entries: &[
+            wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 1,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Texture {
+                    multisampled: false,
+                    sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                    view_dimension: wgpu::TextureViewDimension::D2,
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 2,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false,
+                    min_binding_size: wgpu::BufferSize::new(8),
+                },
+                count: None,
+            },
+        ],
+    });
+    let bind_group2 = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        layout: &bind_group_layout2,
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::Sampler(&data_tex_sampler),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: wgpu::BindingResource::TextureView(&data_texture_view),
+            },
+            wgpu::BindGroupEntry {
+                binding: 2,
+                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                    buffer: &data_tex_size_buffer,
+                    offset: 0,
+                    size: wgpu::BufferSize::new(8),
+                }),
             },
         ],
         label: None,
@@ -287,24 +360,52 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
 
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: None,
-        bind_group_layouts: &[&bind_group_layout0, &bind_group_layout1],
+        bind_group_layouts: &[
+            &bind_group_layout0,
+            &bind_group_layout1,
+            &bind_group_layout2,
+        ],
         push_constant_ranges: &[],
     });
 
     let swapchain_capabilities = surface.get_capabilities(&adapter);
+    println!("swapchain_format: {:?}", swapchain_capabilities.formats);
     let swapchain_format = swapchain_capabilities.formats[1];
-    log::debug!("swapchain_format: {:?}", swapchain_capabilities.formats);
+    
     // 创建网格数据
     let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Index Buffer"),
-        contents: bytemuck::cast_slice(&vertexs),
+        contents: bytemuck::cast_slice(&verties),
         usage: wgpu::BufferUsages::VERTEX,
     });
 
     // 以下为实例化数据
+
+    let mut u_info = vec![];
+    let check = sdf_tex.tex_info.cell_size * 0.5 * 2.0f32.sqrt();
+    u_info.push(sdf_tex.tex_info.max_offset as f32);
+    u_info.push(sdf_tex.tex_info.min_sdf as f32);
+    u_info.push(sdf_tex.tex_info.sdf_step as f32);
+    u_info.push(check);
+    let translation = vec![
+        sdf_tex_size + pxrange * 2.0,
+        sdf_tex_size + pxrange * 2.0,
+        100.0,
+        100.0,
+    ];
+
+    log::debug!("u_info: {:?}", u_info);
+    log::debug!("translation: {:?}", translation);
+
     let translation_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("translation_buffer"),
         contents: bytemuck::cast_slice(translation.as_slice()),
+        usage: wgpu::BufferUsages::VERTEX,
+    });
+
+    let u_info_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("u_info_buffer"),
+        contents: bytemuck::cast_slice(&u_info),
         usage: wgpu::BufferUsages::VERTEX,
     });
 
@@ -345,6 +446,15 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
                         shader_location: 1,
                     }],
                 },
+                wgpu::VertexBufferLayout {
+                    array_stride: std::mem::size_of::<[f32; 4]>() as wgpu::BufferAddress,
+                    step_mode: wgpu::VertexStepMode::Instance,
+                    attributes: &[wgpu::VertexAttribute {
+                        format: wgpu::VertexFormat::Float32x4,
+                        offset: 0,
+                        shader_location: 2,
+                    }],
+                },
             ],
         },
         fragment: Some(wgpu::FragmentState {
@@ -373,7 +483,21 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
 
     surface.configure(&device, &config);
 
-
+    let texture_extent = wgpu::Extent3d {
+        width: 2048,
+        height: 2048,
+        depth_or_array_layers: 1,
+    };
+    let fbo = device.create_texture(&wgpu::TextureDescriptor {
+        label: Some("FBO"),
+        size: texture_extent,
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: wgpu::TextureFormat::Bgra8Unorm,
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+        view_formats: &[],
+    });
 
     event_loop.run(move |event, _, control_flow| {
         // Have the closure take ownership of the resources.
@@ -381,7 +505,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         // the resources are properly cleaned up.
         // let _ = (&instance, &adapter, &shader, &pipeline_layout);
 
-        *control_flow = ControlFlow::Wait;
+        // *control_flow = ControlFlow::Poll;
         // log::debug!("=========1");
         match event {
             Event::WindowEvent {
@@ -393,20 +517,17 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
                 config.height = size.height;
                 surface.configure(&device, &config);
                 // On macos the window needs to be redrawn manually after resizing
-                window.request_redraw();
+                // window.request_redraw();
             }
             Event::MainEventsCleared => {
-                window.request_redraw();
+                // window.request_redraw();
             }
             Event::RedrawRequested(_) => {
-                let frame = surface
-                    .get_current_texture()
-                    .expect("Failed to acquire next swap chain texture");
-                let view = frame
-                    .texture
-                    .create_view(&wgpu::TextureViewDescriptor::default());
                 let mut encoder =
                     device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+
+                let view = fbo.create_view(&wgpu::TextureViewDescriptor::default());
+
                 {
                     let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                         label: None,
@@ -414,7 +535,43 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
                             view: &view,
                             resolve_target: None,
                             ops: wgpu::Operations {
-                                load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                                load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
+                                store: wgpu::StoreOp::Store,
+                            },
+                        })],
+                        depth_stencil_attachment: None,
+                        timestamp_writes: None,
+                        occlusion_query_set: None,
+                    });
+                    // rpass.push_debug_group("Prepare data for draw.");
+                    rpass.set_pipeline(&render_pipeline);
+                    rpass.set_viewport(128., 128., 128., 128., 0., 1.);
+                    rpass.set_bind_group(0, &bind_group0, &[]);
+                    rpass.set_bind_group(1, &bind_group1, &[]);
+                    rpass.set_bind_group(2, &bind_group2, &[]);
+
+                    rpass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+                    rpass.set_vertex_buffer(0, vertex_buffer.slice(..));
+                    rpass.set_vertex_buffer(1, translation_buffer.slice(..));
+                    rpass.set_vertex_buffer(2, u_info_buffer.slice(..));
+
+                    rpass.draw_indexed(0..6, 0, 0..1 as u32);
+                }
+
+                let frame = surface
+                    .get_current_texture()
+                    .expect("Failed to acquire next swap chain texture");
+                let view = frame
+                    .texture
+                    .create_view(&wgpu::TextureViewDescriptor::default());
+                {
+                    let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                        label: None,
+                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                            view: &view,
+                            resolve_target: None,
+                            ops: wgpu::Operations {
+                                load: wgpu::LoadOp::Clear(wgpu::Color::WHITE),
                                 store: wgpu::StoreOp::Store,
                             },
                         })],
@@ -427,13 +584,12 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
 
                     rpass.set_bind_group(0, &bind_group0, &[]);
                     rpass.set_bind_group(1, &bind_group1, &[]);
+                    rpass.set_bind_group(2, &bind_group2, &[]);
 
                     rpass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-
                     rpass.set_vertex_buffer(0, vertex_buffer.slice(..));
                     rpass.set_vertex_buffer(1, translation_buffer.slice(..));
-
-                    // rpass.insert_debug_marker("Draw!");
+                    rpass.set_vertex_buffer(2, u_info_buffer.slice(..));
 
                     rpass.draw_indexed(0..6, 0, 0..1 as u32);
                 }

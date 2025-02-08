@@ -517,15 +517,15 @@ pub fn encode_sdf(
                         is_outer_glow,
                         is_reverse,
                     );
-                    // if j == 6 && (i == 7 || i == 6) {
-                    //     log::debug!("p: {}, i: {}, j: {}", p, i, j);
-                    //     log::debug!("============== cell: {:?}, extents: {:?}, ab: {:?}, unit_d: {:?}", cell, extents, ab, unit_d);
-                    //     log::debug!("begin: {}, end: {}", begin.y / unit_d, end.y / unit_d);
-                    //     log::debug!("sdf: {:?}", r);
-                    //     for a in &near_arcs {
-                    //         log::debug!("{:?}", global_arcs[*a])
-                    //     }
-                    // }
+                    if j == 6 && (i == 7 || i == 6) {
+                        println!("p: {}, i: {}, j: {}", p, i, j);
+                        println!("============== cell: {:?}, extents: {:?}, ab: {:?}, unit_d: {:?}", cell, extents, ab, unit_d);
+                        println!("begin: {}, end: {}", begin.y / unit_d, end.y / unit_d);
+                        println!("sdf: {:?}", r);
+                        for a in &near_arcs {
+                            println!("{:?}", global_arcs[*a])
+                        }
+                    }
 
                     // svg 不需要颠倒纹理
                     if is_svg {
@@ -616,7 +616,7 @@ fn compute_sdf2(
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct LayoutInfo {
     pub plane_bounds: Vec<f32>,
     pub atlas_bounds: Vec<f32>,
@@ -918,7 +918,7 @@ pub struct CellInfo {
     pub(crate) info: Vec<(Vec<usize>, Aabb)>,
     pub(crate) min_width: f32,
     pub(crate) min_height: f32,
-    pub(crate) is_area: bool,
+    pub is_area: bool,
 }
 
 impl CellInfo {

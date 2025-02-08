@@ -12,7 +12,7 @@ use parry2d::{
 use serde::{Deserialize, Serialize};
 // use usvg::tiny_skia_path::PathSegment;
 
-use crate::glyphy::blob::recursion_near_arcs_of_cell;
+use crate::glyphy::blob::{recursion_near_arcs_of_cell, SdfInfo};
 use crate::glyphy::geometry::arc::{Arc, ID};
 use crate::glyphy::geometry::segment::{PPoint, PSegment};
 use crate::glyphy::util::GLYPHY_INFINITY;
@@ -177,9 +177,10 @@ impl Circle {
 
     pub fn get_svg_info_of_wasm(&self) -> WasmSvgInfo {
         let info = self.get_svg_info();
-        WasmSvgInfo{
+        WasmSvgInfo {
             buf: bitcode::serialize(&info).unwrap(),
             binding_box: info.binding_box,
+            is_area: info.is_area,
         }
     }
 
@@ -278,9 +279,10 @@ impl Rect {
 
     pub fn get_svg_info_of_wasm(&self) -> WasmSvgInfo {
         let info = self.get_svg_info();
-        WasmSvgInfo{
+        WasmSvgInfo {
             buf: bitcode::serialize(&info).unwrap(),
             binding_box: info.binding_box,
+            is_area: info.is_area,
         }
     }
 
@@ -300,11 +302,12 @@ impl Rect {
 pub struct Segment {
     segment: MSegment,
     pub(crate) attribute: Attribute,
+    step: Option<Vec<f32>>,
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 impl Segment {
-    pub fn new(a_x: f32, a_y: f32, b_x: f32, b_y: f32) -> Self {
+    pub fn new(a_x: f32, a_y: f32, b_x: f32, b_y: f32, step: Option<Vec<f32>>) -> Self {
         let mut attribute = Attribute::default();
         let a = Point::new(a_x, a_y);
         let b = Point::new(b_x, b_y);
@@ -313,56 +316,65 @@ impl Segment {
         Self {
             segment: MSegment::new(a, b),
             attribute,
+            step,
         }
     }
 
     pub fn get_arc_endpoints(&self) -> Vec<ArcEndpoint> {
-        vec![
-            ArcEndpoint::new(self.segment.a.x, self.segment.a.y, f32::INFINITY),
-            ArcEndpoint::new(self.segment.b.x, self.segment.b.y, 0.0),
-            // ArcEndpoint::new(self.segment.a.x, self.segment.a.y, 0.0),
-        ]
+        if let Some(step) = &self.step {
+            let r = self.get_stroke_dasharray_arc_endpoints([step[0], step[1]]);
+            println!("get_arc_endpoints: {:?}", r);
+            r
+        } else {
+            vec![
+                ArcEndpoint::new(self.segment.a.x, self.segment.a.y, f32::INFINITY),
+                ArcEndpoint::new(self.segment.b.x, self.segment.b.y, 0.0),
+            ]
+        }
     }
 
-    fn _get_stroke_dasharray_arc_endpoints(&self, step: [f32; 2]) -> Vec<ArcEndpoint> {
+    fn get_stroke_dasharray_arc_endpoints(&self, step: [f32; 2]) -> Vec<ArcEndpoint> {
         let length = self.segment.length();
         let part = step[0] + step[1];
         let num = length / part;
         let mmod = num - num.trunc();
         let dir = (self.segment.b - self.segment.a).normalize();
-
+        println!(
+            "get_stroke_dasharray_arc_endpoints {:?}",
+            (length, part, num, mmod)
+        );
         let real = dir * step[0];
         let a_virtual = dir * step[1];
 
-        let mut arcs = vec![ArcEndpoint::new(
-            self.segment.a.x,
-            self.segment.a.y,
-            f32::INFINITY,
-        )];
+        let mut arcs = vec![];
 
+        let mut start = ArcEndpoint::new(self.segment.a.x, self.segment.a.y, f32::INFINITY);
         for _ in 0..num as usize {
-            let last = arcs.last().unwrap();
-            let x = last.p[0] + real[0];
-            let y = last.p[1] + real[1];
+            let p0 = start.clone();
+            let x = p0.p[0] + real[0];
+            let y = p0.p[1] + real[1];
             let p1 = ArcEndpoint::new(x, y, 0.0);
+
+            arcs.push(p0.clone());
+            arcs.push(p1.clone());
+
             let x = p1.p[0] + a_virtual[0];
             let y = p1.p[1] + a_virtual[1];
-            let p2 = ArcEndpoint::new(x, y, f32::INFINITY);
-
-            arcs.push(p1);
-            arcs.push(p2);
+            start = ArcEndpoint::new(x, y, f32::INFINITY);
         }
 
-        let last = arcs.last().unwrap();
-        if mmod > step[0] / part {
-            let x = last.p[0] + real[0];
-            let y = last.p[1] + real[1];
-            let p = ArcEndpoint::new(x, y, 0.0);
-            arcs.push(p);
-        } else {
-            let x = self.segment.b.x;
-            let y = self.segment.b.y;
-            let p = ArcEndpoint::new(x, y, 0.0);
+        if mmod > 0.01 {
+            let r = mmod / (step[0] / part);
+            let p = if r > 1.0 {
+                let x = start.p[0] + real[0];
+                let y = start.p[1] + real[1];
+                ArcEndpoint::new(x, y, 0.0)
+            } else {
+                let x = start.p[0] + real[0] * r;
+                let y = start.p[1] + real[1] * r;
+                ArcEndpoint::new(x, y, 0.0)
+            };
+            arcs.push(start);
             arcs.push(p);
         }
 
@@ -408,9 +420,10 @@ impl Segment {
 
     pub fn get_svg_info_of_wasm(&self) -> WasmSvgInfo {
         let info = self.get_svg_info();
-        WasmSvgInfo{
+        WasmSvgInfo {
             buf: bitcode::serialize(&info).unwrap(),
             binding_box: info.binding_box,
+            is_area: info.is_area,
         }
     }
 
@@ -534,9 +547,10 @@ impl Ellipse {
 
     pub fn get_svg_info_of_wasm(&self) -> WasmSvgInfo {
         let info = self.get_svg_info();
-        WasmSvgInfo{
+        WasmSvgInfo {
             buf: bitcode::serialize(&info).unwrap(),
             binding_box: info.binding_box,
+            is_area: info.is_area,
         }
     }
 
@@ -641,9 +655,10 @@ impl Polygon {
 
     pub fn get_svg_info_of_wasm(&self) -> WasmSvgInfo {
         let info = self.get_svg_info();
-        WasmSvgInfo{
+        WasmSvgInfo {
             buf: bitcode::serialize(&info).unwrap(),
             binding_box: info.binding_box,
+            is_area: info.is_area,
         }
     }
 
@@ -769,9 +784,10 @@ impl Polyline {
 
     pub fn get_svg_info_of_wasm(&self) -> WasmSvgInfo {
         let info = self.get_svg_info();
-        WasmSvgInfo{
+        WasmSvgInfo {
             buf: bitcode::serialize(&info).unwrap(),
             binding_box: info.binding_box,
+            is_area: info.is_area,
         }
     }
 
@@ -974,9 +990,10 @@ impl Path {
 
     pub fn get_svg_info_of_wasm(&self) -> WasmSvgInfo {
         let info = self.get_svg_info();
-        WasmSvgInfo{
+        WasmSvgInfo {
             buf: bitcode::serialize(&info).unwrap(),
             binding_box: info.binding_box,
+            is_area: info.is_area,
         }
     }
 
@@ -996,14 +1013,15 @@ impl Path {
 pub struct WasmSvgInfo {
     pub buf: Vec<u8>,
     pub binding_box: Vec<f32>,
+    pub is_area: bool,
 }
 
-#[cfg_attr(target_arch = "wasm32",  wasm_bindgen(getter_with_clone))]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SvgInfo {
-    binding_box: Vec<f32>,
+    pub binding_box: Vec<f32>,
     arc_endpoints: Vec<ArcEndpoint>,
-    is_area: bool,
+    pub is_area: bool,
     is_reverse: Option<bool>,
 }
 
@@ -1030,7 +1048,7 @@ impl SvgInfo {
     pub fn compute_layout(&self, tex_size: usize, pxrange: u32, cur_off: u32) -> LayoutInfo {
         compute_layout(&self.binding_box, tex_size, pxrange, 1, cur_off, true)
     }
-    
+
     pub fn compute_near_arcs(&self, scale: f32) -> CellInfo {
         let mut info = compute_near_arcs(
             Aabb::new(
@@ -1068,6 +1086,7 @@ impl SvgInfo {
             &self.arc_endpoints,
             scale,
         );
+        // println!("============1111111111111111 : {:?}",(&arcs, &info));
         let pixmap = crate::utils::encode_sdf(
             &arcs,
             info,
@@ -1102,6 +1121,12 @@ impl SvgInfo {
             },
         }
     }
+
+    pub fn compute_sdf_cell(&self, scale: f32) -> SdfInfo {
+        let cell = self.compute_near_arcs(scale);
+        let blob = cell.encode_blob_arc();
+        blob.encode_tex()
+    }
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
@@ -1114,13 +1139,19 @@ impl SvgInfo {
     ) -> WasmSvgInfo {
         let info = Self::new(binding_box, arc_endpoints, is_area, is_reverse);
         let buf = bitcode::serialize(&info).unwrap();
-        WasmSvgInfo{
+        WasmSvgInfo {
             buf,
             binding_box: info.binding_box,
+            is_area: info.is_area
         }
     }
 
-    pub fn compute_layout_of_wasm(binding_box: &[f32], tex_size: usize, pxrange: u32, cur_off: u32) -> Vec<f32> {
+    pub fn compute_layout_of_wasm(
+        binding_box: &[f32],
+        tex_size: usize,
+        pxrange: u32,
+        cur_off: u32,
+    ) -> Vec<f32> {
         let LayoutInfo {
             mut plane_bounds,
             mut atlas_bounds,
@@ -1137,8 +1168,9 @@ impl SvgInfo {
         res
     }
 
-    pub fn compute_near_arcs_of_wasm(&self, scale: f32) -> Vec<u8> {
-        bitcode::serialize(&self.compute_near_arcs(scale)).unwrap()
+    pub fn compute_near_arcs_of_wasm(info: &[u8], scale: f32) -> Vec<u8> {
+        let info: SvgInfo = bitcode::deserialize(info).unwrap();
+        bitcode::serialize(&info.compute_near_arcs(scale)).unwrap()
     }
 
     pub fn compute_sdf_tex_of_wasm(
@@ -1152,6 +1184,13 @@ impl SvgInfo {
         let info: SvgInfo = bitcode::deserialize(info).unwrap();
         bitcode::serialize(&info.compute_sdf_tex(tex_size, pxrange, is_outer_glow, cur_off, scale))
             .unwrap()
+    }
+
+    pub fn compute_sdf_cell_of_wasm(info: &[u8], scale: f32) -> Vec<u8> {
+        let info: SvgInfo = bitcode::deserialize(info).unwrap();
+        let cell = info.compute_near_arcs(scale);
+        let blob = cell.encode_blob_arc();
+        bitcode::serialize(&blob.encode_tex()).unwrap()
     }
 }
 
@@ -1420,7 +1459,7 @@ pub fn compute_near_arcs(view_box: Aabb, endpoints: &Vec<ArcEndpoint>, scale: f3
         &mut temp,
         &mut tempsegment,
         // id,
-        &mut tempidxs
+        &mut tempidxs,
     );
 
     CellInfo {

@@ -14,12 +14,12 @@ precision highp float;
 // 如果 晶格的 sdf 在 [-check, check]，该晶格 和 字体轮廓 可能 相交 
 
 
-layout(set = 1, binding = 0) uniform sampler index_tex_samp;
-layout(set = 1, binding = 1) uniform texture2D u_index_tex;
+layout(set = 0, binding = 0) uniform sampler index_tex_samp;
+layout(set = 0, binding = 1) uniform texture2D u_index_tex;
 
-layout(set = 2, binding = 0) uniform sampler data_tex_samp;
-layout(set = 2, binding = 1) uniform texture2D u_data_tex;
-layout(set = 2, binding = 2) uniform vec2 data_tex_size_buffer;
+layout(set = 1, binding = 0) uniform sampler data_tex_samp;
+layout(set = 1, binding = 1) uniform texture2D u_data_tex;
+layout(set = 1, binding = 2) uniform vec2 data_tex_size_buffer;
 
 layout (location = 1) in vec2 uv; // uv坐标
 layout (location = 2) in vec4 u_info; // sdf附加数据
@@ -476,16 +476,19 @@ float antialias(float d) {
 
 void main() {
 	vec2 nominal_size = vec2(32., 32.);
-	int pxrange = 5;
-	// 重点：计算 SDF 
-	float gsdist = glyphy_sdf(uv, nominal_size);
+	
+	float pxrange =  data_tex_size_buffer.y;
 
-	float d = 0.5 - (gsdist * 0.2);
+	// 重点：计算 SDF 
+	// 默认pxrange= 6.7 ; 0.5 范围内除以2为3.35
+	float gsdist = glyphy_sdf(vec2(uv.x, 1.0 - uv.y), nominal_size) * (3.35 / pxrange);
+	
+	float d = 0.5 - abs(gsdist);
 	fragColor = vec4(d, d, d, 1.0);
 
 	// fragColor = vec4((1.0 - (gsdist * 0.4)), 0.0, 0.0, 1.0);
 	// vec4 c = texture(sampler2D(u_index_tex, index_tex_samp), uv).rgba;
 	// fragColor = vec4(c.rg, 0.0, 1.0);
 	// fragColor = vec4(fwidth(p), 0., 1.0);
-	fragColor.rgb *= fragColor.a;
+	// fragColor.rgb *= fragColor.a;
 }

@@ -6,7 +6,7 @@ use tracing::Level;
 use tracing_subscriber::fmt::Subscriber;
 
 // use nalgebra::Vector3;
-use pi_sdf::{font::FontFace, glyphy::blob::TexData, utils::create_indices};
+use pi_sdf::{font::FontFace, glyphy::blob::TexData, shape, utils::create_indices};
 use pi_wgpu::{self as wgpu, Backend, Dx12Compiler, InstanceDescriptor, Surface};
 use wgpu::{util::DeviceExt, BlendState, ColorTargetState};
 use winit::{
@@ -39,7 +39,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         })
         .await
         .expect("Failed to find an appropriate adapter");
-    let mut allocator = Allocator::new(128 * 1024*1024);
+    let mut allocator = Allocator::new(128 * 1024 * 1024);
     // Create the logical device and command queue
     let (device, queue) = adapter
         .request_device(
@@ -51,7 +51,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
                     .using_resolution(adapter.limits()),
             },
             None,
-            &mut allocator
+            // &mut allocator
         )
         .await
         .expect("Failed to create device");
@@ -75,111 +75,88 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         },
     });
     let scale = 1.0;
-    // 加载字体文件
-    let buffer = std::fs::read("./source/msyh.ttf").unwrap();
-    // let buffer = std::fs::read("./source/msyh.ttf").unwrap();
-    let mut ft_face = FontFace::new(Arc::new(buffer));
-    let outline = ft_face.to_outline('魔');
-    let cell_info = outline.compute_near_arcs(scale);
+    let rect = shape::Rect::new(20.0, 20.0, 150.0, 50.0);
+    let info = rect.get_svg_info();
+
+    let line = shape::Segment::new(220.0, 300.0, 20.0, 100.0);
+    let info = line.get_svg_info();
+
+    let cell_info = info.compute_near_arcs(scale);
     let blob_arc = cell_info.encode_blob_arc();
     let sdf_tex = blob_arc.encode_tex();
+
+    let bbox = info.binding_box;
+    // let 
+    // let uv_min = 
+
+    // 加载字体文件
+    // let buffer = std::fs::read("./source/msyh.ttf").unwrap();
+    // // let buffer = std::fs::read("./source/msyh.ttf").unwrap();
+    // let mut ft_face = FontFace::new(Arc::new(buffer));
+    // let outline = ft_face.to_outline('魔');
+    // let cell_info = outline.compute_near_arcs(scale);
+    // let blob_arc = cell_info.encode_blob_arc();
+    // let sdf_tex = blob_arc.encode_tex();
     let pxrange = 5.0;
-    let sdf_tex_size = 32.0;
+    let cur_off = 2.0;
+    let sdf_tex_size = (bbox[2] - bbox[0]).max(bbox[3] - bbox[1]) * 0.5;
+    println!("============== sdf_tex_size: {}", sdf_tex_size);
     // let verties = ft_face.verties(32.0, &mut [2.]);
-    let width = cell_info.extents.width();
-    let height = cell_info.extents.height();
+    // let width = cell_info.extents.width();
+    // let height = cell_info.extents.height();
 
-    let size = sdf_tex_size * (scale + 1.0); // 
-    let px_distance =  sdf_tex.tex_info.grid_w  / size;
-    let distance = (1.0 / px_distance) / pxrange;
-    log::debug!("px_distance: {:?}", (px_distance, distance));
-    let size_2 = size * 0.5;
+    let size = sdf_tex_size * (scale + 1.0); //
+    let uv = (1.0 - (sdf_tex_size + cur_off * 2.0) / size) * 0.5;
+    println!("============== uv: {}", uv);
+
+    // let size_2 = size * 0.5;
     let verties = [
-        0.0, 0.0, (size_2 - sdf_tex_size * 0.5 - pxrange) / size, (size_2 - sdf_tex_size * 0.5 - pxrange) / size,
-        0.0, 1.0, (size_2 - sdf_tex_size * 0.5 - pxrange) / size, (size_2 + sdf_tex_size * 0.5 + pxrange) / size,
-        1.0, 0.0, (size_2 + sdf_tex_size * 0.5 + pxrange) / size, (size_2 - sdf_tex_size * 0.5 - pxrange) / size,
-        1.0, 1.0, (size_2 + sdf_tex_size * 0.5 + pxrange) / size, (size_2 + sdf_tex_size * 0.5 + pxrange) / size,
+        -1.0f32, -1.0, uv, uv, -1.0, 1.0, uv, 1.0 - uv, 1.0, -1.0, 1.0 - uv, uv, 1.0, 1.0, 1.0 - uv, 1.0- uv,
     ]; // 获取网格数据
-    log::debug!("verties: {:?}", verties);
-    let view_matrix = na::Matrix4::<f32>::identity(); // 视口矩阵
-    let view_matrix_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("Index Buffer"),
-        contents: bytemuck::cast_slice(view_matrix.as_slice()),
-        usage: wgpu::BufferUsages::UNIFORM,
-    });
-    log::debug!("view_matrix.as_slice(): {:?}", view_matrix.as_slice());
 
-    // 投影矩阵
-    let proj_matrix = na::Orthographic3::<f32>::new(
-        0.0,
-        window_size.width as f32,
-        0.0,
-        window_size.height as f32,
-        -1.0,
-        1.0,
-    );
-    let proj_matrix_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("Index Buffer"),
-        contents: bytemuck::cast_slice(proj_matrix.as_matrix().as_slice()),
-        usage: wgpu::BufferUsages::UNIFORM,
-    });
-    log::debug!(
-        "proj_matrix.as_slice(): {:?}",
-        proj_matrix.as_matrix().as_slice()
-    );
+    // log::debug!("verties: {:?}", verties);
+    // let view_matrix = na::Matrix4::<f32>::identity(); // 视口矩阵
+    // let view_matrix_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+    //     label: Some("Index Buffer"),
+    //     contents: bytemuck::cast_slice(view_matrix.as_slice()),
+    //     usage: wgpu::BufferUsages::UNIFORM,
+    // });
+    // log::debug!("view_matrix.as_slice(): {:?}", view_matrix.as_slice());
 
-    let bind_group_layout0 = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-        label: None,
-        entries: &[
-            wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: wgpu::BufferSize::new(64),
-                },
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 1,
-                visibility: wgpu::ShaderStages::VERTEX,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: wgpu::BufferSize::new(64),
-                },
-                count: None,
-            },
-        ],
-    });
+    // // 投影矩阵
+    // let proj_matrix = na::Orthographic3::<f32>::new(
+    //     0.0,
+    //     window_size.width as f32,
+    //     0.0,
+    //     window_size.height as f32,
+    //     -1.0,
+    //     1.0,
+    // );
+    // let proj_matrix_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+    //     label: Some("Index Buffer"),
+    //     contents: bytemuck::cast_slice(proj_matrix.as_matrix().as_slice()),
+    //     usage: wgpu::BufferUsages::UNIFORM,
+    // });
+    // log::debug!(
+    //     "proj_matrix.as_slice(): {:?}",
+    //     proj_matrix.as_matrix().as_slice()
+    // );
 
-    let bind_group0 = device.create_bind_group(&wgpu::BindGroupDescriptor {
-        layout: &bind_group_layout0,
-        entries: &[
-            wgpu::BindGroupEntry {
-                binding: 0,
-                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                    buffer: &view_matrix_buffer,
-                    offset: 0,
-                    size: wgpu::BufferSize::new(64),
-                }),
-            },
-            wgpu::BindGroupEntry {
-                binding: 1,
-                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                    buffer: &proj_matrix_buffer,
-                    offset: 0,
-                    size: wgpu::BufferSize::new(64),
-                }),
-            },
-        ],
-        label: None,
-    });
+    // let bind_group_layout0 = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+    //     label: None,
+    //     entries: &[],
+    // });
+
+    // let bind_group0 = device.create_bind_group(&wgpu::BindGroupDescriptor {
+    //     layout: &bind_group_layout0,
+    //     entries: &[],
+    //     label: None,
+    // });
 
     let tex_size = (
         sdf_tex.tex_info.grid_w as u32,
-        sdf_tex.tex_info.grid_h as u32);
+        sdf_tex.tex_info.grid_h as u32,
+    );
     // 创建索引纹理
     let index_tex = &sdf_tex.index_tex;
     let index_texture_extent = wgpu::Extent3d {
@@ -211,11 +188,11 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         index_texture_extent,
     );
 
-    let u_data_tex_width_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("u_data_tex_width_buffer"),
-        contents: bytemuck::cast_slice(&[index_tex.len() as f32]),
-        usage: wgpu::BufferUsages::UNIFORM,
-    });
+    // let u_data_tex_width_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+    //     label: Some("u_data_tex_width_buffer"),
+    //     contents: bytemuck::cast_slice(&[index_tex.len() as f32]),
+    //     usage: wgpu::BufferUsages::UNIFORM,
+    // });
 
     let bind_group_layout1 = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: None,
@@ -275,7 +252,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
 
     let data_tex_size_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("u_weight_and_offset_buffer"),
-        contents: bytemuck::cast_slice(&[(sdf_tex.data_tex.len() / 4) as f32, 1 as f32]),
+        contents: bytemuck::cast_slice(&[(sdf_tex.data_tex.len() / 4) as f32, pxrange as f32]),
         usage: wgpu::BufferUsages::UNIFORM,
     });
 
@@ -348,7 +325,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: None,
         bind_group_layouts: &[
-            &bind_group_layout0,
+            // &bind_group_layout0,
             &bind_group_layout1,
             &bind_group_layout2,
         ],
@@ -356,8 +333,8 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     });
 
     let swapchain_capabilities = surface.get_capabilities(&adapter);
-    let swapchain_format = swapchain_capabilities.formats[1];
-    log::debug!("swapchain_format: {:?}", swapchain_capabilities.formats);
+    let swapchain_format = swapchain_capabilities.formats[2];
+    println!("swapchain_format: {:?}", swapchain_capabilities.formats);
     // 创建网格数据
     let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Index Buffer"),
@@ -373,16 +350,21 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     u_info.push(sdf_tex.tex_info.min_sdf as f32);
     u_info.push(sdf_tex.tex_info.sdf_step as f32);
     u_info.push(check);
-    let translation = vec![sdf_tex_size + pxrange * 2.0, sdf_tex_size + pxrange * 2.0, 100.0, 100.0];
+    let translation = vec![
+        sdf_tex_size + pxrange * 2.0,
+        sdf_tex_size + pxrange * 2.0,
+        100.0,
+        100.0,
+    ];
 
     log::debug!("u_info: {:?}", u_info);
     log::debug!("translation: {:?}", translation);
 
-    let translation_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: Some("translation_buffer"),
-        contents: bytemuck::cast_slice(translation.as_slice()),
-        usage: wgpu::BufferUsages::VERTEX,
-    });
+    // let translation_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+    //     label: Some("translation_buffer"),
+    //     contents: bytemuck::cast_slice(translation.as_slice()),
+    //     usage: wgpu::BufferUsages::VERTEX,
+    // });
 
     let u_info_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("u_info_buffer"),
@@ -427,15 +409,15 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
                         shader_location: 1,
                     }],
                 },
-                wgpu::VertexBufferLayout {
-                    array_stride: std::mem::size_of::<[f32; 4]>() as wgpu::BufferAddress,
-                    step_mode: wgpu::VertexStepMode::Instance,
-                    attributes: &[wgpu::VertexAttribute {
-                        format: wgpu::VertexFormat::Float32x4,
-                        offset: 0,
-                        shader_location: 2,
-                    }],
-                },
+                // wgpu::VertexBufferLayout {
+                //     array_stride: std::mem::size_of::<[f32; 4]>() as wgpu::BufferAddress,
+                //     step_mode: wgpu::VertexStepMode::Instance,
+                //     attributes: &[wgpu::VertexAttribute {
+                //         format: wgpu::VertexFormat::Float32x4,
+                //         offset: 0,
+                //         shader_location: 2,
+                //     }],
+                // },
             ],
         },
         fragment: Some(wgpu::FragmentState {
@@ -482,10 +464,10 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
                 config.height = size.height;
                 surface.configure(&device, &config);
                 // On macos the window needs to be redrawn manually after resizing
-                // window.request_redraw();
+                window.request_redraw();
             }
             Event::MainEventsCleared => {
-                // window.request_redraw();
+                window.request_redraw();
             }
             Event::RedrawRequested(_) => {
                 let frame = surface
@@ -513,15 +495,15 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
                     });
                     // rpass.push_debug_group("Prepare data for draw.");
                     rpass.set_pipeline(&render_pipeline);
-
-                    rpass.set_bind_group(0, &bind_group0, &[]);
-                    rpass.set_bind_group(1, &bind_group1, &[]);
-                    rpass.set_bind_group(2, &bind_group2, &[]);
+                    
+                    rpass.set_viewport(bbox[0] , bbox[1] , sdf_tex_size + cur_off * 2.0, sdf_tex_size + cur_off * 2.0, 0.0, 1.0);
+                    rpass.set_bind_group(0, &bind_group1, &[]);
+                    rpass.set_bind_group(1, &bind_group2, &[]);
 
                     rpass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint16);
                     rpass.set_vertex_buffer(0, vertex_buffer.slice(..));
-                    rpass.set_vertex_buffer(1, translation_buffer.slice(..));
-                    rpass.set_vertex_buffer(2, u_info_buffer.slice(..));
+                    // rpass.set_vertex_buffer(1, translation_buffer.slice(..));
+                    rpass.set_vertex_buffer(1, u_info_buffer.slice(..));
 
                     rpass.draw_indexed(0..6, 0, 0..1 as u32);
                 }

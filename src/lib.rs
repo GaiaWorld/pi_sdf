@@ -34,6 +34,7 @@ static ALLOCATOR: talc::Talck<talc::locking::AssumeUnlockable, talc::ClaimOnOom>
 };
 // use font::FontFace;
 use glyphy::geometry::{aabb::Aabb, arc::Arc};
+use shape::SvgInfo;
 // use pi_share::Share;
 // use serde_json::value::Index;
 use utils::{CellInfo, OutlineInfo, SdfInfo2};

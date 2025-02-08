@@ -1,5 +1,5 @@
 use image::ColorType;
-use pi_sdf::{shape::{Path, PathVerb, SvgInfo}, utils::SdfInfo2};
+use pi_sdf::{shape::{self, Path, PathVerb, SvgInfo}, utils::SdfInfo2};
 // 1 -> 5
 // 2 -> 10
 fn main() {
@@ -58,25 +58,25 @@ fn main() {
     //     ],
     // );
 
-    let mut path = Path::new1(
-        vec![
-            PathVerb::MoveTo, PathVerb::EllipticalArcTo, PathVerb::LineTo, PathVerb::EllipticalArcTo, PathVerb::LineTo, PathVerb::EllipticalArcTo, PathVerb::LineTo, PathVerb::EllipticalArcTo, PathVerb::Close
-            // PathVerb::MoveTo,
-            // PathVerb::LineTo,
-            // PathVerb::EllipticalArcTo,
-            // PathVerb::LineTo,
-            // PathVerb::EllipticalArcTo,
-            // PathVerb::LineTo,
-            // PathVerb::EllipticalArcTo,
-            // PathVerb::LineTo,
-            // PathVerb::EllipticalArcTo,
-        ],
-        vec![
-            0.0, 10.0, 8.0, 8.0, 0.0, 0.0, 8.0, 18.0, 10.0, 18.0, 8.0, 8.0, 0.0, 0.0, 18.0, 10.0, 18.0, 8.0, 8.0, 8.0, 0.0, 0.0, 10.0, 0.0, 8.0, 0.0, 8.0, 8.0, 0.0, 0.0, 0.0, 8.0
-        ],
-    );
+    // let mut path = Path::new1(
+    //     vec![
+    //         PathVerb::MoveTo, PathVerb::EllipticalArcTo, PathVerb::LineTo, PathVerb::EllipticalArcTo, PathVerb::LineTo, PathVerb::EllipticalArcTo, PathVerb::LineTo, PathVerb::EllipticalArcTo, PathVerb::Close
+    //         // PathVerb::MoveTo,
+    //         // PathVerb::LineTo,
+    //         // PathVerb::EllipticalArcTo,
+    //         // PathVerb::LineTo,
+    //         // PathVerb::EllipticalArcTo,
+    //         // PathVerb::LineTo,
+    //         // PathVerb::EllipticalArcTo,
+    //         // PathVerb::LineTo,
+    //         // PathVerb::EllipticalArcTo,
+    //     ],
+    //     vec![
+    //         0.0, 10.0, 8.0, 8.0, 0.0, 0.0, 8.0, 18.0, 10.0, 18.0, 8.0, 8.0, 0.0, 0.0, 18.0, 10.0, 18.0, 8.0, 8.0, 8.0, 0.0, 0.0, 10.0, 0.0, 8.0, 0.0, 8.0, 8.0, 0.0, 0.0, 0.0, 8.0
+    //     ],
+    // );
 
-    let info = path.get_svg_info();
+    // let info = path.get_svg_info();
 
     // let point = [
     //     100.0, 100.0, f32::INFINITY,
@@ -92,9 +92,16 @@ fn main() {
     // let binding_box = [85.0, 68.0, 117.0, 100.0];
     // let info = SvgInfo::new(&binding_box, point.to_vec(), true, None);
 
+    let rect = shape::Segment::new(10., 400.0, 250.0, 400.0, Some([20.0,10.0]));
+    let info = rect.get_svg_info();
+
+    let bbox = &info.binding_box;
+    let pxrange = 5;
+    let cur_off = 2;
+    let sdf_tex_size = (bbox[2] - bbox[0]).max(bbox[3] - bbox[1]) * 0.5;
     
-    let sdf = SvgInfo::compute_sdf_tex_of_wasm(&bitcode::serialize(&info).unwrap(),32, 1, false, 2, 1.0);
-    let sdf :SdfInfo2 = bitcode::deserialize(&sdf) .unwrap();
+    let sdf = SvgInfo::compute_sdf_tex(&info,sdf_tex_size as usize, pxrange as u32, false, cur_off as u32, 1.0);
+    // let sdf :SdfInfo2 = bitcode::deserialize(&sdf) .unwrap();
     log::debug!("sdf.sdf_tex: {}", sdf.sdf_tex[38 * 3 + 3]);
     let _ = image::save_buffer(
         "Rounded_rectangle.png",

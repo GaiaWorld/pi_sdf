@@ -240,6 +240,7 @@ pub fn glyphy_sdf_from_arc_list3(arcs: &Vec<usize>, p: Point, global_arcs: &Vec<
 
             /* TODO This distance has the wrong sign.  Fix */
             let sdist = arc.distance_to_point(c);
+            // println!("sdist: {}", sdist);
 
             let udist = sdist.abs() * (1.0 - GLYPHY_EPSILON);
 

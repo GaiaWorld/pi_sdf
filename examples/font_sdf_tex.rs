@@ -7,7 +7,15 @@ use tracing::Level;
 use tracing_subscriber::fmt::Subscriber;
 
 // use nalgebra::Vector3;
-use pi_sdf::{blur::gaussian_blur, font::FontFace, glyphy::{blob::TexData, geometry::{aabb::Aabb, arc::Arc as SdfArc}}, utils::{create_indices, CellInfo}};
+use pi_sdf::{
+    blur::gaussian_blur,
+    font::FontFace,
+    glyphy::{
+        blob::TexData,
+        geometry::{aabb::Aabb, arc::Arc as SdfArc},
+    },
+    utils::{create_indices, CellInfo},
+};
 use pi_wgpu::{self as wgpu, Surface};
 use wgpu::{util::DeviceExt, BlendState, ColorTargetState};
 use winit::{
@@ -23,10 +31,11 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
 
     let window_size = window.inner_size();
     let instance = wgpu::Instance::default();
-    // let instance = wgpu::Instance::new(InstanceDescriptor {
-    //     backends: Backend::Gl.into(),
-    //     dx12_shader_compiler: Dx12Compiler::default(),
-    // });
+    let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+        backends: wgpu::Backend::Gl.into(),
+        dx12_shader_compiler: wgpu::Dx12Compiler::default(),
+        ..Default::default()
+    });
 
     let surface = instance.create_surface(window.as_ref()).unwrap();
     let surface: Surface<'static> = unsafe { transmute(surface) };
@@ -52,7 +61,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
                     .using_resolution(adapter.limits()),
             },
             None,
-            &mut allocator
+            // &mut allocator,
         )
         .await
         .expect("Failed to create device");
@@ -61,6 +70,14 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         label: None,
         source: wgpu::ShaderSource::Glsl {
             shader: include_str!("../source/sdf.vs").into(),
+            stage: naga::ShaderStage::Vertex,
+            defines: Default::default(),
+        },
+    });
+    let vs2 = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        label: None,
+        source: wgpu::ShaderSource::Glsl {
+            shader: include_str!("../source/sdf1.vs").into(),
             stage: naga::ShaderStage::Vertex,
             defines: Default::default(),
         },
@@ -76,16 +93,23 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         },
     });
 
+    let fs2 = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        label: None,
+        source: wgpu::ShaderSource::Glsl {
+            shader: include_str!("../source/sdf1.fs").into(),
+            stage: naga::ShaderStage::Fragment,
+            defines: Default::default(),
+        },
+    });
+
     // let buffer = std::fs::read("./source/SOURCEHANSANSK-MEDIUM.TTF").unwrap();
     let buffer = std::fs::read("./source/msyh.ttf").unwrap();
     let mut ft_face = FontFace::new(Arc::new(buffer));
-    
-    
+
     println!("max_box_normaliz: {:?}", ft_face.max_box_normaliz());
     let pxrange = 10;
     let time = std::time::Instant::now();
     let mut outline_info = ft_face.to_outline('魔');
-
 
     // println!("===================plane_bounds: {:?}", plane_bounds);
     let result_arcs = outline_info.compute_near_arcs(2.0);
@@ -102,7 +126,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     // // let r = bincode::serialize(&result_arcs).unwrap();
     // let r = bitcode::serialize(&result_arcs).unwrap();
     // println!("time2: {:?}", (time2.elapsed(), r.len()));
-   
+
     // let time2 = std::time::Instant::now();
     // // let arcs: CellInfo  = bincode::deserialize(&r).unwrap();
     // let arcs: CellInfo  = bitcode::deserialize(&r).unwrap();
@@ -117,26 +141,43 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     println!("time4: {:?}", time.elapsed());
     println!("glpyh_info: {:?}", glpyh_info.tex_info);
     let tex_size = glpyh_info.tex_size;
-    let _ = image::save_buffer("image.png", &glpyh_info.sdf_tex, tex_size as u32, tex_size as u32, ColorType::L8);
+    let _ = image::save_buffer(
+        "image.png",
+        &glpyh_info.sdf_tex,
+        tex_size as u32,
+        tex_size as u32,
+        ColorType::L8,
+    );
 
     // let time4 = std::time::Instant::now();
-    let gaussian_blur = gaussian_blur(glpyh_info.sdf_tex.clone(), tex_size as u32, tex_size as u32, range, weight);
+    let gaussian_blur = gaussian_blur(
+        glpyh_info.sdf_tex.clone(),
+        tex_size as u32,
+        tex_size as u32,
+        range,
+        weight,
+    );
     // println!("time4: {:?}", time4.elapsed());
-    let _ = image::save_buffer("gaussian_blur.png", &gaussian_blur, tex_size as u32, tex_size as u32, ColorType::L8);
+    let _ = image::save_buffer(
+        "gaussian_blur.png",
+        &gaussian_blur,
+        tex_size as u32,
+        tex_size as u32,
+        ColorType::L8,
+    );
     // let buffer = include_bytes!("../source/sdf.png").to_vec();
     // let image_buf = image::load_from_memory(&buffer).unwrap();
     // let tex_size: u32 = image_buf.width();
     // let pixmap = image_buf.into_bytes();
 
-
     let font_size = 64.0f32;
     let translation = vec![font_size, font_size, 10.0, 10.0];
 
     let vertexs = [
-        0.0f32, 0.0, 0.0, 0.0, 
-        0.0, 1.0, 0.0, 1.0, 
-        1.0, 0.0, 1.0, 0.0, 
-        1.0, 1.0, 1.0, 1.0,
+        0.0f32, 0.0, 0.0, 0.0,
+         0.0, 1.0, 0.0, 1.0, 
+         1.0, 0.0, 1.0, 0.0, 
+         1.0, 1.0, 1.0, 1.0,
     ]; // 获取网格数据
     println!("vertexs: {:?}", vertexs);
 
@@ -250,8 +291,8 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
 
     let sdf_tex_sampler = device.create_sampler(&&wgpu::SamplerDescriptor {
         label: None,
-        min_filter: wgpu::FilterMode::Linear,
-        mag_filter: wgpu::FilterMode::Linear,
+        // min_filter: wgpu::FilterMode::Linear,
+        // mag_filter: wgpu::FilterMode::Linear,
         // mipmap_filter: wgpu::FilterMode::Linear,
         ..Default::default()
     });
@@ -321,7 +362,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     });
 
     let swapchain_capabilities = surface.get_capabilities(&adapter);
-    let swapchain_format = swapchain_capabilities.formats[1];
+    let swapchain_format = swapchain_capabilities.formats[3];
     println!("swapchain_format: {:?}", swapchain_capabilities.formats);
     // 创建网格数据
     let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -387,6 +428,44 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         multiview: None,
     });
 
+    let render_pipeline2 = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        label: None,
+        layout: Some(&pipeline_layout),
+        vertex: wgpu::VertexState {
+            module: &vs2,
+            entry_point: "main",
+            buffers: &[
+                wgpu::VertexBufferLayout {
+                    array_stride: std::mem::size_of::<[f32; 4]>() as wgpu::BufferAddress,
+                    step_mode: wgpu::VertexStepMode::Vertex,
+                    attributes: &[wgpu::VertexAttribute {
+                        format: wgpu::VertexFormat::Float32x4,
+                        offset: 0,
+                        shader_location: 0,
+                    }],
+                },
+                wgpu::VertexBufferLayout {
+                    array_stride: std::mem::size_of::<[f32; 4]>() as wgpu::BufferAddress,
+                    step_mode: wgpu::VertexStepMode::Instance,
+                    attributes: &[wgpu::VertexAttribute {
+                        format: wgpu::VertexFormat::Float32x4,
+                        offset: 0,
+                        shader_location: 1,
+                    }],
+                },
+            ],
+        },
+        fragment: Some(wgpu::FragmentState {
+            module: &fs2,
+            entry_point: "main",
+            targets: &[Some(ColorTargetState::from(wgpu::TextureFormat::R8Unorm))],
+        }),
+        primitive,
+        depth_stencil: None,
+        multisample: wgpu::MultisampleState::default(),
+        multiview: None,
+    });
+
     // println!("render_pipeline: {:?}", render_pipeline);
 
     let mut config = wgpu::SurfaceConfiguration {
@@ -401,6 +480,23 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     };
 
     surface.configure(&device, &config);
+
+    let texture_extent = wgpu::Extent3d {
+        width: 2048,
+        height: 2048,
+        depth_or_array_layers: 1,
+    };
+    let fbo = device.create_texture(&wgpu::TextureDescriptor {
+        label: Some("FBO"),
+        size: texture_extent,
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: wgpu::TextureFormat::R8Unorm,
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+        view_formats: &[],
+    });
+    let mut is_first = true;
 
     event_loop.run(move |event, _, control_flow| {
         // Have the closure take ownership of the resources.
@@ -426,14 +522,50 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
                 window.request_redraw();
             }
             Event::RedrawRequested(_) => {
+                let mut encoder =
+                    device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+
+                // if is_first {
+                //     is_first = false;
+                    let fbo_view = fbo.create_view(&wgpu::TextureViewDescriptor::default());
+                    {
+                        let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                            label: None,
+                            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                                view: &fbo_view,
+                                resolve_target: None,
+                                ops: wgpu::Operations {
+                                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+                                    store: wgpu::StoreOp::Store,
+                                },
+                            })],
+                            depth_stencil_attachment: None,
+                            timestamp_writes: None,
+                            occlusion_query_set: None,
+                        });
+                        // rpass.push_debug_group("Prepare data for draw.");
+                        rpass.set_pipeline(&render_pipeline2);
+                        rpass.set_viewport(128., 128., 512., 512., 0., 1.);
+                        rpass.set_bind_group(0, &bind_group0, &[]);
+                        rpass.set_bind_group(1, &bind_group1, &[]);
+                        // rpass.set_bind_group(2, &bind_group2, &[]);
+
+                        rpass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint16);
+                        rpass.set_vertex_buffer(0, vertex_buffer.slice(..));
+                        rpass.set_vertex_buffer(1, translation_buffer.slice(..));
+                        // rpass.set_vertex_buffer(2, u_info_buffer.slice(..));
+
+                        rpass.draw_indexed(0..6, 0, 0..1 as u32);
+                    }
+                // }
+
                 let frame = surface
                     .get_current_texture()
                     .expect("Failed to acquire next swap chain texture");
                 let view = frame
                     .texture
                     .create_view(&wgpu::TextureViewDescriptor::default());
-                let mut encoder =
-                    device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+
                 {
                     let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                         label: None,
@@ -487,7 +619,7 @@ fn main() {
     // let window = winit::window::Window::new(&event_loop).unwrap();
     #[cfg(not(target_arch = "wasm32"))]
     {
-        env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("debug")).init();
+        env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
         pollster::block_on(run(event_loop, window));
     }
     #[cfg(target_arch = "wasm32")]
