@@ -55,7 +55,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         )
         .await
         .expect("Failed to create device");
-
+    println!("features: {:?}", adapter.features());
     let vs = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: None,
         source: wgpu::ShaderSource::Glsl {
