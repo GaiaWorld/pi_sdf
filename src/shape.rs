@@ -17,6 +17,7 @@ use crate::glyphy::geometry::arc::{Arc, ID};
 use crate::glyphy::geometry::segment::{PPoint, PSegment};
 use crate::glyphy::util::GLYPHY_INFINITY;
 use crate::utils::{compute_cell_range, CellInfo, LayoutInfo, OutlineSinkExt, SdfInfo2, TexInfo2};
+use crate::Vector2;
 use crate::{
     glyphy::geometry::aabb::Aabb,
     utils::{compute_layout, Attribute},
@@ -162,6 +163,10 @@ impl Circle {
 
     pub fn get_svg_info(&self) -> SvgInfo {
         let binding_box = self.binding_box();
+        let size = (binding_box.maxs.x - binding_box.mins.x)
+            .max(binding_box.maxs.y - binding_box.mins.y)
+            .ceil();
+        let tex_size = if size < 64.0 { 32.0 } else { size * 0.5 };
         SvgInfo {
             binding_box: vec![
                 binding_box.mins.x,
@@ -172,6 +177,8 @@ impl Circle {
             arc_endpoints: self.get_arc_endpoints(),
             is_area: self.is_area(),
             is_reverse: None,
+            hash: self.get_hash(),
+            tex_size
         }
     }
 
@@ -181,6 +188,8 @@ impl Circle {
             buf: bitcode::serialize(&info).unwrap(),
             binding_box: info.binding_box,
             is_area: info.is_area,
+            hash: info.hash.to_string(),
+            tex_size: info.tex_size,
         }
     }
 
@@ -264,6 +273,10 @@ impl Rect {
 
     pub fn get_svg_info(&self) -> SvgInfo {
         let binding_box = self.binding_box();
+        let size = (binding_box.maxs.x - binding_box.mins.x)
+            .max(binding_box.maxs.y - binding_box.mins.y)
+            .ceil();
+        let tex_size = if size < 64.0 { 32.0 } else { size * 0.5 };
         SvgInfo {
             binding_box: vec![
                 binding_box.mins.x,
@@ -274,6 +287,8 @@ impl Rect {
             arc_endpoints: self.get_arc_endpoints(),
             is_area: self.is_area(),
             is_reverse: None,
+            hash: self.get_hash(),
+            tex_size
         }
     }
 
@@ -283,6 +298,8 @@ impl Rect {
             buf: bitcode::serialize(&info).unwrap(),
             binding_box: info.binding_box,
             is_area: info.is_area,
+            hash: info.hash.to_string(),
+            tex_size: info.tex_size,
         }
     }
 
@@ -405,6 +422,10 @@ impl Segment {
 
     pub fn get_svg_info(&self) -> SvgInfo {
         let binding_box = self.binding_box();
+        let size = (binding_box.maxs.x - binding_box.mins.x)
+            .max(binding_box.maxs.y - binding_box.mins.y)
+            .ceil();
+        let tex_size = if size < 64.0 { 32.0 } else { size * 0.5 };
         SvgInfo {
             binding_box: vec![
                 binding_box.mins.x,
@@ -415,6 +436,8 @@ impl Segment {
             arc_endpoints: self.get_arc_endpoints(),
             is_area: self.is_area(),
             is_reverse: None,
+            hash: self.get_hash(),
+            tex_size
         }
     }
 
@@ -424,6 +447,8 @@ impl Segment {
             buf: bitcode::serialize(&info).unwrap(),
             binding_box: info.binding_box,
             is_area: info.is_area,
+            hash: info.hash.to_string(),
+            tex_size: info.tex_size,
         }
     }
 
@@ -518,20 +543,25 @@ impl Ellipse {
     pub fn get_hash(&self) -> u64 {
         let mut hasher = pi_hash::DefaultHasher::default();
         hasher.write(bytemuck::cast_slice(&[
-            self.rx, self.ry, self.cx, self.cy, 4.0,
+            self.rx / self.ry, 4.0,
         ]));
         hasher.finish()
     }
 
     fn binding_box(&self) -> Aabb {
         Aabb::new(
-            Point::new(self.cx - self.rx, self.cy - self.rx),
-            Point::new(self.cx + self.rx, self.cy + self.rx),
+            Point::new(self.cx - self.rx, self.cy - self.ry),
+            Point::new(self.cx + self.rx, self.cy + self.ry),
         )
     }
 
     pub fn get_svg_info(&self) -> SvgInfo {
         let binding_box = self.binding_box();
+        let size = (binding_box.maxs.x - binding_box.mins.x)
+            .max(binding_box.maxs.y - binding_box.mins.y)
+            .ceil();
+        let tex_size = if size < 64.0 { 32.0 } else { size * 0.5 };
+
         SvgInfo {
             binding_box: vec![
                 binding_box.mins.x,
@@ -542,6 +572,8 @@ impl Ellipse {
             arc_endpoints: self.get_arc_endpoints(),
             is_area: self.is_area(),
             is_reverse: None,
+            hash: self.get_hash(),
+            tex_size
         }
     }
 
@@ -551,6 +583,8 @@ impl Ellipse {
             buf: bitcode::serialize(&info).unwrap(),
             binding_box: info.binding_box,
             is_area: info.is_area,
+            hash: info.hash.to_string(),
+            tex_size: info.tex_size,
         }
     }
 
@@ -640,6 +674,11 @@ impl Polygon {
 
     pub fn get_svg_info(&self) -> SvgInfo {
         let binding_box = self.binding_box();
+        let size = (binding_box.maxs.x - binding_box.mins.x)
+            .max(binding_box.maxs.y - binding_box.mins.y)
+            .ceil();
+        let tex_size = if size < 64.0 { 32.0 } else { size * 0.5 };
+
         SvgInfo {
             binding_box: vec![
                 binding_box.mins.x,
@@ -650,6 +689,8 @@ impl Polygon {
             arc_endpoints: self.get_arc_endpoints(),
             is_area: self.is_area(),
             is_reverse: None,
+            hash: self.get_hash(),
+            tex_size
         }
     }
 
@@ -659,6 +700,8 @@ impl Polygon {
             buf: bitcode::serialize(&info).unwrap(),
             binding_box: info.binding_box,
             is_area: info.is_area,
+            hash: info.hash.to_string(),
+            tex_size: info.tex_size,
         }
     }
 
@@ -728,13 +771,13 @@ impl Polyline {
             result.push(ArcEndpoint::new(p.x, p.y, 0.0));
         }
 
-        if !is_close {
-            let mut points = self.points.iter().rev();
-            let _ = points.next();
-            for p in points {
-                result.push(ArcEndpoint::new(p.x, p.y, 0.0));
-            }
-        }
+        // if !is_close {
+        //     let mut points = self.points.iter().rev();
+        //     let _ = points.next();
+        //     for p in points {
+        //         result.push(ArcEndpoint::new(p.x, p.y, 0.0));
+        //     }
+        // }
 
         result
     }
@@ -769,6 +812,11 @@ impl Polyline {
 
     pub fn get_svg_info(&self) -> SvgInfo {
         let binding_box = self.binding_box();
+        let size = (binding_box.maxs.x - binding_box.mins.x)
+        .max(binding_box.maxs.y - binding_box.mins.y)
+        .ceil();
+        let tex_size = if size < 64.0 { 32.0 } else { size * 0.5 };
+
         SvgInfo {
             binding_box: vec![
                 binding_box.mins.x,
@@ -779,6 +827,8 @@ impl Polyline {
             arc_endpoints: self.get_arc_endpoints(),
             is_area: self.is_area(),
             is_reverse: None,
+            hash: self.get_hash(),
+            tex_size
         }
     }
 
@@ -788,6 +838,8 @@ impl Polyline {
             buf: bitcode::serialize(&info).unwrap(),
             binding_box: info.binding_box,
             is_area: info.is_area,
+            hash: info.hash.to_string(),
+            tex_size: info.tex_size,
         }
     }
 
@@ -971,6 +1023,11 @@ impl Path {
 
     pub fn get_svg_info(&self) -> SvgInfo {
         let (arc_endpoints, binding_box, arcs) = self.get_arc_endpoints();
+        let size = (binding_box.maxs.x - binding_box.mins.x)
+                .max(binding_box.maxs.y - binding_box.mins.y)
+                .ceil();
+        let tex_size = if size < 64.0 { 32.0 } else { size * 0.5 };
+
         SvgInfo {
             binding_box: vec![
                 binding_box.mins.x,
@@ -985,6 +1042,8 @@ impl Path {
             } else {
                 None
             },
+            hash: self.get_hash(),
+            tex_size
         }
     }
 
@@ -994,6 +1053,8 @@ impl Path {
             buf: bitcode::serialize(&info).unwrap(),
             binding_box: info.binding_box,
             is_area: info.is_area,
+            hash: info.hash.to_string(),
+            tex_size: info.tex_size,
         }
     }
 
@@ -1014,15 +1075,19 @@ pub struct WasmSvgInfo {
     pub buf: Vec<u8>,
     pub binding_box: Vec<f32>,
     pub is_area: bool,
+    pub hash: String,
+    pub tex_size: f32,
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct SvgInfo {
     pub binding_box: Vec<f32>,
     arc_endpoints: Vec<ArcEndpoint>,
     pub is_area: bool,
     is_reverse: Option<bool>,
+    pub hash: u64,
+    pub tex_size: f32,
 }
 
 impl SvgInfo {
@@ -1033,6 +1098,9 @@ impl SvgInfo {
         is_reverse: Option<bool>,
     ) -> SvgInfo {
         assert_eq!(arc_endpoints.len() % 3, 0);
+        let mut hasher = pi_hash::DefaultHasher::default();
+        hasher.write(bytemuck::cast_slice(&arc_endpoints));
+        let hash = hasher.finish();
         let mut arc_endpoints2 = Vec::with_capacity(arc_endpoints.len() / 3);
         arc_endpoints
             .chunks(3)
@@ -1042,6 +1110,8 @@ impl SvgInfo {
             arc_endpoints: arc_endpoints2,
             is_area,
             is_reverse,
+            hash,
+            tex_size: 0.0
         }
     }
 
@@ -1127,6 +1197,93 @@ impl SvgInfo {
         let blob = cell.encode_blob_arc();
         blob.encode_tex()
     }
+
+    pub fn compute_positions_and_uv(&self, ps: &[f32], uv: &[f32], half_extend: f32, out_ps: &mut Vec<f32>, out_uv: &mut Vec<f32>, out_indices: &mut Vec<u16>){
+        let mut p0 = Point::new(0., 0.);
+        let ps_w = ps[2] - ps[0];
+        let ps_h = ps[3] - ps[1];
+        let uv_w = uv[2] - uv[0];
+        let uv_h = uv[3] - uv[1];
+
+        if self.is_area {
+            return ;
+        }
+        println!("========= self:{:?}", self.arc_endpoints);
+        for i in 0..self.arc_endpoints.len() {
+            let endpoint = &self.arc_endpoints[i];
+            if endpoint.d == GLYPHY_INFINITY {
+                p0 = Point::new(endpoint.p[0], endpoint.p[1]);
+                continue;
+            }
+            let half_extend_2 = half_extend * 2.0;
+            let p1 = Point::new(endpoint.p[0], endpoint.p[1]);
+            let obb = if float_equals(endpoint.d, 0.0, None){
+                calculate_obb(p0, p1, half_extend_2)
+            } else {
+                let arc = Arc::new(p0, p1, endpoint.d);
+                [
+                    Point::new(arc.aabb.mins.x - half_extend_2, arc.aabb.mins.y - half_extend_2),
+                    Point::new(arc.aabb.mins.x - half_extend_2, arc.aabb.maxs.y + half_extend_2),
+                    Point::new(arc.aabb.maxs.x + half_extend_2, arc.aabb.maxs.y + half_extend_2),
+                    Point::new(arc.aabb.maxs.x + half_extend_2, arc.aabb.mins.y - half_extend_2),
+                ]
+            };
+            
+            
+            let start = (out_ps.len() / 2) as u16; 
+
+            let p0_x = obb[0].x;
+            let uv0_x = (p0_x - ps[0]) / ps_w * uv_w + uv[0];
+            out_ps.push(p0_x);
+            out_uv.push(uv0_x);
+
+            let p0_y = obb[0].y;
+            let uv0_y = (p0_y - ps[1]) / ps_h * uv_h + uv[1];
+            out_ps.push(p0_y);
+            out_uv.push(uv0_y);
+
+            let p1_x = obb[1].x;
+            let uv1_x = (p1_x - ps[0]) / ps_w * uv_w + uv[0];
+            out_ps.push(p1_x);
+            out_uv.push(uv1_x);
+
+            let p1_y =  obb[1].y;
+            let uv1_y = (p1_y - ps[1]) / ps_h * uv_h + uv[1];
+            out_ps.push(p1_y);
+            out_uv.push(uv1_y);
+
+            let p2_x = obb[2].x;
+            let uv2_x = (p2_x - ps[0]) / ps_w * uv_w + uv[0];
+            out_ps.push(p2_x);
+            out_uv.push(uv2_x);
+
+            let p2_y= obb[2].y;
+            let uv2_y = (p2_y - ps[1]) / ps_h * uv_h + uv[1];
+            out_ps.push(p2_y);
+            out_uv.push(uv2_y);
+
+            let p3_x = obb[3].x;
+            let uv3_x = (p3_x - ps[0]) / ps_w * uv_w + uv[0];
+            out_ps.push(p3_x);
+            out_uv.push(uv3_x);
+
+            let p3_y =  obb[3].y;
+            let uv3_y = (p3_y - ps[1]) / ps_h * uv_h + uv[1];
+            out_ps.push(p3_y);
+            out_uv.push(uv3_y);
+            if (p0_x - 0.0).abs() < 0.001{
+                println!("======== p0:{:?}, p1:{:?}, obb: {:?}", p0, p1, obb);
+            }
+            p0 = Point::new(endpoint.p[0], endpoint.p[1]);
+            out_indices.push(start);
+            out_indices.push(start + 2);
+            out_indices.push(start + 1);
+            out_indices.push(start);
+            out_indices.push(start + 3);
+            out_indices.push(start + 2);
+        }
+    }
+
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
@@ -1142,7 +1299,9 @@ impl SvgInfo {
         WasmSvgInfo {
             buf,
             binding_box: info.binding_box,
-            is_area: info.is_area
+            is_area: info.is_area,
+            hash: info.hash.to_string(),
+            tex_size: info.tex_size,
         }
     }
 
@@ -1192,8 +1351,23 @@ impl SvgInfo {
         let blob = cell.encode_blob_arc();
         bitcode::serialize(&blob.encode_tex()).unwrap()
     }
+
+    pub fn compute_positions_and_uv_of_wasm(info: &[u8],  ps: &[f32], uv: &[f32], half_extend: f32, ) -> PosInfo{
+        let info: SvgInfo = bitcode::deserialize(info).unwrap();
+        let mut info2 = PosInfo::default();
+        info.compute_positions_and_uv(ps, uv, half_extend, &mut info2.out_ps, &mut info2.out_uv, &mut info2.out_indices);
+        info2
+    }
 }
 
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
+#[derive(Debug, Default)]
+pub struct PosInfo{
+    pub out_ps: Vec<f32>, 
+    pub out_uv: Vec<f32>, 
+    pub out_indices: Vec<u16>
+}
 pub struct SvgScenes {
     shapes: HashMap<u64, (SvgInfo, Attribute)>,
     view_box: Aabb,
@@ -1472,29 +1646,71 @@ pub fn compute_near_arcs(view_box: Aabb, endpoints: &Vec<ArcEndpoint>, scale: f3
     }
 }
 
+// 计算线段的 OBB
+fn calculate_obb(p1: Point, p2: Point, width: f32) -> [Point; 4] {
+    // 计算线段中心点
+    let center = Point::new((p1.x + p2.x) / 2.0, (p1.y + p2.y) / 2.0);
+
+    // 计算线段方向向量
+    let direction = p2 - p1;
+    let length = (direction.x * direction.x + direction.y * direction.y).sqrt();
+    let normalized_direction = direction.scale(1.0 / length);
+
+    // 计算 OBB 的高度（沿线段方向）和宽度（垂直于线段方向）
+    let half_length = (length + 0.4) / 2.0;
+    let half_width = width / 2.0;
+
+    // 计算 OBB 的四个顶点
+    let obb_axis1 = normalized_direction.scale(half_length); // 沿线段方向的轴
+    let obb_axis2 = Vector2::new(-normalized_direction.y, normalized_direction.x).scale(half_width); // 垂直于线段方向的轴
+
+    let p1 = center + obb_axis1 + obb_axis2;
+    let p2 = center + obb_axis1 - obb_axis2;
+    let p3 = center - obb_axis1 - obb_axis2;
+    let p4 = center - obb_axis1 + obb_axis2;
+
+    [p1, p2, p3, p4]
+}
+
 #[test]
 fn test() {
-    let p1 = (0.0f32, 10.0f32);
-    let p2 = (10.0f32, 0.0f32);
-    let r = 10.0f32;
-    let d = ((p2.0 - p1.0).powi(2) + (p2.1 - p1.1).powi(2)).sqrt();
-    let mut theta = 2.0 * (d / (2.0 * r)).asin();
+    // let p1 = (0.0f32, 10.0f32);
+    // let p2 = (10.0f32, 0.0f32);
+    // let r = 10.0f32;
+    // let d = ((p2.0 - p1.0).powi(2) + (p2.1 - p1.1).powi(2)).sqrt();
+    // let mut theta = 2.0 * (d / (2.0 * r)).asin();
 
-    // large_arc 决定弧线是大于还是小于 180 度，0 表示小角度弧，1 表示大角度弧。
-    // sweep 表示弧线的方向，0 表示从起点到终点沿逆时针画弧，1 表示从起点到终点沿顺时针画弧。
+    // // large_arc 决定弧线是大于还是小于 180 度，0 表示小角度弧，1 表示大角度弧。
+    // // sweep 表示弧线的方向，0 表示从起点到终点沿逆时针画弧，1 表示从起点到终点沿顺时针画弧。
 
-    let large_arc = false;
-    let sweet = true;
-    if large_arc != (theta > PI) {
-        theta = TAU - theta;
+    // let large_arc = false;
+    // let sweet = true;
+    // if large_arc != (theta > PI) {
+    //     theta = TAU - theta;
+    // }
+
+    // if sweet {
+    //     theta = -theta;
+    // }
+
+    // // 将弧度转换为角度
+    // let theta_degrees = theta * 180.0 / PI;
+    // log::debug!("圆心角（弧度）：{}", theta);
+    // log::debug!("圆心角（度）：{}", theta_degrees);
+
+    let p2 = Point::new(0.0, 0.0);
+    let p1 = Point::new(4.0, 0.0);
+    let width = 2.0;
+    let r = vec![[1,2,3]; 4];
+
+    let obb = calculate_obb(p1, p2, width);
+
+    println!("OBB vertices:");
+    for point in obb.iter() {
+        println!("({}, {})", point.x, point.y);
     }
-
-    if sweet {
-        theta = -theta;
-    }
-
-    // 将弧度转换为角度
-    let theta_degrees = theta * 180.0 / PI;
-    log::debug!("圆心角（弧度）：{}", theta);
-    log::debug!("圆心角（度）：{}", theta_degrees);
+    let a =Arc::new(Point::new(99.66642, 155.80313), Point::new(104.87043, 152.61417), 0.015748031);
+    println!("============ a: {:?}", a);
 }
+
+

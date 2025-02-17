@@ -645,9 +645,11 @@ impl Arc {
      */
     pub fn extents_call(p0: &Point, p1: &Point, d: f32, radius: f32, c: &Point, tangents: &((f32, f32), (f32, f32)), e: &mut Aabb) {
         e.clear();
+        // println!("===============1e: {:?}", (&e, &radius, &c));
         e.add(*p0);
+        // println!("===============2e: {:?}", (&e, p0));
         e.add(*p1);
-
+        // println!("===============3e: {:?}", (&e, p1));
         let r = radius;
         let p = [
             Point::new(-r + c.x, 0. + c.y),
@@ -656,11 +658,12 @@ impl Arc {
             Point::new(0. + c.x,  r + c.y),
         ];
 
-        for i in 0..4 {
-            if Self::wedge_contains_point_call(d, p0, p1, &p[i], tangents) {
-                e.add(p[i]);
-            }
-        }
+        // for i in 0..4 {
+        //     if Self::wedge_contains_point_call(d, p0, p1, &p[i], tangents) {
+        //         e.add(p[i]);
+        //         println!("==============={}e: {:?}",i+4, (&e, p[i], tangents));
+        //     }
+        // }
     }
     pub fn extents(&self, e: &mut Aabb) {
         e.clear();

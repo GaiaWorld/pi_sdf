@@ -25,15 +25,16 @@
     <!-- 多边形 -->
     <!-- <polygon points="270,110 350,170 320,220 220,210 200,160" style="fill:lime;stroke:purple;stroke-width:1" /> -->
     <!-- 多段线 -->
-    <!-- <polyline points="20,220 40,225 60,240 80,320 120,340 180,320" style="fill:none;stroke:black;stroke-width:3" /> -->
+    <polyline points="20,220 40,225 60,240 80,320 120,340 180,320" style="fill:red;stroke:black;stroke-width:3" />
     <!-- 路径 -->
     <!-- <path d="M 210 30 C 210 250 25 190 110 150" stroke="blue" stroke-width="2" fill="none" /> -->
     <!-- 虚线 -->
     <!-- <path d="M10 400 l215 0" style="fill:none;stroke:black;stroke-width:3;stroke-dasharray:20,10" /> -->
-    <!-- <path d="M 10 315
+    <path d="M 10 315
            L 110 215
            A 30 50 0 0 1 162.55 162.45
            L 172.55 152.45
            A 30 50 -45 0 1 215.1 109.9
-           L 315 10" stroke="black" fill="green" stroke-width="2" fill-opacity="0.5" /> -->
+           L 315 10
+           Z" stroke="black" fill="green" stroke-width="2" fill-opacity="0.5" />
 </svg>
