@@ -23,6 +23,7 @@ pub trait SegmentEXT {
     fn nearest_points_on_line_segments(&self, othera: &Point, otherb: &Point, result: &mut Segment);
     fn norm_squared(&self) -> f32;
     fn norm_scale(&self, scale: f32)->f32;
+    fn generate_line_segment_mesh(&self, thickness: f32) -> Vec<Point>;
 }
 
 impl SegmentEXT for Segment {
@@ -293,6 +294,37 @@ impl SegmentEXT for Segment {
 
     fn norm_scale(&self, _scale: f32) -> f32 {
         (self.a  - self.b ).norm()
+    }
+
+    fn generate_line_segment_mesh(&self, thickness: f32) -> Vec<Point> {
+        let dir = Point::new(
+            self.b.y - self.a.y,
+            -(self.b.x - self.a.x),
+        );
+        let len = (dir.x * dir.x + dir.y * dir.y).sqrt();
+        let offset = Point::new (
+            (dir.x / len) * thickness / 2.0,
+            (dir.y / len) * thickness / 2.0,
+        );
+    
+        let p1 = Point::new(
+            self.a.x + offset.x,
+            self.a.y + offset.y,
+            );
+        let p2 = Point::new(
+            self.a.x - offset.x,
+            self.a.y - offset.y,
+            );
+        let p3 = Point::new(
+            self.b.x + offset.x,
+            self.b.y + offset.y,
+        );
+        let p4 = Point::new(
+            self.b.x - offset.x,
+            self.b.y - offset.y,
+        );
+    
+        vec![p1, p2, p3, p4]
     }
 }
 

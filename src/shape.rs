@@ -253,10 +253,8 @@ impl Rect {
     pub fn get_hash(&self) -> u64 {
         let mut hasher = pi_hash::DefaultHasher::default();
         hasher.write(bytemuck::cast_slice(&[
-            self.x,
-            self.y,
-            self.width,
-            self.height,
+            self.width / self.height,
+            if self.width <= 64.0 { 32.0 } else { 2.0f32.powf(self.width.log2().floor())},
             2.0,
         ]));
         hasher.finish()
@@ -276,7 +274,7 @@ impl Rect {
         let size = (binding_box.maxs.x - binding_box.mins.x)
             .max(binding_box.maxs.y - binding_box.mins.y)
             .ceil();
-        let tex_size = if size < 64.0 { 32.0 } else { size * 0.5 };
+        let tex_size = if size <= 64.0 { 32.0 } else { 2.0f32.powf(size.log2().floor())};
         SvgInfo {
             binding_box: vec![
                 binding_box.mins.x,
@@ -1198,92 +1196,193 @@ impl SvgInfo {
         blob.encode_tex()
     }
 
-    pub fn compute_positions_and_uv(&self, ps: &[f32], uv: &[f32], half_extend: f32, out_ps: &mut Vec<f32>, out_uv: &mut Vec<f32>, out_indices: &mut Vec<u16>){
-        let mut p0 = Point::new(0., 0.);
+    pub fn compute_positions_and_uv(&self, ps: &[f32], uv: &[f32], thickness: f32, out_ps: &mut Vec<f32>, out_uv: &mut Vec<f32>, out_indices: &mut Vec<u16>){
+        if self.is_area {
+            return ;
+        }
+        let thickness = thickness * 2.0;
         let ps_w = ps[2] - ps[0];
         let ps_h = ps[3] - ps[1];
         let uv_w = uv[2] - uv[0];
         let uv_h = uv[3] - uv[1];
 
-        if self.is_area {
-            return ;
-        }
-        println!("========= self:{:?}", self.arc_endpoints);
+        let mut prev = None;
+        let mut curr = None;
+        let mut next = None;
+        let mut p0 = Point::new(0., 0.);
+        let half_thickness = thickness / 2.0;
+        
         for i in 0..self.arc_endpoints.len() {
             let endpoint = &self.arc_endpoints[i];
             if endpoint.d == GLYPHY_INFINITY {
                 p0 = Point::new(endpoint.p[0], endpoint.p[1]);
                 continue;
             }
-            let half_extend_2 = half_extend * 2.0;
             let p1 = Point::new(endpoint.p[0], endpoint.p[1]);
-            let obb = if float_equals(endpoint.d, 0.0, None){
-                calculate_obb(p0, p1, half_extend_2)
-            } else {
-                let arc = Arc::new(p0, p1, endpoint.d);
-                [
-                    Point::new(arc.aabb.mins.x - half_extend_2, arc.aabb.mins.y - half_extend_2),
-                    Point::new(arc.aabb.mins.x - half_extend_2, arc.aabb.maxs.y + half_extend_2),
-                    Point::new(arc.aabb.maxs.x + half_extend_2, arc.aabb.maxs.y + half_extend_2),
-                    Point::new(arc.aabb.maxs.x + half_extend_2, arc.aabb.mins.y - half_extend_2),
-                ]
-            };
-            
-            
-            let start = (out_ps.len() / 2) as u16; 
-
-            let p0_x = obb[0].x;
-            let uv0_x = (p0_x - ps[0]) / ps_w * uv_w + uv[0];
-            out_ps.push(p0_x);
-            out_uv.push(uv0_x);
-
-            let p0_y = obb[0].y;
-            let uv0_y = (p0_y - ps[1]) / ps_h * uv_h + uv[1];
-            out_ps.push(p0_y);
-            out_uv.push(uv0_y);
-
-            let p1_x = obb[1].x;
-            let uv1_x = (p1_x - ps[0]) / ps_w * uv_w + uv[0];
-            out_ps.push(p1_x);
-            out_uv.push(uv1_x);
-
-            let p1_y =  obb[1].y;
-            let uv1_y = (p1_y - ps[1]) / ps_h * uv_h + uv[1];
-            out_ps.push(p1_y);
-            out_uv.push(uv1_y);
-
-            let p2_x = obb[2].x;
-            let uv2_x = (p2_x - ps[0]) / ps_w * uv_w + uv[0];
-            out_ps.push(p2_x);
-            out_uv.push(uv2_x);
-
-            let p2_y= obb[2].y;
-            let uv2_y = (p2_y - ps[1]) / ps_h * uv_h + uv[1];
-            out_ps.push(p2_y);
-            out_uv.push(uv2_y);
-
-            let p3_x = obb[3].x;
-            let uv3_x = (p3_x - ps[0]) / ps_w * uv_w + uv[0];
-            out_ps.push(p3_x);
-            out_uv.push(uv3_x);
-
-            let p3_y =  obb[3].y;
-            let uv3_y = (p3_y - ps[1]) / ps_h * uv_h + uv[1];
-            out_ps.push(p3_y);
-            out_uv.push(uv3_y);
-            if (p0_x - 0.0).abs() < 0.001{
-                println!("======== p0:{:?}, p1:{:?}, obb: {:?}", p0, p1, obb);
+            if curr.is_none(){
+                curr = Some(Arc::new(p0, p1, endpoint.d));
             }
-            p0 = Point::new(endpoint.p[0], endpoint.p[1]);
-            out_indices.push(start);
-            out_indices.push(start + 2);
-            out_indices.push(start + 1);
-            out_indices.push(start);
-            out_indices.push(start + 3);
-            out_indices.push(start + 2);
+            next = self.arc_endpoints.get(i + 1).map(|v| Arc::new(p1, Point::new(v.p[0], v.p[1]), v.d));
+
+             // 计算起点和终点的平均法线
+            let start_normal = calculate_joint_normal(&prev, &curr, &p0);
+            let end_normal = calculate_joint_normal(&curr, &next, &p1);
+
+            let verts = if float_equals(endpoint.d, 0.0, None){
+                // 生成带修正法线的线段
+                let start_offset = [
+                    start_normal[0] * half_thickness,
+                    start_normal[1] * half_thickness,
+                ];
+                let end_offset = [
+                    end_normal[0] * half_thickness,
+                    end_normal[1] * half_thickness,
+                ];
+                
+                vec![
+                    Point::new(p0[0] + start_offset[0], p0[1] + start_offset[1]),
+                    Point::new(p0[0] - start_offset[0], p0[1] - start_offset[1]),
+                    Point::new(p1[0] + end_offset[0], p1[1] + end_offset[1]),
+                    Point::new(p1[0] - end_offset[0], p1[1] - end_offset[1]),
+                ]
+            } else {
+                // 修改后的圆弧生成逻辑（需调整首末顶点）
+                let mut arc_verts = curr.as_ref().unwrap().generate_arc_vertices(thickness);
+
+                // 替换首末顶点的法线方向
+                if !arc_verts.is_empty() {
+                    // 修改第一个顶点对
+                    arc_verts[0] = Point::new(
+                        p0[0] + start_normal[0] * half_thickness,
+                        p0[1] + start_normal[1] * half_thickness,
+                    );
+                    arc_verts[1] =  Point::new(
+                        p0[0] - start_normal[0] * half_thickness,
+                        p0[1] - start_normal[1] * half_thickness,
+                    );
+                    
+                    // 修改最后一个顶点对
+                    let last = arc_verts.len() - 1;
+                    arc_verts[last - 1] =  Point::new(
+                        p1[0] + end_normal[0] * half_thickness,
+                        p1[1] + end_normal[1] * half_thickness,
+                    );
+                    arc_verts[last] =  Point::new(
+                        p1[0] - end_normal[0] * half_thickness,
+                        p1[1] - end_normal[1] * half_thickness,
+                    );
+                }
+                arc_verts
+            };
+            println!("========= verts: {:?}, arc: {:?}", verts, curr);
+            let s = 0.0;
+            for i in 0..verts.len() / 4{
+                let start = (out_ps.len() / 2) as u16; 
+
+                let p0_x = verts[i].x;
+                let uv0_x = (p0_x - ps[0]) / ps_w * uv_w + uv[0] - uv[0] * s ;
+                out_ps.push(p0_x);
+                out_uv.push(uv0_x);
+    
+                let p0_y = verts[i].y;
+                let uv0_y = (p0_y - ps[1]) / ps_h * uv_h + uv[1];
+                out_ps.push(p0_y);
+                out_uv.push(uv0_y);
+    
+                let p1_x = verts[i+1].x;
+                let uv1_x = (p1_x - ps[0]) / ps_w * uv_w + uv[0] - uv[0] * s ;
+                out_ps.push(p1_x);
+                out_uv.push(uv1_x);
+    
+                let p1_y =  verts[i+1].y;
+                let uv1_y = (p1_y - ps[1]) / ps_h * uv_h + uv[1];
+                out_ps.push(p1_y);
+                out_uv.push(uv1_y);
+    
+                let p2_x = verts[i+2].x;
+                let uv2_x = (p2_x - ps[0]) / ps_w * uv_w + uv[0] - uv[0] * s ;
+                out_ps.push(p2_x);
+                out_uv.push(uv2_x);
+    
+                let p2_y= verts[i+2].y;
+                let uv2_y = (p2_y - ps[1]) / ps_h * uv_h + uv[1];
+                out_ps.push(p2_y);
+                out_uv.push(uv2_y);
+    
+                let p3_x = verts[i+3].x;
+                let uv3_x = (p3_x - ps[0]) / ps_w * uv_w + uv[0] - uv[0] * s ;
+                out_ps.push(p3_x);
+                out_uv.push(uv3_x);
+    
+                let p3_y =  verts[i+3].y;
+                let uv3_y = (p3_y - ps[1]) / ps_h * uv_h + uv[1];
+                out_ps.push(p3_y);
+                out_uv.push(uv3_y);
+                
+                out_indices.push(start);
+                out_indices.push(start + 1);
+                out_indices.push(start + 2);
+                out_indices.push(start + 1);
+                out_indices.push(start + 2);
+                out_indices.push(start + 3);
+            }
+
+            p0 = p1;
+            prev = curr;
+            curr = next;
         }
     }
+}
 
+
+fn calculate_joint_normal(
+    prev_arc: &Option<Arc>,
+    next_arc: &Option<Arc>,
+    point: &Point,
+) -> [f32; 2] {
+    let mut normal = [0.0, 0.0];
+    
+    // 前向法线（来自前一段的末端）
+    if let Some(prev) = prev_arc {
+        if prev.d < 1e-4 {
+            let dir = [prev.p1[0] - prev.p0[0], prev.p1[1] - prev.p0[1]];
+            let perp = [-dir[1], dir[0]];
+            let len = (perp[0].powi(2) + perp[1].powi(2)).sqrt();
+            normal[0] += perp[0] / len;
+            normal[1] += perp[1] / len;
+        } else {
+            let dx = point[0] - prev.center[0];
+            let dy = point[1] - prev.center[1];
+            let len = (dx.powi(2) + dy.powi(2)).sqrt();
+            normal[0] += dx / len;
+            normal[1] += dy / len;
+        }
+    }
+    
+    // 后向法线（来自后一段的起点）
+    if let Some(next) = next_arc {
+        if next.d < 1e-4 {
+            let dir = [next.p1[0] - next.p0[0], next.p1[1] - next.p0[1]];
+            let perp = [-dir[1], dir[0]];
+            let len = (perp[0].powi(2) + perp[1].powi(2)).sqrt();
+            normal[0] += perp[0] / len;
+            normal[1] += perp[1] / len;
+        } else {
+            let dx = point[0] - next.center[0];
+            let dy = point[1] - next.center[1];
+            let len = (dx.powi(2) + dy.powi(2)).sqrt();
+            normal[0] += dx / len;
+            normal[1] += dy / len;
+        }
+    }
+    
+    // 归一化平均法线
+    let len = (normal[0].powi(2) + normal[1].powi(2)).sqrt();
+    if len > 0.0 {
+        [normal[0] / len, normal[1] / len]
+    } else {
+        [0.0, 0.0]
+    }
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
@@ -1646,31 +1745,7 @@ pub fn compute_near_arcs(view_box: Aabb, endpoints: &Vec<ArcEndpoint>, scale: f3
     }
 }
 
-// 计算线段的 OBB
-fn calculate_obb(p1: Point, p2: Point, width: f32) -> [Point; 4] {
-    // 计算线段中心点
-    let center = Point::new((p1.x + p2.x) / 2.0, (p1.y + p2.y) / 2.0);
 
-    // 计算线段方向向量
-    let direction = p2 - p1;
-    let length = (direction.x * direction.x + direction.y * direction.y).sqrt();
-    let normalized_direction = direction.scale(1.0 / length);
-
-    // 计算 OBB 的高度（沿线段方向）和宽度（垂直于线段方向）
-    let half_length = (length + 0.4) / 2.0;
-    let half_width = width / 2.0;
-
-    // 计算 OBB 的四个顶点
-    let obb_axis1 = normalized_direction.scale(half_length); // 沿线段方向的轴
-    let obb_axis2 = Vector2::new(-normalized_direction.y, normalized_direction.x).scale(half_width); // 垂直于线段方向的轴
-
-    let p1 = center + obb_axis1 + obb_axis2;
-    let p2 = center + obb_axis1 - obb_axis2;
-    let p3 = center - obb_axis1 - obb_axis2;
-    let p4 = center - obb_axis1 + obb_axis2;
-
-    [p1, p2, p3, p4]
-}
 
 #[test]
 fn test() {

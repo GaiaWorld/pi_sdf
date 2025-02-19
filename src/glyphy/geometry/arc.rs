@@ -645,11 +645,8 @@ impl Arc {
      */
     pub fn extents_call(p0: &Point, p1: &Point, d: f32, radius: f32, c: &Point, tangents: &((f32, f32), (f32, f32)), e: &mut Aabb) {
         e.clear();
-        // println!("===============1e: {:?}", (&e, &radius, &c));
         e.add(*p0);
-        // println!("===============2e: {:?}", (&e, p0));
         e.add(*p1);
-        // println!("===============3e: {:?}", (&e, p1));
         let r = radius;
         let p = [
             Point::new(-r + c.x, 0. + c.y),
@@ -658,12 +655,11 @@ impl Arc {
             Point::new(0. + c.x,  r + c.y),
         ];
 
-        // for i in 0..4 {
-        //     if Self::wedge_contains_point_call(d, p0, p1, &p[i], tangents) {
-        //         e.add(p[i]);
-        //         println!("==============={}e: {:?}",i+4, (&e, p[i], tangents));
-        //     }
-        // }
+        for i in 0..4 {
+            if Self::wedge_contains_point_call(d, p0, p1, &p[i], tangents) {
+                e.add(p[i]);
+            }
+        }
     }
     pub fn extents(&self, e: &mut Aabb) {
         e.clear();
@@ -744,6 +740,58 @@ impl Arc {
         } else {
             ((mins.y..maxs.y), norm_squared)
         }
+    }
+
+    pub fn generate_arc_vertices(
+        &self,
+        thickness: f32,
+    ) -> Vec<Point> {
+        let start = self.p0;
+        let end = self.p1;
+        let center = self.center;
+        let num_segments = (self.angle / (std::f32::consts::PI * 0.125)).ceil() as usize;
+
+        let radius = ((start[0] - center[0]).powi(2) + (start[1] - center[1]).powi(2)).sqrt();
+        let mut start_angle = (start[1] - center[1]).atan2(start[0] - center[0]);
+        let mut end_angle = (end[1] - center[1]).atan2(end[0] - center[0]);
+        
+        // Adjust angles to ensure proper winding
+        if end_angle < start_angle {
+            std::mem::swap(&mut start_angle, &mut end_angle);
+        }
+        if end_angle - start_angle > std::f32::consts::PI * 2.0 {
+            end_angle = start_angle + std::f32::consts::PI * 2.0;
+        }
+    
+        let angle_step = (end_angle - start_angle) / num_segments as f32;
+        let half_thickness = thickness / 2.0;
+        let mut vertices = Vec::with_capacity((num_segments + 1) * 2);
+    
+        // Generate points along the arc
+        for i in 0..=num_segments {
+            let angle = start_angle + angle_step * i as f32;
+            let x = center[0] + angle.cos() * radius;
+            let y = center[1] + angle.sin() * radius;
+            
+            // Calculate normal direction (pointing outward)
+            let normal_x = (x - center[0]) / radius;
+            let normal_y = (y - center[1]) / radius;
+            
+            vertices.push(Point::new(x + normal_x * half_thickness- 1.0, y + normal_y * half_thickness));
+            vertices.push(Point::new(x - normal_x * half_thickness - 1.0, y - normal_y * half_thickness));
+        }
+    
+        // Generate triangle strip indices
+        let mut triangles = Vec::with_capacity(num_segments * 6);
+        for i in 0..num_segments {
+            let base = i * 2;
+            triangles.push(vertices[base]);
+            triangles.push(vertices[base + 1]);
+            triangles.push(vertices[base + 2]);
+            triangles.push(vertices[base + 3]);
+        }
+    
+        triangles
     }
 }
 
