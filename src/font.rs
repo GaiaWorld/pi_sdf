@@ -1,4 +1,7 @@
-use crate::{glyphy::geometry::{arc::ID, segment::{PPoint, PSegment}}, utils::{compute_cell_range, CellInfo}};
+use crate::{
+    glyphy::geometry::segment::{PPoint, PSegment},
+    utils::{compute_cell_range, CellInfo},
+};
 use allsorts::{
     binary::read::ReadScope,
     font::MatchingPresentation,
@@ -9,7 +12,6 @@ use allsorts::{
 };
 use pi_share::Share;
 
-use crate::utils::SdfInfo2;
 use crate::{
     glyphy::{
         blob::recursion_near_arcs_of_cell,
@@ -27,48 +29,56 @@ use crate::{
 use std::char;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::wasm_bindgen;
-
+/// FontFace 结构体，表示一个字体的面，包含字体数据和相关信息。
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub struct FontFace {
+    /// 字体的二进制数据，使用 Share 进行内存共享。
     pub(crate) _data: Share<Vec<u8>>,
+    /// Font 实例，使用 DynamicFontTableProvider 提供表数据。
     pub(crate) font: Font<DynamicFontTableProvider<'static>>,
+    /// GLYF 表，存储字体轮廓信息。
     pub(crate) glyf: GlyfTable<'static>,
     _glyf_data: Vec<u8>,
     _loca_data: Vec<u8>,
     pub(crate) _loca: LocaTable<'static>,
+    /// 字体的最大包围盒，用于布局和绘制。
     pub(crate) max_box: Aabb,
     pub(crate) max_box_normaliz: Aabb,
     pub(crate) units_per_em: u16,
 }
 
 impl FontFace {
+    /// 创建一个新的 FontFace 实例，使用提供的字体二进制数据进行初始化。
+    ///
+    /// # 参数
+    /// * `_data`: 字体的二进制数据，使用 Share 进行内存共享。
+    ///
+    /// # 返回值
+    /// * `Self`: 新的 FontFace 实例。
     pub fn new_inner(_data: Share<Vec<u8>>) -> Self {
+        // 初始化日志模块，设置日志级别为 Info。
         let _ = console_log::init_with_level(log::Level::Info);
-        // log::info!("=========== 1, : {}", _data.len());
         let d: &'static Vec<u8> = unsafe { std::mem::transmute(_data.as_ref()) };
         let scope = ReadScope::new(d);
         let font_file = scope.read::<FontData<'static>>().unwrap();
-        // font_file.table_provider(index)
-        // log::info!("=========== 2");
         let provider = font_file.table_provider(0).unwrap();
         let font: Font<DynamicFontTableProvider<'static>> = Font::new(provider).unwrap().unwrap();
-        // log::info!("=========== 3");
+
         let head_table = font
             .head_table()
             .unwrap()
             .ok_or("missing head table")
             .unwrap();
 
-        // log::info!("=========== 4");
         let max_box_normaliz = Self::get_max_box_normaliz(&head_table);
         let _loca_data = font
             .font_table_provider
             .read_table_data(tag::LOCA)
             .unwrap()
             .to_vec();
-        // log::info!("=========== 5");
+
         let l: &'static Vec<u8> = unsafe { std::mem::transmute(&_loca_data) };
-        // log::info!("=========== 6");
+
         let loca = ReadScope::new(&l)
             .read_dep::<LocaTable<'_>>((
                 usize::from(font.maxp_table.num_glyphs),
@@ -114,16 +124,27 @@ impl FontFace {
         }
     }
 
+    /// 获取 Font 实例。
+    ///
+    /// # 返回值
+    /// * `&Font<DynamicFontTableProvider>`: Font 实例的引用。
     pub fn font(&self) -> &Font<DynamicFontTableProvider> {
         &self.font
     }
 
+    /// 计算顶点数据，返回一个用于图形渲染的顶点数组。
+    ///
+    /// # 参数
+    /// * `_font_size`: 字体大小，用于缩放字体轮廓。
+    /// * `_shadow_offsett`: 阴影偏移数据，用于绘制阴影效果。
+    ///
+    /// # 返回值
+    /// * `[f32; 16]`: 顶点数组，用于传递给图形API进行渲染。
     pub fn verties(&self, _font_size: f32, _shadow_offsett: &mut [f32]) -> [f32; 16] {
         let extents = self.max_box_normaliz.clone();
 
         let min_uv = [0.0f32, 0.0];
         let max_uv = [1.0f32, 1.0];
-
         [
             extents.mins.x,
             extents.mins.y,
@@ -144,7 +165,15 @@ impl FontFace {
         ]
     }
 
-    fn get_max_box_normaliz(head_table: &HeadTable) -> Aabb {
+    /// 计算标准化的最大包围盒。
+    /// 根据Head表中的数据，计算字体的最大包围盒并规范化。
+    ///
+    /// # 参数
+    /// * `head_table: &HeadTable` - Head表的引用，包含字体的基本信息。
+    ///
+    /// # 返回值
+    /// * `Aabb` -标准化后的最大包围盒。
+    pub fn get_max_box_normaliz(head_table: &HeadTable) -> Aabb {
         let mut extents = Aabb::new(
             Point::new(head_table.x_min as f32, head_table.y_min as f32),
             Point::new(head_table.x_max as f32, head_table.y_max as f32),
@@ -166,45 +195,16 @@ impl FontFace {
         extents
     }
 
-    // pub fn encode_uint_arc(
-    //     extents: Aabb,
-    //     mut endpoints: Vec<ArcEndpoint>,
-    // ) -> (BlobArc, HashMap<u64, u64>) {
-    //     // log::debug!("result_arcs: {:?}", result_arcs.len());
-
-    //     // let width_cells = (extents.width() / min_width).floor();
-    //     // let height_cells = (extents.height() / min_height).floor();
-    //     // 根据最小格子大小计算每个格子的圆弧数据
-    //     let CellInfo{info, min_width, min_height, ..} =
-    //         Self::compute_near_arcs(extents, 0.0, &mut endpoints);
-    //     // log::trace!("near_arcs: {}", near_arcs.len());
-    //     let (unit_arcs, map) =
-    //         encode_uint_arc_data(info, &extents, min_width, min_height, None);
-    //     // log::debug!("unit_arcs[14][5]: {:?}", unit_arcs[14][5]);
-
-    //     let [min_sdf, max_sdf] = travel_data(&unit_arcs);
-    //     let blob_arc = BlobArc {
-    //         min_sdf,
-    //         max_sdf,
-    //         cell_size: min_width,
-    //         #[cfg(feature = "debug")]
-    //         show: format!("<br> 格子数：宽 = {}, 高 = {} <br>", min_width, min_height),
-    //         extents,
-    //         data: unit_arcs,
-    //         avg_fetch_achieved: 0.0,
-    //         endpoints,
-    //     };
-
-    //     // extents.scale(1.0 / upem, 1.0 / upem);
-
-    //     // gi.nominal_w = width_cells;
-    //     // gi.nominal_h = height_cells;
-
-    //     // gi.extents.set(&extents);
-
-    //     (blob_arc, map)
-    // }
-
+    /// 计算近段弧的信息。
+    /// 根据给定的包围盒和比例因子，计算出与视网格最近的弧的信息，用于后续的绘制。
+    ///
+    /// # 参数
+    /// * `extents: Aabb` - 当前细胞的活动范围。
+    /// * `scale: f32` - 缩放比例。
+    /// * `endpoints: &Vec<ArcEndpoint>` - 圆弧端点的集合。
+    ///
+    /// # 返回值
+    /// * `CellInfo` - 包含包围盒、近段弧、最小宽度和高度等信息。
     pub fn compute_near_arcs<'a>(
         extents: Aabb,
         scale: f32,
@@ -214,7 +214,7 @@ impl FontFace {
         log::debug!("extents: {:?}", extents);
 
         if endpoints.len() > 0 {
-            // 用奇偶规则，计算 每个圆弧的 环绕数
+            // 用奇偶规则，计算每个圆弧的环绕数。
             glyphy_outline_winding_from_even_odd(endpoints, false);
         }
 
@@ -224,7 +224,7 @@ impl FontFace {
         let mut p0 = Point::new(0., 0.);
 
         // let startid = ID.load(std::sync::atomic::Ordering::SeqCst);
-        // 将圆弧控制点变成圆弧
+        // 将圆弧控制点变成圆弧。
         let mut near_arcs = Vec::with_capacity(endpoints.len());
         let mut arcs = Vec::with_capacity(endpoints.len());
         let mut id = 0;
@@ -243,14 +243,12 @@ impl FontFace {
             arcs.push(unsafe { std::mem::transmute(near_arcs.last().unwrap()) });
         }
 
-        // println!("near_arcs: {}, startid: {}, endid: {:?}", near_arcs.len(), , near_arcs.last().unwrap().id);
-        // let mut tempsegment = parry2d::shape::Segment::new(Point::new(0., 0.), Point::new(0., 0.));
         let mut tempsegment = PSegment::new(PPoint::new(0., 0.), PPoint::new(0., 0.));
         let mut result_arcs = vec![];
         let mut temp = Vec::with_capacity(arcs.len());
         let mut tempidx = vec![];
         let (ab1, ab2) = extents.half(Direction::Col);
-        // 二分法递归细分格子，知道格子周围的圆弧数量小于二或者小于32/1停止
+        // 二分法递归细分格子，直到格子周围的圆弧数量少于一定数目或达到停止条件。
         recursion_near_arcs_of_cell(
             // &near_arcs,
             &extents,
@@ -325,18 +323,34 @@ impl FontFace {
         }
     }
 
+    /// 获取字体的上升高度（ascender）。
+    ///
+    /// # 返回值
+    /// 上升高度（f32）
     pub fn ascender(&self) -> f32 {
         self.font.hhea_table.ascender as f32 / self.units_per_em as f32
     }
 
+    /// 获取字体的单位每英尺数（units_per_em）。
+    ///
+    /// # 返回值
+    /// 单位每英尺数（u16）
     pub fn units_per_em(&self) -> u16 {
         self.units_per_em
     }
 
+    /// 获取字体的下降高度（descender）。
+    ///
+    /// # 返回值
+    /// 下降高度（f32）
     pub fn descender(&self) -> f32 {
         self.font.hhea_table.descender as f32 / self.units_per_em as f32
     }
 
+    /// 获取字形的最大边界框（max_box）。
+    ///
+    /// # 返回值
+    /// 最大边界框的坐标（Vec<f32>）
     pub fn max_box(&self) -> Vec<f32> {
         vec![
             self.max_box.mins.x,
@@ -346,6 +360,10 @@ impl FontFace {
         ]
     }
 
+    /// 获取归一化的字形最大边界框（max_box_normaliz）。
+    ///
+    /// # 返回值
+    /// 归一化后的最大边界框的坐标（Vec<f32>）_vals
     pub fn max_box_normaliz(&self) -> Vec<f32> {
         vec![
             self.max_box_normaliz.mins.x,
@@ -355,6 +373,12 @@ impl FontFace {
         ]
     }
 
+    /// 获取字符的字形索引。
+    ///
+    /// # 参数
+    /// - `ch`: 查询的字符
+    /// # 返回值
+    /// 字形索引（u16）
     pub fn glyph_index(&mut self, ch: char) -> u16 {
         let (glyph_index, _) =
             self.font
@@ -362,10 +386,20 @@ impl FontFace {
         glyph_index
     }
 
+    /// 获取字体数据的大小。
+    ///
+    /// # 返回值
+    /// 字体数据的大小（usize）
     pub fn debug_size(&self) -> usize {
         self._data.len()
     }
 
+    /// 将字符转换为轮廓信息。
+    ///
+    /// # 参数
+    /// - `ch`: 查询的字符
+    /// # 返回值
+    /// 轮廓信息（OutlineInfo）
     pub fn to_outline(&mut self, ch: char) -> OutlineInfo {
         let mut sink = GlyphVisitor::new(SCALE / self.units_per_em as f32);
         sink.accumulate.tolerance = self.units_per_em as f32 * TOLERANCE;
@@ -409,6 +443,12 @@ impl FontFace {
         }
     }
 
+    /// 将字符转换为轮廓信息（WebAssembly专用）。
+    ///
+    /// # 参数
+    /// - `ch`: 查询的字符
+    /// # 返回值
+    /// 轮廓信息（WasmOutlineInfo）
     pub fn to_outline_of_wasm(&mut self, ch: char) -> WasmOutlineInfo {
         let outline = self.to_outline(ch);
         let buf = bitcode::serialize(&outline).unwrap();
@@ -417,16 +457,24 @@ impl FontFace {
             units_per_em: outline.units_per_em,
             advance: outline.advance,
             bbox: outline.bbox,
-            extents: outline.extents
+            extents: outline.extents,
         }
     }
 }
 
+/// WebAssembly环境下的轮廓信息结构体。
+///
+/// # 属性
+/// - `buf`: 序列化后的轮廓数据
+/// - `units_per_em`: 字体的单位每英尺数
+/// - `advance`: 字符的水平进度
+/// - `bbox`: 字形的边界框
+/// - `extents`: 字形的扩展信息
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
 pub struct WasmOutlineInfo {
     pub buf: Vec<u8>,
     pub units_per_em: u16,
     pub advance: u16,
     pub bbox: Vec<f32>,
-    pub extents: Vec<f32>
+    pub extents: Vec<f32>,
 }

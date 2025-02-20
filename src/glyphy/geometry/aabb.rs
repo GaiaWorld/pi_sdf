@@ -1,30 +1,35 @@
 use derive_deref_rs::Deref;
-use parry2d::{bounding_volume::Aabb as AabbInner, math::Vector, shape::Segment};
+use parry2d::{bounding_volume::Aabb as AabbInner, shape::Segment};
 use serde::{
     de::{self, MapAccess, SeqAccess, Visitor},
     ser::SerializeStruct,
     Deserialize, Serialize,
 };
-use std::{fmt, ops::Range};
+use std::fmt;
 
 use crate::{
-    glyphy::{geometry::segment::SegmentEXT, util::GLYPHY_INFINITY},
+    glyphy::util::GLYPHY_INFINITY,
     Point,
 };
 
 use super::{arc::Arc, segment::{PPoint, PSegment}};
 
+// 方向枚举类型，用于描述几何形状的各个方向
+#[derive(Debug, Clone, Copy)]
 pub enum Direction {
-    Top,
-    Bottom,
-    Left,
-    Right,
-    Row,
-    Col,
+    Top,    // 表示顶部方向
+    Bottom, // 表示底部方向
+    Left,   // 表示左边方向
+    Right,  // 表示右边方向
+    Row,    // 行方向
+    Col,    // 列方向
 }
 
+// Aabb结构体，封装了parry2d库中的AabbInner类型，同时实现了Deref trait以便直接访问内部方法
 #[derive(Debug, Clone, Copy, Deref)]
 pub struct Aabb(pub AabbInner);
+
+/// Aabb序列化实现，将Aabb结构体序列化为包含四个字段的结构体
 impl Serialize for Aabb {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -39,6 +44,7 @@ impl Serialize for Aabb {
     }
 }
 
+/// Aabb反序列化实现，通过指定的反序列化器将数据反序列化为Aabb结构体
 impl<'de> Deserialize<'de> for Aabb {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -61,9 +67,10 @@ impl<'de> Deserialize<'de> for Aabb {
                 formatter.write_str("struct Aabb")
             }
 
+            /// 从映射结构中反序列化Aabb结构
             fn visit_map<V>(self, mut map: V) -> Result<Aabb, V::Error>
             where
-                V: MapAccess<'de>,
+                V: MapAccess<'de>
             {
                 let mut min_x = None;
                 let mut min_y = None;
@@ -115,20 +122,20 @@ impl<'de> Deserialize<'de> for Aabb {
             {
                 let x = seq
                     .next_element()?
-                    .ok_or_else(|| de::Error::invalid_length(0, &self))?;
+                    .ok_or_else(|| de::Error::invalid_length(0, &self))?;  // 读取第一个元素作为min_x
                 let y = seq
                     .next_element()?
-                    .ok_or_else(|| de::Error::invalid_length(1, &self))?;
+                    .ok_or_else(|| de::Error::invalid_length(1, &self))?;  // 读取第二个元素作为min_y
                 let x1 = seq
                     .next_element()?
-                    .ok_or_else(|| de::Error::invalid_length(1, &self))?;
+                    .ok_or_else(|| de::Error::invalid_length(2, &self))?;  // 读取第三个元素作为max_x
                 let y1 = seq
                     .next_element()?
-                    .ok_or_else(|| de::Error::invalid_length(1, &self))?;
+                    .ok_or_else(|| de::Error::invalid_length(3, &self))?;  // 读取第四个元素作为max_y
 
                 Ok(Aabb(parry2d::bounding_volume::Aabb::new(
-                    Point::new(x, y),
-                    Point::new(x1, y1),
+                    Point::new(x, y),     // 构建最小点
+                    Point::new(x1, y1),   // 构建最大点
                 )))
             }
         }
@@ -145,27 +152,39 @@ impl<'de> Deserialize<'de> for Aabb {
 }
 
 impl Aabb {
+    /// 创建一个新的包围盒实例，使用给定的最小点和最大点
+    ///
+    /// # 参数
+    /// - `min`: 包围盒的最小坐标点
+    /// - `max`: 包围盒的最大坐标点
     pub fn new(min: Point, max: Point) -> Self {
         Self(AabbInner::new(min, max))
     }
 
+    /// 创建一个无效的包围盒实例，默认填充为无限值
     pub fn new_invalid() -> Self {
         Self(AabbInner::new_invalid())
     }
+
+    /// 清空包围盒，设置其为无效状态
     pub fn clear(&mut self) {
         self.maxs = Point::new(GLYPHY_INFINITY, GLYPHY_INFINITY);
         self.mins = Point::new(GLYPHY_INFINITY, GLYPHY_INFINITY);
     }
 
+    /// 将另一个包围盒的值复制到当前包围盒中
+    ///
+    /// # 参数
+    /// - `other`: 要复制的另一个包围盒
     pub fn set(&mut self, other: &Aabb) {
         self.mins.clone_from(&other.mins);
         self.maxs.clone_from(&other.maxs);
-        // self.mins.x = other.mins.x;
-        // self.mins.y = other.mins.y;
-        // self.maxs.x = other.maxs.x;
-        // self.maxs.y = other.maxs.y;
     }
 
+    /// 将一个点扩展到当前包围盒中
+    ///
+    /// # 参数
+    /// - `p`: 要扩展加入的点
     pub fn add(&mut self, p: Point) {
         if self.is_empty() {
             self.mins.x = p.x;
@@ -181,11 +200,19 @@ impl Aabb {
         self.maxs.y = if p.y > self.maxs.y { p.y } else { self.maxs.y };
     }
 
+    /// 检查包围盒是否为空（即无效）
+    ///
+    /// # 返回值
+    /// - `bool`: 包围盒是否为空
     pub fn is_empty(&self) -> bool {
         // 当最小值是无穷时，包围盒是空的
         return self.mins.x == GLYPHY_INFINITY || self.mins.x == -GLYPHY_INFINITY;
     }
 
+    /// 通过另一个包围盒扩展当前包围盒，使其包含两个包围盒的内容
+    ///
+    /// # 参数
+    /// - `other`: 要扩展加入的另一个包围盒
     pub fn extend(&mut self, other: &Aabb) {
         // 对方是空，就是自己
         if other.is_empty() {
@@ -200,28 +227,13 @@ impl Aabb {
 
         self.mins = self.mins.inf(&other.mins);
         self.maxs = self.maxs.sup(&other.maxs);
-        // self.mins.x = if self.mins.x < other.mins.x {
-        //     self.mins.x
-        // } else {
-        //     other.mins.x
-        // };
-        // self.mins.y = if self.mins.y < other.mins.y {
-        //     self.mins.y
-        // } else {
-        //     other.mins.y
-        // };
-        // self.maxs.x = if self.maxs.x > other.maxs.x {
-        //     self.maxs.x
-        // } else {
-        //     other.maxs.x
-        // };
-        // self.maxs.y = if self.maxs.y > other.maxs.y {
-        //     self.maxs.y
-        // } else {
-        //     other.maxs.y
-        // };
     }
 
+    /// 使用给定的 x 和 y 值扩展包围盒
+    ///
+    /// # 参数
+    /// - `x`: 要扩展的 x 值
+    /// - `y`: 要扩展的 y 值
     pub fn extend_by(&mut self, x: f32, y: f32) {
         self.mins.x = self.mins.x.min(x);
         self.mins.y = self.mins.y.min(y);
@@ -229,6 +241,13 @@ impl Aabb {
         self.maxs.y = self.maxs.y.max(y);
     }
 
+    /// 检查点是否在包围盒内
+    ///
+    /// # 参数
+    /// - `p`: 要检查的点
+    ///
+    /// # 返回值
+    /// - `bool`: 点是否在包围盒内部
     pub fn includes(&self, p: &Point) -> bool {
         return self.mins.x <= p.x
             && p.x <= self.maxs.x
@@ -236,6 +255,11 @@ impl Aabb {
             && p.y <= self.maxs.y;
     }
 
+    /// 将包围盒的尺寸按照给定的缩放因子进行缩放
+    ///
+    /// # 参数
+    /// - `x_scale`: x 轴方向的缩放因子
+    /// - `y_scale`: y 轴方向的缩放因子
     pub fn scale(&mut self, x_scale: f32, y_scale: f32) {
         self.mins.x *= x_scale;
         self.maxs.x *= x_scale;
@@ -283,8 +307,7 @@ impl Aabb {
         }
     }
 
-    // pub fn bound_to_ref(&self, direction: Direction, mut result: &mut Segment) {
-    pub fn bound_to_ref(&self, direction: Direction, mut result: &mut PSegment) {
+    pub fn bound_to_ref(&self, direction: Direction, result: &mut PSegment) {
         match direction {
             Direction::Top => result.modify_by_points((self.mins.x, self.mins.y), (self.maxs.x, self.mins.y)),
             Direction::Bottom => result.modify_by_points((self.mins.x, self.maxs.y), (self.maxs.x, self.maxs.y)),
@@ -298,16 +321,14 @@ impl Aabb {
     pub fn near_arcs(
         &self,
         arcs: &Vec<&'static Arc>,
-        // segment: &Segment,
+
         segment: &PSegment,
         result_arcs: &mut Vec<&'static Arc>,
         temps: &mut Vec<(PPoint, f32)>,
         delete_index: &mut Vec<usize>,
     ) {
-        // let mut temps = Vec::with_capacity(arcs.len());
         temps.clear();
-        // log::debug!("segment: {:?}", segment);
-        // let mut temp = segment.clone();
+
         let mut temp = segment.clone();
         let mut isfirst = true;
         let mut p1: Point = Point::new(0., 0.);
@@ -346,7 +367,7 @@ impl Aabb {
 
                         let d11 = result_arc.squared_distance_to_point2_and_norm_square(&p1);
                         let d12 = result_arc.squared_distance_to_point2_and_norm_square(&p2);
-                        
+
                         let d21 = arc.squared_distance_to_point2_and_norm_square(&p1);
                         let d22 = arc.squared_distance_to_point2_and_norm_square(&p2);
 
@@ -356,7 +377,7 @@ impl Aabb {
                         }
                     }
                 }
-                
+
                 if is_push {
                     delete_index.clear();
                     for j in 0..result_arcs.len() {
@@ -378,111 +399,13 @@ impl Aabb {
                         temps.remove(idx);
                         // log::debug!("remove : {:?}", r);
                     }
-                    
+
                     result_arcs.push(*arc);
                     temps.push((*p, min_dist));
                 }
             }
         }
     }
-
-    // fn near_arcs(
-    //     &self,
-    //     arcs: &Vec<&'static Arc>,
-    //     segment: &Segment,
-    //     result_arcs: &mut Vec<&'static Arc>,
-    // ) {
-    //     let mut temps = vec![];
-    //     log::debug!("segment: {:?}", segment);
-    //     for i in 0..arcs.len() {
-    //         let line0 = segment.squared_distance_to_point2(&arcs[i].p0);
-    //         let line1 = segment.squared_distance_to_point2(&arcs[i].p1);
-    //         log::debug!("line0: {:?}, line1: {:?}", line0, line1);
-
-    //         if i == 0 {
-    //             result_arcs.push(&arcs[i]);
-    //             temps.push((line0, line1));
-    //         } else {
-    //             let mut is_push = true;
-
-    //             let p0 = line0.b;
-    //             let p1 = line1.b;
-
-    //             for j in 0..result_arcs.len() {
-    //                 let arc = result_arcs[j];
-
-    //                 let dist0 = arc.squared_distance_to_point2(&line0.b).norm_squared();
-    //                 let dist1 = if line0.b == line1.b {
-    //                     dist0
-    //                 } else {
-    //                     arc.squared_distance_to_point2(&line1.b).norm_squared()
-    //                 };
-
-    //                 if dist0 < line0.norm_squared() && dist1 < line1.norm_squared() {
-    //                     is_push = false
-    //                 }
-    //             }
-
-    //             let mut delete_index = vec![];
-    //             if is_push {
-    //                 for j in 0..result_arcs.len() {
-    //                     let p = temps[j].0;
-    //                     let dist = temps[j].1;
-    //                     let d = arcs[i].squared_distance_to_point2(&p);
-    //                     log::debug!("dist: {}, d: {}", dist, d);
-    //                     if d < dist {
-    //                         // let rangs = &mut temps[j].2;
-    //                         // let mut new_rang = vec![];
-    //                         // for r in rangs.iter() {
-    //                         //     if rang.contains(&r.start) && rang.contains(&r.end) {
-    //                         //         continue;
-    //                         //     } else if rang.contains(&r.start) {
-    //                         //         if (rang.end - r.end).abs() > 0.1 {
-    //                         //             new_rang.push(rang.end..r.end)
-    //                         //         }
-    //                         //     } else if rang.contains(&r.end) {
-    //                         //         if (r.start - rang.start).abs() > 0.1 {
-    //                         //             new_rang.push(r.start..rang.start);
-    //                         //         }
-    //                         //     } else if r.contains(&rang.end) && r.contains(&rang.start) {
-    //                         //         if (r.start - rang.start).abs() > 0.1 {
-    //                         //             new_rang.push(r.start..rang.start);
-    //                         //         }
-
-    //                         //         if (r.end - rang.end).abs() > 0.1 {
-    //                         //             new_rang.push(rang.end..r.end);
-    //                         //         }
-    //                         //     } else {
-    //                         //         if (r.start - r.end).abs() > 0.1 {
-    //                         //             new_rang.push(r.clone());
-    //                         //         }
-    //                         //     }
-    //                         // }
-    //                         // *rangs = new_rang;
-
-    //                         // if rangs.is_empty() {
-    //                         //     delete_index.push(j);
-    //                         // }
-
-    //                         delete_index.push(j);
-    //                     }
-    //                 }
-    //             }
-    //             // log::debug!("delete_index: {:?}", delete_index);
-    //             for i in (0..delete_index.len()).rev() {
-    //                 let r = result_arcs.remove(delete_index[i]);
-    //                 temps.remove(delete_index[i]);
-    //                 log::debug!("remove : {:?}", r);
-    //             }
-
-    //             if is_push {
-    //                 // log::debug!("is_push");
-    //                 result_arcs.push(&arcs[i]);
-    //                 temps.push((p, min_dist, vec![rang]));
-    //             }
-    //         }
-    //     }
-    // }
 
     pub fn width(&self) -> f32 {
         self.maxs.x - self.mins.x
@@ -525,6 +448,7 @@ impl Aabb {
         return None;
     }
 }
+
 
 #[test]
 fn test() {

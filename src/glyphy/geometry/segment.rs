@@ -6,7 +6,7 @@
 use std::ops::Range;
 
 use crate::{glyphy::geometry::line::Line, Point};
-use parry2d::{bounding_volume::Aabb, math::Vector, shape::Segment};
+use parry2d::{bounding_volume::Aabb, shape::Segment};
 
 use super::{point::PointExt, signed_vector::SignedVector};
 

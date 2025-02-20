@@ -200,7 +200,6 @@ impl ArcsBezierApproximatorSpringSystem {
         let n = t.len() - 1;
 
         *e = vec![0.0; n];
-        // log::debug!("e.len: {}", e.len());
         arcs.clear();
 
         _max_e = 0.0;
@@ -215,7 +214,6 @@ impl ArcsBezierApproximatorSpringSystem {
                 arc_bezier_error_approximator_default,
             );
             arcs.push(arc);
-            // log::debug!("n: {}", n);
             e[i] = temp.value;
 
             _max_e = _max_e.max(e[i]);
@@ -253,11 +251,10 @@ impl ArcsBezierApproximatorSpringSystem {
                 let l = k_inv / total;
                 t[i + 1] = t[i] + l;
             }
-            t[n] = 1.0; // Do self to get real 1.0, not .9999999999999998!
+            t[n] = 1.0; // 确保最后一个点在t=1
 
             [min_e, max_e] = Self::calc_arcs(&b, &t, &appx, e, arcs, max_e, min_e);
 
-            //fprintf (stderr, "n %d jiggle %d max_e %g min_e %g\n", n, s, max_e, min_e);
 
             n_jiggle += 1;
             if max_e < tolerance || (2.0 * min_e - max_e > tolerance) {
@@ -277,12 +274,11 @@ impl ArcsBezierApproximatorSpringSystem {
         max_segments: Option<i32>,
     ) -> f32 {
         let max_segments = if let Some(v) = max_segments { v } else { 100 };
-        /* Handle fully-degenerate cases. */
         let v1 = b.p1 - (b.p0);
         let v2 = b.p2 - (b.p0);
         let v3 = b.p3 - (b.p0);
         if is_zero(v1.sdf_cross(&v2), None) && is_zero(v2.sdf_cross(&v3), None) {
-            // Curve has no area.  If endpoints are NOT the same, replace with single line segment.  Otherwise fully skip. */
+            // 如果所有点都在一条直线上, 只生成一个圆弧 (可以是直线)
             arcs.clear();
             if !b.p0.equals(&b.p1) {
                 arcs.push(Arc::new(b.p0, b.p3, 0.0));
@@ -295,15 +291,14 @@ impl ArcsBezierApproximatorSpringSystem {
 
         let mut max_e = 0.0;
         let mut min_e = 0.0;
-        // let mut n_jiggle = 0.0;
 
-        /* Technically speaking we can bsearch for n. */
+
         for n in 1..max_segments as usize {
             _t = vec![0.0; n + 1];
             for i in 0..n {
                 _t[i] = i as f32 / n as f32;
             }
-            _t[n] = 1.0; // Do self out of the loop to get real 1.0, not .9999999999999998!
+            _t[n] = 1.0; // 确保最后一个点在t=1
 
             [min_e, max_e] = Self::calc_arcs(b, &_t, appx, &mut e, arcs, max_e, min_e);
 
@@ -312,7 +307,6 @@ impl ArcsBezierApproximatorSpringSystem {
                 if e[i] <= tolerance {
                     [_, min_e, max_e] =
                         Self::jiggle(b, appx, &mut _t, &mut e, arcs, max_e, min_e, tolerance);
-                    // n_jiggle += jiggle;
                     break;
                 }
             }

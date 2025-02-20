@@ -293,7 +293,7 @@ impl Arc {
 
     pub fn grids(&self, gridw: f32, gridh: f32, result: &mut Vec<usize>) {
         let start = self.p0 - self.center;
-        let end = self.p1 - self.center;
+        let _end = self.p1 - self.center;
         let count = (self.len / gridw.min(gridh)).ceil() as usize;
         let perangle = self.angle / (count as f32);
         let (sin, cos) = f32::sin_cos(perangle);
@@ -754,7 +754,7 @@ impl Arc {
         let radius = ((start[0] - center[0]).powi(2) + (start[1] - center[1]).powi(2)).sqrt();
         let mut start_angle = (start[1] - center[1]).atan2(start[0] - center[0]);
         let mut end_angle = (end[1] - center[1]).atan2(end[0] - center[0]);
-        
+
         // Adjust angles to ensure proper winding
         if end_angle < start_angle {
             std::mem::swap(&mut start_angle, &mut end_angle);
@@ -762,25 +762,25 @@ impl Arc {
         if end_angle - start_angle > std::f32::consts::PI * 2.0 {
             end_angle = start_angle + std::f32::consts::PI * 2.0;
         }
-    
+
         let angle_step = (end_angle - start_angle) / num_segments as f32;
         let half_thickness = thickness / 2.0;
         let mut vertices = Vec::with_capacity((num_segments + 1) * 2);
-    
+
         // Generate points along the arc
         for i in 0..=num_segments {
             let angle = start_angle + angle_step * i as f32;
             let x = center[0] + angle.cos() * radius;
             let y = center[1] + angle.sin() * radius;
-            
+
             // Calculate normal direction (pointing outward)
             let normal_x = (x - center[0]) / radius;
             let normal_y = (y - center[1]) / radius;
-            
+
             vertices.push(Point::new(x + normal_x * half_thickness- 1.0, y + normal_y * half_thickness));
             vertices.push(Point::new(x - normal_x * half_thickness - 1.0, y - normal_y * half_thickness));
         }
-    
+
         // Generate triangle strip indices
         let mut triangles = Vec::with_capacity(num_segments * 6);
         for i in 0..num_segments {
@@ -790,7 +790,7 @@ impl Arc {
             triangles.push(vertices[base + 2]);
             triangles.push(vertices[base + 3]);
         }
-    
+
         triangles
     }
 }

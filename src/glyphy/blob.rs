@@ -1,5 +1,9 @@
-use parry2d::{math::Vector, shape::Segment};
-use std:: ops::Range;
+//! 该模块提供用于处理矢量图形签名距离场(SDF)生成和纹理编码的功能。
+//!
+//! 主要功能包括将几何图元(圆弧、线段)转换为优化的单元结构，生成SDF数据，
+//! 并将这些数据编码为纹理格式以便GPU渲染。支持WebAssembly目标架构。
+
+use parry2d::math::Vector;
 use std::collections::HashMap;
 // use std::collections::BTreeMap as HashMap;
 
@@ -12,7 +16,7 @@ use super::{
         aabb::{Aabb, Direction},
         arc::{Arc, ArcEndpoint},
         line::Line,
-        segment::{PPoint, PSegment, SegmentEXT},
+        segment::{PPoint, PSegment},
         vector::VectorEXT,
     },
     sdf::glyphy_sdf_from_arc_list,
@@ -21,19 +25,23 @@ use super::{
 
 use crate::Point;
 
+/// 最大网格尺寸限制
 pub const MAX_GRID_SIZE: f32 = 63.0;
 
+/// SDF最大距离阈值
 const GLYPHY_MAX_D: f32 = 0.5;
 
 const MAX_X: f32 = 4095.;
 const MAX_Y: f32 = 4095.;
 
+/// 编码过程错误类型
 #[derive(Debug)]
 pub enum EncodeError {
     MemoryOverflow,
     NewLine,
 }
 
+/// 表示单个处理单元的结构体
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
 #[derive(Clone, Debug)]
 pub struct UnitArc {
@@ -44,12 +52,12 @@ pub struct UnitArc {
     #[cfg(feature = "debug")]
     pub(crate) show: String, // 用于Canvas显示的字符串
 
-    pub data: Vec<ArcEndpoint>,
+    pub data: Vec<ArcEndpoint>, // 处理后的端点数据
 
     pub origin_data: Vec<ArcEndpoint>, // 原始数据, 用于显示 点 (因为data 对 1, 0 做了优化)
-
-    pub key: u64,
-    pub s_dist: u8,
+    pub key: u64, // 唯一标识键
+    pub s_dist: u8, // 距离场数据
+    /// 多级降采样距离场
     pub s_dist_1: u64,
     pub s_dist_2: u64,
     pub s_dist_3: u64,
@@ -57,10 +65,12 @@ pub struct UnitArc {
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 impl UnitArc {
+    /// 获取数据长度
     pub fn get_data_len(&self) -> usize {
         self.data.len()
     }
 
+    /// 获取唯一键值
     pub fn get_key(&self) -> u64 {
         if self.data.len() == 1 && self.data[0].line_key.is_some() {
             // 线段
@@ -79,22 +89,23 @@ impl UnitArc {
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 #[derive(Debug, Clone)]
 pub struct BlobArc {
-    pub min_sdf: f32,
-    pub max_sdf: f32,
+    pub min_sdf: f32,// 最小SDF值
+    pub max_sdf: f32,// 最大SDF值
 
-    pub cell_size: f32,
+    pub cell_size: f32,// 单元格尺寸
     // 显示
     #[cfg(feature = "debug")]
     pub(crate) show: String,
 
-    pub(crate) extents: Aabb,
+    pub(crate) extents: Aabb,// 包围盒范围
 
-    pub(crate) data: Vec<Vec<UnitArc>>,
-    pub avg_fetch_achieved: f32,
+    pub(crate) data: Vec<Vec<UnitArc>>,// 单元数据矩阵
+    pub avg_fetch_achieved: f32,// 平均获取次数
     pub(crate) endpoints: Vec<ArcEndpoint>,
-    pub(crate) data_tex_map: HashMap<u64, u64>,
+    pub(crate) data_tex_map: HashMap<u64, u64>, // 数据纹理映射去重
 }
 
+/// 范围描述结构体
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 #[derive(Debug, Clone, Copy)]
 pub struct Extents {
@@ -106,11 +117,13 @@ pub struct Extents {
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 impl BlobArc {
+    /// 获取指定位置的单元
     pub fn get_unit_arc(&self, i: usize, j: usize) -> UnitArc {
         // log::debug!("i: {}, j: {}", i, j);
         self.data[j][i].clone()
     }
 
+    /// 获取范围描述
     pub fn get_extents(&self) -> Extents {
         Extents {
             max_x: self.extents.maxs.x,
@@ -120,14 +133,17 @@ impl BlobArc {
         }
     }
 
+    /// 获取端点数量
     pub fn get_endpoints_len(&self) -> usize {
         self.endpoints.len()
     }
 
+    /// 获取指定索引的端点
     pub fn get_endpoint(&self, index: usize) -> ArcEndpoint {
         self.endpoints[index].clone()
     }
 
+    /// 编码纹理数据
     pub fn encode_tex(&self) -> SdfInfo {
         let data_tex = self.encode_data_tex1();
         let (tex_info, index_tex, sdf_tex1, sdf_tex2, sdf_tex3, sdf_tex4) =
@@ -149,7 +165,7 @@ impl BlobArc {
 
 impl BlobArc {
     // 按数据去重，并编码到纹理
-    fn encode_data_tex(
+    pub fn encode_data_tex(
         &self,
         map: &HashMap<u64, u64>,
         data_tex: &mut Vec<u8>,
@@ -441,10 +457,10 @@ impl BlobArc {
 
         let mut index_tex: Vec<u8> = Vec::with_capacity(grid_w * grid_h * 2);
 
-        let mut sdf_tex: Vec<u8> = Vec::with_capacity(grid_w * grid_h); //阴影用的minimip
-        let mut sdf_tex1: Vec<u8> = Vec::with_capacity((grid_w >> 1) * (grid_h >> 1));
-        let mut sdf_tex2: Vec<u8> = Vec::with_capacity((grid_w >> 2) * (grid_h >> 2));
-        let mut sdf_tex3: Vec<u8> = Vec::with_capacity((grid_w >> 3) * (grid_h >> 3));
+        let sdf_tex: Vec<u8> = Vec::with_capacity(grid_w * grid_h); //阴影用的minimip
+        let sdf_tex1: Vec<u8> = Vec::with_capacity((grid_w >> 1) * (grid_h >> 1));
+        let sdf_tex2: Vec<u8> = Vec::with_capacity((grid_w >> 2) * (grid_h >> 2));
+        let sdf_tex3: Vec<u8> = Vec::with_capacity((grid_w >> 3) * (grid_h >> 3));
 
         // 2 * grid_w * grid_h 个 Uint8
         for i in 0..self.data.len() {
@@ -783,6 +799,7 @@ pub struct TexData {
     pub data_offset_y: usize,
     pub data_tex_width: usize,
 
+    /// 多级SDF纹理
     pub sdf_tex: Vec<u8>, // 字节数 = 4 * 像素个数
     pub sdf_tex1: Vec<u8>,
     pub sdf_tex2: Vec<u8>,
@@ -850,13 +867,18 @@ impl Default for TexInfo {
 #[derive(Debug, Serialize, Deserialize)]
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
 pub struct SdfInfo {
+    /// 纹理元信息
     pub tex_info: TexInfo,
+    /// 数据纹理
     pub data_tex: Vec<u8>,
+    /// 索引纹理
     pub index_tex: Vec<u8>,
+    /// 多级SDF纹理
     pub sdf_tex1: Vec<u8>,
     pub sdf_tex2: Vec<u8>,
     pub sdf_tex3: Vec<u8>,
     pub sdf_tex4: Vec<u8>,
+    /// 网格尺寸
     pub grid_size: Vec<f32>,
 }
 

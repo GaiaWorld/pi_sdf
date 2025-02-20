@@ -1,3 +1,10 @@
+//! 该模块提供用于处理矢量图形签名距离场(SDF)生成和纹理编码的工具函数和结构体。
+//!
+//! 主要功能包括：
+//! - 字体轮廓的解析和处理
+//! - SDF纹理的生成和编码
+//! - 几何图元（圆弧、线段）的转换和优化
+//! - WebAssembly支持
 use core::fmt;
 use std::collections::HashMap;
 // use std::collections::BTreeMap as HashMap;
@@ -20,8 +27,8 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use crate::{
     glyphy::{
         blob::{travel_data, BlobArc},
-        geometry::{aabb::Aabb, arc::ID, arcs::GlyphyArcAccumulator},
-        sdf::{glyphy_sdf_from_arc_list2, glyphy_sdf_from_arc_list3},
+        geometry::{aabb::Aabb, arcs::GlyphyArcAccumulator},
+        sdf::glyphy_sdf_from_arc_list3,
         util::float2_equals,
     },
     Point,
@@ -57,30 +64,49 @@ pub static SCALE: f32 = 2048.0;
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct TexInfo2 {
     pub sdf_offset_x: usize,
+    /// SDF纹理的y轴偏移量
     pub sdf_offset_y: usize,
+    /// 字符的水平推进量
     pub advance: f32,
+    /// 当前处理的字符
     pub char: char,
+    /// 平面X坐标的最小值
     pub plane_min_x: f32,
+    /// 平面Y坐标的最小值
     pub plane_min_y: f32,
+    /// 平面X坐标的最大值
     pub plane_max_x: f32,
+    /// 平面Y坐标的最大值
     pub plane_max_y: f32,
+    /// 纹理集X坐标的最小值
     pub atlas_min_x: f32,
+    /// 纹理集Y坐标的最小值
     pub atlas_min_y: f32,
+    /// 纹理集X坐标的最大值
     pub atlas_max_x: f32,
+    /// 纹理集Y坐标的最大值
     pub atlas_max_y: f32,
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Serialize, Deserialize, Clone)]
+
+/// SdfInfo2结构体用于存储SDF纹理信息以及相关的辅助数据
 pub struct SdfInfo2 {
+    /// 包含SDF纹理的位置信息
     pub tex_info: TexInfo2,
+    /// SDF纹理的具体数据，使用Vec<u8>存储
     pub sdf_tex: Vec<u8>,
+    /// 纹理的大小，使用u32表示
     pub tex_size: u32,
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen(getter_with_clone))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
+
+/// OutlineInfo结构体用于存储字符的轮廓信息
 pub struct OutlineInfo {
+    /// 当前处理的字符
     pub(crate) char: char,
     pub endpoints: Vec<ArcEndpoint>,
     pub bbox: Vec<f32>,
@@ -92,8 +118,15 @@ pub struct OutlineInfo {
 }
 
 impl OutlineInfo {
+    /// 计算字符的附近圆弧，返回CellInfo结构体，其中包含圆弧集合和其他相关数据
+    ///
+    /// # 参数
+    /// * `scale` - 缩放比例因子，用于调整计算过程中的比例
+    ///
+    /// # 返回
+    /// * `CellInfo` - 包含字符轮廓的圆弧集合和相关元数据
     pub fn compute_near_arcs(&self, scale: f32) -> CellInfo {
-       
+
         let r = FontFace::compute_near_arcs(
             Aabb::new(
                 Point::new(self.extents[0], self.extents[1]),
@@ -106,6 +139,15 @@ impl OutlineInfo {
         r
     }
 
+    /// 计算字符的布局信息，包括字符在纹理中的位置、大小等
+    ///
+    /// # 参数
+    /// * `tex_size` - 纹理的大小
+    /// * `pxrange` - 像素范围
+    /// * `cur_off` - 当前偏移量
+    ///
+    /// # 返回
+    /// * `LayoutInfo` - 包含字符布局的详细信息
     pub fn compute_layout(&self, tex_size: usize, pxrange: u32, cur_off: u32) -> LayoutInfo {
         compute_layout(
             &self.extents,
@@ -117,6 +159,17 @@ impl OutlineInfo {
         )
     }
 
+    /// 生成字符的SDF纹理信息
+    ///
+    /// # 参数
+    /// * `result_arcs` - 包含字符轮廓的圆弧信息
+    /// * `tex_size` - 纹理的大小
+    /// * `pxrange` - 像素范围
+    /// * `is_outer_glow` - 是否为外发光效果
+    /// * `cur_off` - 当前偏移量
+    ///
+    /// # 返回
+    /// * `SdfInfo2` - 包含SDF纹理数据和布局信息的结构体
     pub fn compute_sdf_tex(
         &self,
         result_arcs: CellInfo,
@@ -172,11 +225,33 @@ impl OutlineInfo {
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 impl OutlineInfo {
+    /// 通过 wasm 绑定计算字符的附近圆弧信息，并返回序列化后的字节数组
+    ///
+    /// # 参数
+    /// * `outline` - 轮廓信息的字节数组输入
+    /// * `scale` - 缩放比例因子
+    ///
+    /// # 返回
+    /// * `Vec<u8>` - 序列化后的字符轮廓圆弧信息字节数组
     pub fn compute_near_arcs_of_wasm(outline: &[u8], scale: f32) -> Vec<u8> {
         let outline: OutlineInfo = bitcode::deserialize(outline).unwrap();
         bitcode::serialize(&outline.compute_near_arcs(scale)).unwrap()
     }
 
+    /// 通过 wasm 绑定计算字符的 SDF 纹理，并返回序列化后的字节数组
+    ///
+    /// # 参数
+    /// * `result_arcs` - 包含字符轮廓的圆弧信息字节数组
+    /// * `extents` - 字符的范围数组
+    /// * `units_per_em` - 每em单位的数量，用于缩放计算
+    /// * `advance` - 字符的水平推进量，表示字符的宽度
+    /// * `tex_size` - 纹理的大小，以像素为单位
+    /// * `pxrange` - 用于计算距离场的像素范围
+    /// * `is_outer_glow` - 是否应用外发光效果
+    /// * `cur_off` - 当前的偏移量，用于多字符布局
+    ///
+    /// # 返回
+    /// * `Vec<u8>` - 序列化后的 SDF 纹理信息字节数组
     pub fn compute_sdf_tex_of_wasm(
         result_arcs: &[u8],
         extents: &[f32],
@@ -199,40 +274,51 @@ impl OutlineInfo {
             Point::new(extents[0], extents[1]),
             Point::new(extents[2], extents[3]),
         );
-        let CellInfo { arcs, info, .. } = result_arcs;
-        let pixmap = encode_sdf(
-            &arcs,
-            info,
-            &extents,
-            tex_size as usize,
-            distance,
-            None,
-            is_outer_glow,
-            false,
-            None,
-        );
-
+        let CellInfo { arcs, info, .. } = result_arcs; // 解构CellInfo，获取arcs和info字段
+        let pixmap = encode_sdf( // 调用encode_sdf生成SDF纹理数据
+            &arcs, // 传递圆弧的引用
+            info, // 传递CellInfo的info字段，可能包含其他元数据信息
+            &extents, // 传递字符的范围信息，表示字符在平面中的位置和大小
+            tex_size as usize, // 纹理的大小，确保类型正确
+            distance, // 用于生成距离场的距离值
+            None, // 可能是其他参数的默认值，暂时保留为None
+            is_outer_glow, // 传递是否应用外发光效果的标志
+            false, // 可能的其他参数，默认为false
+            None, // 可能的其他参数，默认为None
+        ); // 调用结束后， pixmap就包含了生成的SDF纹理数据
+        // 使用生成的SDF纹理数据和其他布局信息，构造SdfInfo2结构体实例，并将其序列化为字节数组返回
         bitcode::serialize(&SdfInfo2 {
-            tex_info: TexInfo2 {
-                char: ' ',
-                advance: advance as f32 / units_per_em as f32,
-                sdf_offset_x: 0,
-                sdf_offset_y: 0,
-                plane_min_x: plane_bounds[0],
-                plane_min_y: plane_bounds[1],
-                plane_max_x: plane_bounds[2],
-                plane_max_y: plane_bounds[3],
-                atlas_min_x: atlas_bounds[0],
-                atlas_min_y: atlas_bounds[1],
-                atlas_max_x: atlas_bounds[2],
-                atlas_max_y: atlas_bounds[3],
-            },
-            sdf_tex: pixmap,
-            tex_size,
-        })
-        .unwrap()
-    }
+            tex_info: TexInfo2 { // 构造TexInfo2结构体实例
+                char: ' ', // 当前处理的字符，这里示例中使用空格，实际应根据情况设置为对应的字符
+                advance: advance as f32 / units_per_em as f32, // 计算字符的推进量，即宽度比例
+                sdf_offset_x: 0, // SDF纹理在x轴的偏移量，默认为0，可以根据布局需求调整
+                sdf_offset_y: 0, // SDF纹理在y轴的偏移量，默认为0，可以根据布局需求调整
+                plane_min_x: plane_bounds[0], // 平面坐标系中x的最小值
+                plane_min_y: plane_bounds[1], // 平面坐标系中y的最小值
+                plane_max_x: plane_bounds[2], // 平面坐标系中x的最大值
+                plane_max_y: plane_bounds[3], // 平面坐标系中y的最大值
+                atlas_min_x: atlas_bounds[0], // 纹理集坐标系中x的最小值
+                atlas_min_y: atlas_bounds[1], // 纹理集坐标系中y的最小值
+                atlas_max_x: atlas_bounds[2], // 纹理集坐标系中x的最大值
+                atlas_max_y: atlas_bounds[3], // 纹理集坐标系中y的最大值
+            }, // 结束TexInfo2结构体的构造
+            sdf_tex: pixmap, // 将pixmap设置为SDF纹理数据字段
+            tex_size, // 设置纹理大小，这里直接使用计算出的tex_size值，并确保类型正确可达u32类型，若有需要可以进行调整，例如tex_size as u32
+        }) // 结束SdfInfo2结构体的构造，并将其作为参数传递给serialize函数进行序列化处理
+        .unwrap() // 使用unwrap处理Result，假设序列化总是成功，或者根据需要替换为error处理机制
+    } // 结束compute_sdf_tex_of_wasm函数定义，返回序列化后的字节数组
 
+    /// 通过 wasm 绑定计算字符的布局信息，并返回序列化后的字节数组
+    ///
+    /// # 参数
+    /// * `extents` - 字符的范围数组
+    /// * `units_per_em` - 每em单位的数量，用于缩放计算
+    /// * `tex_size` - 纹理的大小，以像素为单位
+    /// * `pxrange` - 用于计算距离场的像素范围
+    /// * `cur_off` - 当前的偏移量，用于多字符布局
+    ///
+    /// # 返回
+    /// * `Vec<f32>` - 序列化后的布局信息数组，包括平面界限、纹理集界限、范围界限、距离和纹理大小
     pub fn compute_layout_of_wasm(
         extents: &[f32],
         units_per_em: u16,
@@ -256,34 +342,48 @@ impl OutlineInfo {
         res
     }
 }
-pub struct User {
-    pub accumulate: GlyphyArcAccumulator,
-    pub path_str: String,
-    pub svg_paths: Vec<String>,
-    pub svg_endpoints: Vec<[f32; 2]>,
+/// 用户相关的数据结构，包含累积信息和路径信息
+pub struct User { // 用户自定义数据结构的定义，包含 glyphs累积器，路径字符串，svg路径和路径终点坐标
+    pub accumulate: GlyphyArcAccumulator, // glyphs累积器，用于累积弧段信息，可能是多字符布局所需的累积结构
+    pub path_str: String, // 路径字符串，用于描述图形路径的字符串表示，可能是SVG路径描述字符串或其他格式
+    pub svg_paths: Vec<String>, // 包含多个SVG路径字符串的向量，用于存储多个路径的信息，例如多个字符的耦合路径段
+    pub svg_endpoints: Vec<[f32; 2]>, // 包含坐标的向量，每个元素为一个坐标点的数组，用于存储各个路径的终点坐标，便于后续处理和绘制
 }
 
+/// GlyphVisitor用于处理字体路径数据的结构体
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub struct GlyphVisitor {
+    /// 用于光栅化的Rasterizer对象
     _rasterizer: Rasterizer,
+     /// 用于累积路径数据的GlyphyArcAccumulator对象
     pub(crate) accumulate: GlyphyArcAccumulator,
+    /// 字体路径的字符串表示（仅在调试模式下有效）
     #[cfg(feature = "debug")]
     pub(crate) path_str: String,
-    // #[cfg(feature = "debug")]
+    /// SVG路径的集合
     pub(crate) svg_paths: Vec<String>,
+    /// SVG路径的终点集合
     pub(crate) svg_endpoints: Vec<[f32; 2]>,
 
     scale: f32,
     // scale2: f32,
+     /// 起始点
     pub(crate) start: Point,
+    /// 上一个点
     pub(crate) previous: Point,
     pub index: usize,
+    /// 边界框
     pub(crate) bbox: Aabb,
+     /// 弧的数量
     pub(crate) arcs: usize,
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 impl GlyphVisitor {
+    /// GlyphVisitor的构造函数，创建一个新的GlyphVisitor实例
+    /// 
+    /// # 参数
+    /// * `scale` - 标尺因子，用于缩放坐标
     pub fn new(scale: f32) -> Self {
         let accumulate = GlyphyArcAccumulator::new();
         let _rasterizer = ab_glyph_rasterizer::Rasterizer::new(512, 512);
@@ -309,6 +409,7 @@ impl GlyphVisitor {
     }
 }
 
+/// OutlineSinkExt trait的扩展实现
 pub trait OutlineSinkExt: OutlineSink {
     fn arc2_to(&mut self, d: f32, to: Vector2F);
 }
@@ -334,6 +435,10 @@ impl OutlineSinkExt for GlyphVisitor {
 }
 
 impl OutlineSink for GlyphVisitor {
+     /// 移动到指定点的方法
+    /// 
+    /// # 参数
+    /// * `to` - 目标点
     fn move_to(&mut self, to: Vector2F) {
         self.arcs += 1;
         let to = Point::new(to.x(), to.y()) * self.scale;
@@ -350,6 +455,10 @@ impl OutlineSink for GlyphVisitor {
         self.previous = to;
     }
 
+    /// 直线到指定点的方法
+    /// 
+    /// # 参数
+    /// * `to` - 目标点
     fn line_to(&mut self, to: Vector2F) {
         let to = Point::new(to.x(), to.y()) * self.scale;
         log::debug!("+ L {} {} ", to.x, to.y);
@@ -368,6 +477,11 @@ impl OutlineSink for GlyphVisitor {
         self.previous = to;
     }
 
+     /// 二次贝塞尔曲线到指定点的方法
+    /// 
+    /// # 参数
+    /// * `control` - 控制点
+    /// * `to` - 目标点
     fn quadratic_curve_to(&mut self, control: Vector2F, to: Vector2F) {
         let control = Point::new(control.x(), control.y()) * self.scale;
         let to = Point::new(to.x(), to.y()) * self.scale;
@@ -390,6 +504,11 @@ impl OutlineSink for GlyphVisitor {
         self.previous = to;
     }
 
+     /// 三次贝塞尔曲线到指定点的方法
+    /// 
+    /// # 参数
+    /// * `control` - 控制线段
+    /// * `to` - 目标点
     fn cubic_curve_to(&mut self, control: LineSegment2F, to: Vector2F) {
         // 字形数据没有三次贝塞尔曲线
         let control1 = Point::new(control.from_x(), control.from_y()) * self.scale;
@@ -417,6 +536,7 @@ impl OutlineSink for GlyphVisitor {
         //         point(to.x * self.scale, to.y * self.scale),
         //     );
         // }
+        // }
         self.bbox.extend_by(control1.x, control1.y);
         self.bbox.extend_by(control2.x, control2.y);
         self.bbox.extend_by(to.x, to.y);
@@ -424,6 +544,7 @@ impl OutlineSink for GlyphVisitor {
         self.previous = to;
     }
 
+    /// 关闭路径的方法
     fn close(&mut self) {
         if self.previous != self.start {
             log::debug!("+ L {} {} ", self.start.x, self.start.y);
@@ -460,6 +581,20 @@ impl OutlineSink for GlyphVisitor {
     }
 }
 
+/// 将输入的矢量数据转换为纹理表示的SDF格式
+///
+/// # 参数
+/// * `global_arcs` - 存储所有弧段的全局列表
+/// * `arcs_info` - 每个网格点对应的弧段索引及其在矢量路径中所占据的位置
+/// * `extents` - 矢量形状的包围盒
+/// * `tex_size` - 生成的纹理宽度和高度（二维纹理，方形纹理，边长为tex_size）
+/// * `distance` - 在该距离内，alpha值衰减为0的点（边缘范围的截止值）
+/// * `width` - SVG转换中的线宽（未实现，保留为None）
+/// * `is_outer_glow` - 是否应用外发光效果（闪烁效果）
+/// * `is_svg` - 是否作为SVG路径进行处理（影响坐标变换的方向）
+/// * `is_reverse` - 是否反转颜色通道（区分前景与背景）
+/// # 返回值
+/// 生成的SDF纹理作为一维数组，每个元素代表一个纹理点的值。
 pub fn encode_sdf(
     global_arcs: &Vec<Arc>,
     arcs_info: Vec<(Vec<usize>, Aabb)>,
@@ -471,23 +606,31 @@ pub fn encode_sdf(
     is_svg: bool,
     is_reverse: Option<bool>,
 ) -> Vec<u8> {
-    let glyph_width = extents.width();
-    // let glyph_height = extents.height();
+    // 除非字符的高度不是0，否则方阵将无法正确生成。极端情况下字符宽度为0时可能会导致计算错误，应当进行判断，但根据问题描述，应不会出现这种情况。
+    // 假设矢量形状包围盒的width不为零
+    let glyph_width = extents.width(); // 计算矢量形状的宽度
+    // 假设高度不为零，暂未处理高度为零的情况
 
-    let unit_d = glyph_width / tex_size as f32;
+    // 计算每单元在包围盒中的尺寸宽度，该值为纹理单位的缩放因子
+    let unit_d = glyph_width / tex_size as f32; // 计算每单元宽度
 
-    let mut data = vec![0; tex_size * tex_size];
+    // 初始化所有纹理点的值为0
+    let mut data = vec![0; tex_size * tex_size]; // 创建一个一维数组用于存储最终的纹理数据
 
-    for (near_arcs, cell) in arcs_info {
-        if let Some(ab) = cell.collision(extents) {
-            //
-            let begin = ab.mins - extents.mins;
-            let end = ab.maxs - extents.mins;
+    // 遍历每个网格点（cell），每个cell对应一个弧段列表，以及该cell在矢量形状包围盒中的所在区域
+    for (near_arcs, cell) in arcs_info {  // 遍历每个预处理好的单元格
+        if let Some(ab) = cell.collision(extents) { // 确定该单元格是否在矢量过程中实际占用空间
+            // Compute the relative positions for this tile in texture space中将包围盒偏移一个单元尺寸，以适合整数坐标计算
+            let begin = ab.mins - extents.mins; // 将包围盒的起点坐标系原点设为中心点坐标系下的张量起点，便于计算
+            let end = ab.maxs - extents.mins;   // 围绕盒的终点
 
+            // 将包围盒的起点坐标系转换为纹理坐标系，单位缩放为unit_d，并转换为整数索引
             let mut begin_x = begin.x / unit_d;
-            begin_x = (begin_x * 10000.0).round() * 0.0001;
+            // 使用四舍五入的方式将浮点数转换为整数索引，避免坐标系偏移误差
+            begin_x = (begin_x * 10000.0).round() * 0.0001; // 四舍五入
             let begin_x = begin_x.round() as usize;
 
+            // 同样处理其他坐标轴
             let mut begin_y = begin.y / unit_d;
             begin_y = (begin_y * 10000.0).round() * 0.0001;
             let begin_y = begin_y.round() as usize;
@@ -499,15 +642,17 @@ pub fn encode_sdf(
             let mut end_y = end.y / unit_d;
             end_y = (end_y * 10000.0).round() * 0.0001;
             let end_y = end_y.round() as usize;
-            // log::debug!("{:?}", (begin_x, begin_y, end_x, end_y));
-            // If the arclist is two arcs that can be combined in encoding if reordered, do that.
-            for i in begin_x..end_x {
-                for j in begin_y..end_y {
+
+            // 遍历该单元格在纹理中的对应区域，每个(i,j)点即为纹理中的一个点，对应的2D坐标i,j转换为线性数组索引i + j * tex_size
+            for i in begin_x..end_x {  // 纹理x轴方向遍历
+                for j in begin_y..end_y {   // 纹理y轴方向遍历
+                    // 将纹理点的i,j转回矢量空间的具体点p。由于每个单元的中心点对应于i+0.5的位置，所以坐标转换要考虑scale和offset
                     let p = Point::new(
-                        (i as f32 + 0.5) * unit_d + extents.mins.x,
-                        (j as f32 + 0.5) * unit_d + extents.mins.y,
+                        (i as f32 + 0.5) * unit_d + extents.mins.x,  // 计算x坐标
+                        (j as f32 + 0.5) * unit_d + extents.mins.y   // 计算y坐标
                     );
 
+                    // 调用计算函数，计算该点p处的SDF值
                     let r = compute_sdf2(
                         global_arcs,
                         p,
@@ -517,83 +662,52 @@ pub fn encode_sdf(
                         is_outer_glow,
                         is_reverse,
                     );
-                    // if j == 6 && (i == 7 || i == 6) {
-                    //     println!("p: {}, i: {}, j: {}", p, i, j);
-                    //     println!("============== cell: {:?}, extents: {:?}, ab: {:?}, unit_d: {:?}", cell, extents, ab, unit_d);
-                    //     println!("begin: {}, end: {}", begin.y / unit_d, end.y / unit_d);
-                    //     println!("sdf: {:?}", r);
-                    //     for a in &near_arcs {
-                    //         println!("{:?}", global_arcs[*a])
-                    //     }
-                    // }
 
-                    // svg 不需要颠倒纹理
+                    // 根据是否是_svg模式，调整点p在数据数组中的索引。_svg模式则不需要颠倒y轴，否则颠倒y轴以适应纹理坐标系
                     if is_svg {
+                        // 对SVG不存在颠倒，索引i,j直接访问
                         data[j * tex_size + i] = r.0;
                     } else {
-                        // log::debug!("{:?}", (r, j, i));
+                        // 非-svg模式下，颠倒y轴，将纹理的y轴坐标从下往上存储，即(y) -> (tex_size - 1 - y)
                         data[(tex_size - j - 1) * tex_size + i] = r.0;
                     }
                 }
             }
         }
     }
-    data
+    data // 返回生成的纹理数据
 }
-
-fn compute_sdf(p: Point, near_arcs: &Vec<Arc>, is_area: Option<bool>) -> u8 {
-    let sdf = glyphy_sdf_from_arc_list2(near_arcs, p).0;
-
-    let a = if let Some(is_area) = is_area {
-        let sdf1 = if !is_area {
-            (256.0 - (sdf.abs()) * 32.0).clamp(0.0, 255.0)
-        } else {
-            (256.0 - sdf * 32.0).clamp(0.0, 255.0)
-        };
-        sdf1
-    } else {
-        // let sdf = glyphy_sdf_from_arc_list2(&near_arcs, p).0;
-        // let temp = units_per_em as f32 / 2048.0;
-        // (0.5 - (sdf / (glyph_width / 64.0))).clamp(0.0, 1.0) * 255.0
-        (128.0 - sdf).clamp(0.0, 255.0)
-    };
-
-    a as u8
-}
-
-fn compute_sdf2(
-    global_arcs: &Vec<Arc>,
-    p: Point,
-    near_arcs: &Vec<usize>,
-    distance: f32,
-    width: Option<f32>,
-    is_outer_glow: bool,
-    is_reverse: Option<bool>,
+/// 计算SDF的函数，用于对每个点p进行采样，计算其对应SDF的值。
+///
+/// 此函数主要用于svg和字体贴图的sdf生成。函数会根据输入的参数计算出点p处的sdf值，并根据一些后续处理参数进行调整。
+///
+/// # 参数说明
+/// * `global_arcs` - 全局的弧段列表，包含整个矢量形状的各个弧线段信息。
+/// * `p` - 当前需要计算SDF的点的位置。
+/// * `near_arcs` - 当前单元内的近邻弧段列表。用于快速计算该点的SDF。
+/// * `distance` - SDF衰减距离，超过这个距离的点，其alpha值为0。
+/// * `width` - 轮廓宽度，如果非空，则将宽度中心设定为0.5，否则将取具体的距离。
+/// * `is_outer_glow` - 是否应用外发光效果，主要用于闪烁效果处理。
+/// * `is_reverse` - 是否反转颜色通道，用于区分前景与背景颜色。
+///
+/// # 返回值
+/// 一个元组，包含：
+/// - `u8`：处理后的sdf值，用于颜色显示。
+/// - `f32`：原始的sdf值，主要用于后续的计算处理。
+/// - `f32`：经过处理的sdf2值，同样用于后续的计算或显示。
+pub fn compute_sdf2(
+    global_arcs: &Vec<Arc>,         // v作为arc的全局集合输入接口模式不影响内部实现，无需改变变量类型，否则会导致编译错误。但此处是智能指针，应该可以处理。
+    p: Point,                       // 点p。能发现它是参数，可以通过显式传递进行计算。
+    near_arcs: &Vec<usize>,         // 当前单元格内的近邻arc索引列表，用于快速计算。
+    distance: f32,                  // 衰减距离。
+    width: Option<f32>,             // 宽度参数，可能影响中心点的处理。
+    is_outer_glow: bool,            // 是否外发光效果。
+    is_reverse: Option<bool>,       // 是否反转颜色通道。
 ) -> (u8, f32, f32) {
     let mut sdf = glyphy_sdf_from_arc_list3(near_arcs, p.clone(), global_arcs).0;
     // 去除浮点误差
     sdf = (sdf * 10000.0).round() * 0.0001;
-    // let p2 = Point::new(85.0, 82.0) - p;
-    // if p2.norm_squared() < 0.1{
-    //     log::debug!("p : {:?}", (p, sdf, distance));
-    //     for i in near_arcs{
-    //         log::debug!("{:?}", global_arcs[*i]);
-    //     }
-    // }
-    // let p2 = Point::new(85.5, 84.5) - p;
-    // if p2.norm_squared() < 0.1 {
-    //     log::debug!("p : {:?}", (p, sdf, distance));
-    //     for i in near_arcs {
-    //         log::debug!("{:?}", global_arcs[*i]);
-    //     }
-    // }
-    // let p2 = Point::new(85.5, 85.5) - p;
-    // if p2.norm_squared() < 0.1 {
-    //     log::debug!("p : {:?}", (p, sdf, distance));
-    //     for i in near_arcs {
-    //         log::debug!("{:?}", global_arcs[*i]);
-    //     }
-    // }
+
     if let Some(is_reverse) = is_reverse {
         if is_reverse {
             sdf = -sdf;
@@ -634,57 +748,62 @@ pub(crate) fn compute_layout(
     cur_off: u32,
     is_svg: bool,
 ) -> LayoutInfo {
+    // 创建一个aabb包围盒用于存储矢量图的几何范围。
     // map 无序导致每次计算的数据不一样
     let mut extents2 = Aabb::new(
         Point::new(extents[0], extents[1]),
         Point::new(extents[2], extents[3]),
     );
+    // 计算矢量图的宽度和高度。
     let extents_w = extents2.width();
     let extents_h = extents2.height();
+    // 计算缩放比例，将矢量图的尺寸转换为适用的单位。
     let scale = 1.0 / units_per_em as f32;
     let plane_bounds = extents2.scaled(&Vector::new(scale, scale));
 
+    // 计算每个像素在矢量图中的距离。
     let px_distance = extents_w.max(extents_h) / tex_size as f32;
     let distance = px_distance * pxrange as f32;
+    // 扩展矢量图的包围盒，以适应纹理边缘的处理。
     let expand = px_distance * cur_off as f32;
-    // log::debug!("distance: {}", distance);
     extents2.mins.x -= expand;
     extents2.mins.y -= expand;
     extents2.maxs.x += expand;
     extents2.maxs.y += expand;
 
-    // let pxrange = (pxrange >> 2 << 2) + 4;
+    // 计算考虑到偏移后的纹理大小。
     let tex_size = tex_size + (cur_off * 2) as usize;
+    // 初始化atlas.Bounds，并根据当前偏移设置其边界范围。
     let mut atlas_bounds = Aabb::new_invalid();
     atlas_bounds.mins.x = cur_off as f32;
     atlas_bounds.mins.y = cur_off as f32;
     atlas_bounds.maxs.x = tex_size as f32 - cur_off as f32;
     atlas_bounds.maxs.y = tex_size as f32 - cur_off as f32;
 
+    // 根据矢量图的宽高差异进行调整，确保矢量图在纹理中正确映射。
     let temp = extents_w - extents_h;
     if temp > 0.0 {
         extents2.maxs.y += temp;
         if is_svg {
-            // log::debug!("============= is_svg: {}", (temp / extents.height() * tex_size as f32 - 1.0));
+            // 对于svg格式，调整atlas_bounds的高度以匹配矢量图的高，避免裁剪。
             atlas_bounds.maxs.y -= (temp / extents2.height() * tex_size as f32).trunc();
         } else {
-            // 字体的y最终需要上下颠倒
+            // 对于非svg情况，调整atlas_bounds的底部以适应矢量图的高，可能反转y轴。
             atlas_bounds.mins.y += (temp / extents2.height() * tex_size as f32).ceil();
         }
     } else {
         extents2.maxs.x -= temp;
+        // 调整atlas_bounds的宽度以匹配矢量图的宽。
         atlas_bounds.maxs.x -= (temp.abs() / extents2.width() * tex_size as f32).trunc();
     }
-    // plane_bounds.scale(
-    //     atlas_bounds.width() / 32.0 / plane_bounds.width(),
-    //     atlas_bounds.height() / 32.0 / plane_bounds.width(),
-    // );
 
+    // 输出调试信息，显示plane.Bounds，atlas.Bounds和tex_size。
     log::debug!(
         "plane_bounds: {:?}, atlas_bounds: {:?}, tex_size: {}",
         plane_bounds, atlas_bounds, tex_size
     );
 
+    // 创建并返回LayoutInfo结构体，包含计算后的各参数。
     LayoutInfo {
         plane_bounds: vec![
             plane_bounds.mins.x,
@@ -709,21 +828,28 @@ pub(crate) fn compute_layout(
     }
 }
 
+// 它根据输入的比例参数进行调整，确保包围盒的范围适合显示需求。
 pub fn compute_cell_range(mut bbox: Aabb, scale: f32) -> Aabb {
+    // 缩放因子设置为输入值的一半，用于调整包围盒的尺寸。
     let scale = scale * 0.5;
+    // 计算当前包围盒的宽度和高度。
     let w = bbox.width();
     let h = bbox.height();
-
+    // 确定宽度和高度的差异，用于后续调整。
     let temp = w - h;
+    // 根据差异调整包围盒的范围，确保合适的空间分配。
     if temp > 0.0 {
+        // 如果宽度大于高度，调整y轴范围。
         bbox.maxs.y += temp;
     } else {
+        // 如果高度大于宽度，调整x轴范围。
         bbox.maxs.x -= temp;
     }
-
+    // 计算调整后的包围盒宽度。
     let w = bbox.width();
+    // 计算扩展的大小，用于延伸包围盒。
     let extents = scale * w;
-
+    // 扩展包围盒的每个边，确保内容不会被裁剪。
     bbox.mins.x -= extents;
     bbox.mins.y -= extents;
     bbox.maxs.x += extents;
@@ -733,13 +859,17 @@ pub fn compute_cell_range(mut bbox: Aabb, scale: f32) -> Aabb {
 }
 
 pub fn to_arc_cmds(endpoints: &Vec<ArcEndpoint>) -> (Vec<Vec<String>>, Vec<[f32; 2]>) {
+    // 初始化命令数组和点列表以存储处理结果
     let mut _cmd = vec![];
     let mut cmd_array = vec![];
     let mut current_point = None;
     let mut pts = vec![];
+    // 遍历endpoint切片中的每一个元素，处理弧线绘制命令生成SVG路径字符串
     for ep in endpoints {
         pts.push([ep.p[0], ep.p[1]]);
+        pts.push([ep.p[0], ep.p[1]]); // 将当前弧的终点坐标加入pts列表
 
+        // 处理GLYPHY_INFINITY类型的端点，即一条新的路径起点
         if ep.d == GLYPHY_INFINITY {
             if current_point.is_none() || !float2_equals(&ep.p, current_point.as_ref().unwrap()) {
                 if _cmd.len() > 0 {
@@ -821,7 +951,6 @@ pub fn arc_to_svg_a(
         radius, radius, large_arc_flag, sweep_flag, end_x, end_y
     );
 }
-
 pub fn create_indices() -> [u16; 6] {
     [0, 1, 2, 1, 2, 3]
 }
@@ -1242,3 +1371,4 @@ impl<'de> Deserialize<'de> for CellInfo {
         deserializer.deserialize_struct("Point", FIELDS, CellInfoVisitor)
     }
 }
+
