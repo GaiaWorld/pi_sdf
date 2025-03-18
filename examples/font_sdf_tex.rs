@@ -103,8 +103,8 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     });
 
     // let buffer = std::fs::read("./source/SOURCEHANSANSK-MEDIUM.TTF").unwrap();
-    let buffer = std::fs::read("./source/msyh.ttf").unwrap();
-    let mut ft_face = FontFace::new(Arc::new(buffer));
+    let buffer = std::fs::read("./source/kt.woff2").unwrap();
+    let mut ft_face = { FontFace::new(Arc::new(buffer)) };
 
     println!("max_box_normaliz: {:?}", ft_face.max_box_normaliz());
     let pxrange = 10;
@@ -362,8 +362,9 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     });
 
     let swapchain_capabilities = surface.get_capabilities(&adapter);
-    let swapchain_format = swapchain_capabilities.formats[3];
     println!("swapchain_format: {:?}", swapchain_capabilities.formats);
+    let swapchain_format = swapchain_capabilities.formats[1];
+    // println!("swapchain_format: {:?}", swapchain_capabilities.formats);
     // 创建网格数据
     let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: Some("Index Buffer"),

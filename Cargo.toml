@@ -1,6 +1,6 @@
 [package]
 name = "pi_sdf"
-version = "0.1.28"
+version = "0.1.29"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -13,9 +13,9 @@ derive-deref-rs = "0.1"
 parry2d = "0.13"
 log = {version = "0.4"}#, features = ["release_max_level_error"]}
 allsorts = { version = "0.14", default-features = false,  features = ["flate2_rust", "outline"]}
-ab_glyph_rasterizer = "0.1"
+# ab_glyph_rasterizer = "0.1"
 console_log = "1.0"
-usvg = "0.32"
+# usvg = "0.32"
 kurbo = "0.9"
 bytemuck = { version = "1.4", features = [ "derive" ] }
 pi_hash = {version = "0.1", features = ["xxhash"]}
@@ -29,6 +29,7 @@ lyon_geom = "1.0"
 # lol_alloc = {path = "../lol_alloc"}
 # lol_alloc = "0.4"
 talc = "=4.4.0"
+unicode-segmentation = "1.10"
 
 [target."cfg(target_arch = \"wasm32\")".dependencies]
 getrandom = {version = "0.2", features = ["js"]}
@@ -54,7 +55,7 @@ pi_assets = "0.14"
 [profile.release]
 # incremental = true
 # strip = true
-# lto = true
+lto = true
 # panic = "abort"
 # codegen-units = 1
 # opt-level = 

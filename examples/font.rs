@@ -78,7 +78,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     let rect = shape::Rect::new(20.0, 20.0, 150.0, 50.0);
     let info = rect.get_svg_info();
 
-    let line = shape::Segment::new(220.0, 300.0, 20.0, 100.0);
+    let line = shape::Segment::new(220.0, 300.0, 20.0, 100.0, None);
     let info = line.get_svg_info();
 
     let cell_info = info.compute_near_arcs(scale);
@@ -333,7 +333,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     });
 
     let swapchain_capabilities = surface.get_capabilities(&adapter);
-    let swapchain_format = swapchain_capabilities.formats[2];
+    let swapchain_format = swapchain_capabilities.formats[1];
     println!("swapchain_format: {:?}", swapchain_capabilities.formats);
     // 创建网格数据
     let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {

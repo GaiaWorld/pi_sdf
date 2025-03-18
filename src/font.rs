@@ -3,14 +3,10 @@ use crate::{
     utils::{compute_cell_range, CellInfo},
 };
 use allsorts::{
-    binary::read::ReadScope,
-    font::MatchingPresentation,
-    font_data::{DynamicFontTableProvider, FontData},
-    outline::OutlineBuilder,
-    tables::{glyf::GlyfTable, loca::LocaTable, FontTableProvider, HeadTable},
-    tag, Font,
+    binary::read::ReadScope, font::MatchingPresentation, font_data::{DynamicFontTableProvider, FontData}, gsub::{FeatureMask, Features}, outline::OutlineBuilder, tables::{glyf::GlyfTable, loca::LocaTable, FontTableProvider, HeadTable}, tag, Font
 };
 use pi_share::Share;
+use unicode_segmentation::UnicodeSegmentation;
 
 use crate::{
     glyphy::{
@@ -29,6 +25,14 @@ use crate::{
 use std::char;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::wasm_bindgen;
+
+fn is_arabic_char(c: char) -> bool {
+    match c as u32 {
+        0x0600..=0x06FF | 0x0750..=0x077F | 0x08A0..=0x08FF | 0xFB50..=0xFDFF | 0xFE70..=0xFEFF => true,
+        _ => false,
+    }
+}
+
 /// FontFace 结构体，表示一个字体的面，包含字体数据和相关信息。
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub struct FontFace {
@@ -57,6 +61,7 @@ impl FontFace {
     /// * `Self`: 新的 FontFace 实例。
     pub fn new_inner(_data: Share<Vec<u8>>) -> Self {
         // 初始化日志模块，设置日志级别为 Info。
+        log::error!("=============1");
         let _ = console_log::init_with_level(log::Level::Info);
         let d: &'static Vec<u8> = unsafe { std::mem::transmute(_data.as_ref()) };
         let scope = ReadScope::new(d);
@@ -108,11 +113,11 @@ impl FontFace {
         // extents.maxs.x += 128.0;
         // extents.maxs.y += 128.0;
 
-        // log::info!("=========== 10");
+        log::error!("=========== 10!! _glyf_data: {}, : _loca_data: {}", _glyf_data.len(), _loca_data.len());
         // todo!()
         log::debug!("units_per_em: {}", head_table.units_per_em);
         Self {
-            _data,
+            _data: pi_share::Share::new(vec![]),
             font,
             glyf,
             _glyf_data,
@@ -312,6 +317,11 @@ impl FontFace {
         let (glyph_index, _) =
             self.font
                 .lookup_glyph_index(char, MatchingPresentation::NotRequired, None);
+        self.horizontal_advance_of_glyph_index(glyph_index)
+    }
+
+    /// 水平宽度
+    pub fn horizontal_advance_of_glyph_index(&mut self, glyph_index: u16) -> f32 {
         if glyph_index != 0 {
             // self.font
             match self.font.horizontal_advance(glyph_index) {
@@ -386,12 +396,71 @@ impl FontFace {
         glyph_index
     }
 
+    pub fn glyph_indexs(&mut self, text: &str, script: u32) -> Vec<u16> {
+        let g = text.split_word_bounds().collect::<Vec<&str>>();
+        let mut glyphs = Vec::new();
+        let mut str = "".to_string();
+        for s in g {
+            let char  = s.chars().next().unwrap();
+            println!("===========char: {}, unicode: {}, is_arabic_char: {}", s, char as u32, is_arabic_char(char));
+            if !is_arabic_char(char){
+                str.push_str(s);
+            } else {
+                if !str.is_empty() {
+                    // println!("========== 普通字符：{}, 颠倒：{}", str, str.chars().rev().collect::<String>());
+                    // let r = str.chars().rev().collect::<String>();
+                    let t = if script != 0{
+                        str.chars().rev().collect::<String>()
+                    }else{
+                        str.chars().collect::<String>()
+                    };
+
+                    glyphs.append(&mut self.glyph_indexs_impl(&t));
+                    str.clear();
+                }
+                glyphs.append(&mut self.glyph_indexs_impl(s));
+            }
+        }
+
+        if !str.is_empty() {
+            // println!("========== 普通字符：{}, 颠倒：{}", str, str.chars().rev().collect::<String>());
+            // let r = str.chars().rev().collect::<String>();
+            let t = if script != 0{
+                str.chars().rev().collect::<String>()
+            }else{
+                str.chars().collect::<String>()
+            };
+
+            glyphs.append(&mut self.glyph_indexs_impl(&t));
+            str.clear();
+        }
+        
+        glyphs
+    }
+
+    fn glyph_indexs_impl(&mut self, text: &str)-> Vec<u16> {
+        let script = tag::ARAB;
+        let lang = tag!(b"URD ");
+        let glyphs = self.font.map_glyphs(text, script, MatchingPresentation::NotRequired);
+        let glyphs = self.font
+            .shape(
+                glyphs,
+                script,
+                Some(lang),
+                &Features::Mask(FeatureMask::default()),
+                true,
+            )
+            .expect("error shaping text");
+        glyphs.iter().map(|item| item.glyph.glyph_index).collect::<Vec<u16>>()
+    }
+
     /// 获取字体数据的大小。
     ///
     /// # 返回值
     /// 字体数据的大小（usize）
     pub fn debug_size(&self) -> usize {
-        self._data.len()
+        // self._data.len()
+        0
     }
 
     /// 将字符转换为轮廓信息。
@@ -401,12 +470,23 @@ impl FontFace {
     /// # 返回值
     /// 轮廓信息（OutlineInfo）
     pub fn to_outline(&mut self, ch: char) -> OutlineInfo {
-        let mut sink = GlyphVisitor::new(SCALE / self.units_per_em as f32);
-        sink.accumulate.tolerance = self.units_per_em as f32 * TOLERANCE;
-
         let (glyph_index, _) =
             self.font
                 .lookup_glyph_index(ch, MatchingPresentation::NotRequired, None);
+        let mut o = self.to_outline_of_glyph_index(glyph_index);
+        o.char = ch;
+        o
+    }
+
+    /// 将字符转换为轮廓信息。
+    ///
+    /// # 参数
+    /// - `ch`: 查询的字符
+    /// # 返回值
+    /// 轮廓信息（OutlineInfo）
+    pub fn to_outline_of_glyph_index(&mut self, glyph_index: u16) -> OutlineInfo {
+        let mut sink = GlyphVisitor::new(SCALE / self.units_per_em as f32);
+        sink.accumulate.tolerance = self.units_per_em as f32 * TOLERANCE;
         assert_ne!(glyph_index, 0);
         let advance = self.font.horizontal_advance(glyph_index).unwrap();
 
@@ -436,7 +516,7 @@ impl FontFace {
             bbox: vec![bbox2.mins.x, bbox2.mins.y, bbox2.maxs.x, bbox2.maxs.y],
             advance,
             units_per_em: self.units_per_em,
-            char: ch,
+            char: ' ',
             extents: vec![bbox.mins.x, bbox.mins.y, bbox.maxs.x, bbox.maxs.y],
             // #[cfg(feature = "debug")]
             svg_paths,
@@ -451,6 +531,24 @@ impl FontFace {
     /// 轮廓信息（WasmOutlineInfo）
     pub fn to_outline_of_wasm(&mut self, ch: char) -> WasmOutlineInfo {
         let outline = self.to_outline(ch);
+        let buf = bitcode::serialize(&outline).unwrap();
+        WasmOutlineInfo {
+            buf,
+            units_per_em: outline.units_per_em,
+            advance: outline.advance,
+            bbox: outline.bbox,
+            extents: outline.extents,
+        }
+    }
+
+    /// 将字符转换为轮廓信息（WebAssembly专用）。
+    ///
+    /// # 参数
+    /// - `ch`: 查询的字符
+    /// # 返回值
+    /// 轮廓信息（WasmOutlineInfo）
+    pub fn to_outline_of_wasm_glyph_index(&mut self, glyph_index: u16) -> WasmOutlineInfo {
+        let outline = self.to_outline_of_glyph_index(glyph_index);
         let buf = bitcode::serialize(&outline).unwrap();
         WasmOutlineInfo {
             buf,

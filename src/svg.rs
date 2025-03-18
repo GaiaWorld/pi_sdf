@@ -3,10 +3,10 @@ use allsorts::{
     pathfinder_geometry::{line_segment::LineSegment2F, vector::Vector2F},
 };
 
-use usvg::{
+// use usvg::{
     // tiny_skia_path::{self, PathVerb},
-    TreeParsing,
-};
+    // TreeParsing,
+// };
 
 use crate::{
     glyphy::geometry::aabb::Aabb,
@@ -39,39 +39,39 @@ impl PathType {
 }
 
 pub struct Svg {
-    pub(crate) _tree: usvg::Tree,
+    // pub(crate) _tree: usvg::Tree,
     pub(crate) view_box: Aabb,
 }
 
 impl Svg {
     pub fn new(data: Vec<u8>) -> Self {
-        let tree = usvg::Tree::from_data(&data, &usvg::Options::default()).unwrap();
+        // let tree = usvg::Tree::from_data(&data, &usvg::Options::default()).unwrap();
 
-        let view_box = tree.view_box;
-        let mut left = view_box.rect.left();
-        let mut right = view_box.rect.right();
+        // let view_box = tree.view_box;
+        // let mut left = view_box.rect.left();
+        // let mut right = view_box.rect.right();
 
-        let mut top = view_box.rect.top();
-        let mut bottom = view_box.rect.bottom();
+        // let mut top = view_box.rect.top();
+        // let mut bottom = view_box.rect.bottom();
 
-        let width = (right - left).abs();
-        let height = (bottom - top).abs();
-        if width > height {
-            bottom += width - height;
-        } else {
-            right += height - width;
-        }
-        left -= 10.0;
-        top -= 10.0;
+        // let width = (right - left).abs();
+        // let height = (bottom - top).abs();
+        // if width > height {
+        //     bottom += width - height;
+        // } else {
+        //     right += height - width;
+        // }
+        // left -= 10.0;
+        // top -= 10.0;
 
-        right += 10.0;
-        bottom += 10.0;
+        // right += 10.0;
+        // bottom += 10.0;
 
         Self {
-            _tree: tree,
+            // _tree: tree,
             view_box: Aabb::new(
-                 Point::new(left as f32, top as f32),
-                 Point::new(right as f32, bottom as f32),
+                 Point::new(0 as f32, 0 as f32),
+                 Point::new(0 as f32, 0 as f32),
             ),
         }
     }

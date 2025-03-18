@@ -9,7 +9,7 @@ use core::fmt;
 use std::collections::HashMap;
 // use std::collections::BTreeMap as HashMap;
 
-use ab_glyph_rasterizer::Rasterizer;
+// use ab_glyph_rasterizer::Rasterizer;
 use allsorts::{
     outline::OutlineSink,
     pathfinder_geometry::{line_segment::LineSegment2F, vector::Vector2F},
@@ -20,7 +20,7 @@ use serde::{
     Deserialize, Serialize,
 };
 // use serde::{ser::SerializeStruct, Deserialize, Serialize, Serializer};
-use usvg::{Color, Fill, NonZeroPositiveF64, Paint, Stroke};
+// use usvg::{Color, Fill, NonZeroPositiveF64, Paint, Stroke};
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::wasm_bindgen;
 
@@ -354,7 +354,7 @@ pub struct User { // 用户自定义数据结构的定义，包含 glyphs累积�
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub struct GlyphVisitor {
     /// 用于光栅化的Rasterizer对象
-    _rasterizer: Rasterizer,
+    // _rasterizer: Rasterizer,
      /// 用于累积路径数据的GlyphyArcAccumulator对象
     pub(crate) accumulate: GlyphyArcAccumulator,
     /// 字体路径的字符串表示（仅在调试模式下有效）
@@ -386,9 +386,9 @@ impl GlyphVisitor {
     /// * `scale` - 标尺因子，用于缩放坐标
     pub fn new(scale: f32) -> Self {
         let accumulate = GlyphyArcAccumulator::new();
-        let _rasterizer = ab_glyph_rasterizer::Rasterizer::new(512, 512);
+        // let _rasterizer = ab_glyph_rasterizer::Rasterizer::new(512, 512);
         Self {
-            _rasterizer,
+            // _rasterizer,
             accumulate,
             #[cfg(feature = "debug")]
             path_str: "".to_string(),
@@ -957,8 +957,8 @@ pub fn create_indices() -> [u16; 6] {
 
 #[derive(Debug, Default, Clone)]
 pub struct Attribute {
-    pub fill: Option<Fill>,
-    pub stroke: Option<Stroke>,
+    // pub fill: Option<Fill>,
+    // pub stroke: Option<Stroke>,
     pub is_close: bool,
     pub start: Point,
 }
@@ -967,38 +967,38 @@ unsafe impl Send for Attribute {}
 unsafe impl Sync for Attribute {}
 impl Attribute {
     pub fn set_fill_color(&mut self, r: u8, g: u8, b: u8) {
-        let fill = Fill::from_paint(Paint::Color(Color::new_rgb(r, g, b)));
-        self.fill = Some(fill);
+        // let fill = Fill::from_paint(Paint::Color(Color::new_rgb(r, g, b)));
+        // self.fill = Some(fill);
     }
 
     pub fn set_stroke_color(&mut self, r: u8, g: u8, b: u8) {
-        if let Some(stroke) = &mut self.stroke {
-            stroke.paint = Paint::Color(Color::new_rgb(r, g, b));
-        } else {
-            let mut stroke = Stroke::default();
-            stroke.paint = Paint::Color(Color::new_rgb(r, g, b));
-            self.stroke = Some(stroke);
-        }
+        // if let Some(stroke) = &mut self.stroke {
+        //     stroke.paint = Paint::Color(Color::new_rgb(r, g, b));
+        // } else {
+        //     let mut stroke = Stroke::default();
+        //     stroke.paint = Paint::Color(Color::new_rgb(r, g, b));
+        //     self.stroke = Some(stroke);
+        // }
     }
 
     pub fn set_stroke_width(&mut self, width: f32) {
-        if let Some(stroke) = &mut self.stroke {
-            stroke.width = NonZeroPositiveF64::new(width as f64).unwrap();
-        } else {
-            let mut stroke = Stroke::default();
-            stroke.width = NonZeroPositiveF64::new(width as f64).unwrap();
-            self.stroke = Some(stroke);
-        }
+        // if let Some(stroke) = &mut self.stroke {
+        //     stroke.width = NonZeroPositiveF64::new(width as f64).unwrap();
+        // } else {
+        //     let mut stroke = Stroke::default();
+        //     stroke.width = NonZeroPositiveF64::new(width as f64).unwrap();
+        //     self.stroke = Some(stroke);
+        // }
     }
 
     pub fn set_stroke_dasharray(&mut self, dasharray: Vec<f64>) {
-        if let Some(stroke) = &mut self.stroke {
-            stroke.dasharray = Some(dasharray)
-        } else {
-            let mut stroke = Stroke::default();
-            stroke.dasharray = Some(dasharray);
-            self.stroke = Some(stroke);
-        }
+        // if let Some(stroke) = &mut self.stroke {
+        //     stroke.dasharray = Some(dasharray)
+        // } else {
+        //     let mut stroke = Stroke::default();
+        //     stroke.dasharray = Some(dasharray);
+        //     self.stroke = Some(stroke);
+        // }
     }
 }
 
