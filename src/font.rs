@@ -61,8 +61,8 @@ impl FontFace {
     /// * `Self`: 新的 FontFace 实例。
     pub fn new_inner(_data: Share<Vec<u8>>) -> Self {
         // 初始化日志模块，设置日志级别为 Info。
-        log::error!("=============1");
         let _ = console_log::init_with_level(log::Level::Info);
+        log::error!("FontFace:: new_inner: {}", _data.len());
         let d: &'static Vec<u8> = unsafe { std::mem::transmute(_data.as_ref()) };
         let scope = ReadScope::new(d);
         let font_file = scope.read::<FontData<'static>>().unwrap();
@@ -402,7 +402,7 @@ impl FontFace {
         let mut str = "".to_string();
         for s in g {
             let char  = s.chars().next().unwrap();
-            println!("===========char: {}, unicode: {}, is_arabic_char: {}", s, char as u32, is_arabic_char(char));
+            // println!("===========char: {}, unicode: {}, is_arabic_char: {}", s, char as u32, is_arabic_char(char));
             if !is_arabic_char(char){
                 str.push_str(s);
             } else {

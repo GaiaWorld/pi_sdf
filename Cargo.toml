@@ -1,6 +1,6 @@
 [package]
 name = "pi_sdf"
-version = "0.1.29"
+version = "0.1.30"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -11,7 +11,7 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 derive-deref-rs = "0.1"
 parry2d = "0.13"
-log = {version = "0.4"}#, features = ["release_max_level_error"]}
+log = "0.4"#, features = ["release_max_level_error"]}
 allsorts = { version = "0.14", default-features = false,  features = ["flate2_rust", "outline"]}
 # ab_glyph_rasterizer = "0.1"
 console_log = "1.0"
@@ -24,7 +24,7 @@ brotli-decompressor = "2.5"
 bitcode = {version= "0.6", features = [ "serde" ]}
 # bincode = "1.3"
 web-sys = {version = "0.3", features = ["Window", "Performance"]}
-pi_share = "0.4"
+pi_share = "0.5"
 lyon_geom = "1.0"
 # lol_alloc = {path = "../lol_alloc"}
 # lol_alloc = "0.4"
@@ -55,7 +55,7 @@ pi_assets = "0.14"
 [profile.release]
 # incremental = true
 # strip = true
-lto = true
+# lto = true
 # panic = "abort"
 # codegen-units = 1
 # opt-level = 

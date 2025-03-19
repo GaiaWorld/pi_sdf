@@ -26,7 +26,7 @@ pub type Orthographic3 = parry2d::na::Orthographic3<f32>;
 #[cfg(target_arch = "wasm32")]
 #[global_allocator]
 static ALLOCATOR: talc::Talck<talc::locking::AssumeUnlockable, talc::ClaimOnOom> = unsafe {
-    static mut MEMORY: [u8; 48 * 1024 * 1024] = [0; 48 * 1024 * 1024];
+    static mut MEMORY: [u8; 128 * 1024 * 1024] = [0; 128 * 1024 * 1024];
     let span = talc::Span::from_const_array(std::ptr::addr_of!(MEMORY));
     talc::Talc::new(talc::ClaimOnOom::new(span)).lock()
 };
