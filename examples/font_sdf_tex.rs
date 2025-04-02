@@ -102,14 +102,15 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         },
     });
 
-    // let buffer = std::fs::read("./source/SOURCEHANSANSK-MEDIUM.TTF").unwrap();
-    let buffer = std::fs::read("./source/kt.woff2").unwrap();
+    let buffer = std::fs::read("./source/wdyk-Reg.TTF").unwrap();
+    // let buffer = std::fs::read("./source/wdyk.woff2").unwrap();
     let mut ft_face = { FontFace::new(Arc::new(buffer)) };
-
+    let g = ft_face.glyph_index('□');
+    println!("=============g: {}", g);
     println!("max_box_normaliz: {:?}", ft_face.max_box_normaliz());
     let pxrange = 10;
     let time = std::time::Instant::now();
-    let mut outline_info = ft_face.to_outline('魔');
+    let mut outline_info = ft_face.to_outline('【');
 
     // println!("===================plane_bounds: {:?}", plane_bounds);
     let result_arcs = outline_info.compute_near_arcs(2.0);

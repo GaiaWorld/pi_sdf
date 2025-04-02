@@ -49,6 +49,8 @@ pub struct FontFace {
     pub(crate) max_box: Aabb,
     pub(crate) max_box_normaliz: Aabb,
     pub(crate) units_per_em: u16,
+    // temp_glyphs: Vec<u16>,
+    // temp_str:Vec<String>;
 }
 
 impl FontFace {
@@ -61,8 +63,9 @@ impl FontFace {
     /// * `Self`: 新的 FontFace 实例。
     pub fn new_inner(_data: Share<Vec<u8>>) -> Self {
         // 初始化日志模块，设置日志级别为 Info。
+        #[cfg(target_arch = "wasm32")]
         let _ = console_log::init_with_level(log::Level::Info);
-        log::error!("FontFace:: new_inner: {}", _data.len());
+        println!("FontFace:: new_inner: {:?}", (_data.len(), std::thread::current().id()));
         let d: &'static Vec<u8> = unsafe { std::mem::transmute(_data.as_ref()) };
         let scope = ReadScope::new(d);
         let font_file = scope.read::<FontData<'static>>().unwrap();
@@ -117,7 +120,8 @@ impl FontFace {
         // todo!()
         log::debug!("units_per_em: {}", head_table.units_per_em);
         Self {
-            _data: pi_share::Share::new(vec![]),
+            // _data: pi_share::Share::new(vec![]),
+            _data,
             font,
             glyf,
             _glyf_data,
@@ -397,48 +401,56 @@ impl FontFace {
     }
 
     pub fn glyph_indexs(&mut self, text: &str, script: u32) -> Vec<u16> {
-        let g = text.split_word_bounds().collect::<Vec<&str>>();
-        let mut glyphs = Vec::new();
-        let mut str = "".to_string();
-        for s in g {
-            let char  = s.chars().next().unwrap();
-            // println!("===========char: {}, unicode: {}, is_arabic_char: {}", s, char as u32, is_arabic_char(char));
-            if !is_arabic_char(char){
-                str.push_str(s);
-            } else {
-                if !str.is_empty() {
-                    // println!("========== 普通字符：{}, 颠倒：{}", str, str.chars().rev().collect::<String>());
-                    // let r = str.chars().rev().collect::<String>();
-                    let t = if script != 0{
-                        str.chars().rev().collect::<String>()
-                    }else{
-                        str.chars().collect::<String>()
-                    };
+        // let g = text.split_word_bounds().collect::<Vec<&str>>();
+        // let mut glyphs = Vec::new();
+        // let mut str = Vec::new();
+        // let mut temp_str = "".to_string();
+        // for s in g {
+        //     let char  = s.chars().next().unwrap();
+        //     // println!("===========text: {}, unicode: {}, is_arabic_char: {}", s, char as u32, is_arabic_char(char));
+        //     if !is_arabic_char(char){
+        //         str.push(s);
+        //     } else {
+        //         if !str.is_empty() {
+        //             // println!("========== 普通字符：{:?}, 颠倒：{}", str, str.clone().into_iter().rev().collect::<String>());
+        //             let t = if true {
+        //                 str.clone().into_iter().rev().collect::<String>()
+        //             }else{
+        //                 str.clone().into_iter().collect::<String>()
+        //             };
 
-                    glyphs.append(&mut self.glyph_indexs_impl(&t));
-                    str.clear();
-                }
-                glyphs.append(&mut self.glyph_indexs_impl(s));
-            }
-        }
+        //             temp_str.push_str(&t);
+        //             glyphs.append(&mut self.glyph_indexs_impl(&t));
+        //             str.clear();
+        //         }
+        //         temp_str.push_str(s);
+        //         glyphs.append(&mut self.glyph_indexs_impl(s));
+        //     }
+        // }
 
-        if !str.is_empty() {
-            // println!("========== 普通字符：{}, 颠倒：{}", str, str.chars().rev().collect::<String>());
-            // let r = str.chars().rev().collect::<String>();
-            let t = if script != 0{
-                str.chars().rev().collect::<String>()
-            }else{
-                str.chars().collect::<String>()
-            };
+        // if !str.is_empty() {
+        //     // println!("========== 普通字符：{:?}, 颠倒：{}", str, str.clone().into_iter().rev().collect::<String>());
+        //     // let r = str.chars().rev().collect::<String>();
+        //     let t = if true {
+        //         str.clone().into_iter().rev().collect::<String>()
+        //     }else{
+        //         str.clone().into_iter().collect::<String>()
+        //     };
 
-            glyphs.append(&mut self.glyph_indexs_impl(&t));
-            str.clear();
-        }
-        
-        glyphs
+        //     temp_str.push_str(&t);
+        //     glyphs.append(&mut self.glyph_indexs_impl(&t));
+        //     str.clear();
+        // }
+        self.glyph_indexs_impl(&text)
+
     }
 
     fn glyph_indexs_impl(&mut self, text: &str)-> Vec<u16> {
+
+        // println!("========== text: {:?}", (text, self._glyf_data.len(), std::thread::current().id()));
+        // for c in text.chars(){
+        //     println!("=========== v: {}", c as u32)
+        // }
         let script = tag::ARAB;
         let lang = tag!(b"URD ");
         let glyphs = self.font.map_glyphs(text, script, MatchingPresentation::NotRequired);
@@ -450,8 +462,11 @@ impl FontFace {
                 &Features::Mask(FeatureMask::default()),
                 true,
             )
-            .expect("error shaping text");
-        glyphs.iter().map(|item| item.glyph.glyph_index).collect::<Vec<u16>>()
+            .unwrap();
+       
+        let r = glyphs.iter().map(|item|{/* println!("=========== ch: {:?}, glyph_index: {} ", item.glyph.glyph_origin, item.glyph.glyph_index); */ item.glyph.glyph_index} ).collect::<Vec<u16>>();
+        // println!("=========== r: {:?}", r);
+        r
     }
 
     /// 获取字体数据的大小。
@@ -459,8 +474,7 @@ impl FontFace {
     /// # 返回值
     /// 字体数据的大小（usize）
     pub fn debug_size(&self) -> usize {
-        // self._data.len()
-        0
+        self._data.len() + self._glyf_data.len() + self._loca_data.len()
     }
 
     /// 将字符转换为轮廓信息。

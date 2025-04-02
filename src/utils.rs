@@ -486,9 +486,15 @@ impl OutlineSink for GlyphVisitor {
         let control = Point::new(control.x(), control.y()) * self.scale;
         let to = Point::new(to.x(), to.y()) * self.scale;
 
-        log::debug!("+ Q {} {} {} {} ", control.x, control.y, to.x, to.y);
+        
         // if self.scale > 0.02 {
-        self.accumulate.conic_to(control, to);
+        if (control - self.previous).norm_squared() < 0.001{
+            log::debug!("+ L {} {} ", to.x, to.y);
+            self.accumulate.line_to(to);
+        }else{
+            log::debug!("+ Q {} {} {} {} ", control.x, control.y, to.x, to.y);
+            self.accumulate.conic_to(control, to);
+        }
         #[cfg(feature = "debug")]
         self.path_str.push_str(&format!("Q {} {} {} {} ", control.x, control.y, to.x, to.y));
         self.svg_endpoints.push([to.x, to.y]);
