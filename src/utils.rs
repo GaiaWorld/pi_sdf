@@ -49,6 +49,7 @@ use crate::{
         util::{is_inf, GLYPHY_INFINITY},
     },
 };
+pub static CHARS: & 'static str = "1Il-一|";
 
 pub static MIN_FONT_SIZE: f32 = 10.0;
 
@@ -115,6 +116,7 @@ pub struct OutlineInfo {
     pub extents: Vec<f32>,
     // #[cfg(feature = "debug")]
     pub svg_paths: Vec<String>,
+    pub is_cw: bool
 }
 
 impl OutlineInfo {
@@ -199,13 +201,13 @@ impl OutlineInfo {
             None,
             is_outer_glow,
             false,
-            None,
+            Some(!self.is_cw),
         );
 
         SdfInfo2 {
             tex_info: TexInfo2 {
                 char: self.char,
-                advance: self.advance as f32 / self.units_per_em as f32,
+                advance: self.advance as f32,
                 sdf_offset_x: 0,
                 sdf_offset_y: 0,
                 plane_min_x: plane_bounds[0],
@@ -365,7 +367,7 @@ pub struct GlyphVisitor {
     /// SVG路径的终点集合
     pub(crate) svg_endpoints: Vec<[f32; 2]>,
 
-    scale: f32,
+    pub scale: f32,
     // scale2: f32,
      /// 起始点
     pub(crate) start: Point,
@@ -406,6 +408,30 @@ impl GlyphVisitor {
             ),
             arcs: 0,
         }
+    }
+
+    // points 是一个轮廓上所有按顺序排列的在线点
+    pub fn get_contour_direction(&self) -> f32 {
+        let num_points = self.svg_endpoints.len();
+        if num_points < 3 {
+            return 0.0; // 不是一个有效的多边形
+        }
+
+        let mut area: f32 = 0.0;
+
+        for i in 0..num_points {
+            let p1 = &self.svg_endpoints[i];
+            // 获取下一个点，如果是最后一个点，则下一个点是第一个点（闭合）
+            let p2 = &self.svg_endpoints[(i + 1) % num_points]; 
+            if p2[0].is_infinite(){
+                break;
+            }
+            
+            area += (p1[0] * p2[1]) - (p2[0] * p1[1]);
+        }
+
+        // 返回最终的带符号面积（乘以0.5是可选的，因为我们只关心符号）
+        area
     }
 }
 
@@ -583,9 +609,167 @@ impl OutlineSink for GlyphVisitor {
         // let s = if r { "顺时针" } else { "逆时针" };
         // log::debug!("{}", s);
         self.index = self.accumulate.result.len();
+        self.svg_endpoints.push([f32::INFINITY, f32::INFINITY]);
         // log::debug!("close()");
     }
 }
+
+
+#[cfg(not(target_arch = "wasm32"))]
+impl ttf_parser::OutlineBuilder for GlyphVisitor {
+    /// 移动到指定点的方法
+   /// 
+   /// # 参数
+   /// * `to` - 目标点
+   fn move_to(&mut self, x: f32, y: f32) {
+       self.arcs += 1;
+       let to = Point::new(x, y) * self.scale;
+       log::debug!("M {} {} ", to.x, to.y);
+
+       // if self.scale > 0.02 {
+       self.accumulate.move_to(Point::new(to.x, to.y));
+       #[cfg(feature = "debug")]
+       self.path_str.push_str(&format!("M {} {} ", to.x, to.y));
+       self.svg_endpoints.push([to.x, to.y]);
+       // }
+       self.bbox.extend_by(to.x, to.y);
+       self.start = to;
+       self.previous = to;
+   }
+
+   /// 直线到指定点的方法
+   /// 
+   /// # 参数
+   /// * `to` - 目标点
+   fn line_to(&mut self, x: f32, y: f32) {
+       let to = Point::new(x, y) * self.scale;
+       log::debug!("+ L {} {} ", to.x, to.y);
+       // if self.scale > 0.02 {
+       self.accumulate.line_to(to);
+       #[cfg(feature = "debug")]
+       self.path_str.push_str(&format!("L {} {} ", to.x, to.y));
+       self.svg_endpoints.push([to.x, to.y]);
+       // } else {
+       //     self.rasterizer.draw_line(
+       //         point(self.previous.x * self.scale, self.previous.y * self.scale),
+       //         point(to.x, to.y),
+       //     );
+       // }
+       self.bbox.extend_by(to.x, to.y);
+       self.previous = to;
+   }
+
+    /// 二次贝塞尔曲线到指定点的方法
+   /// 
+   /// # 参数
+   /// * `control` - 控制点
+   /// * `to` - 目标点
+   fn quad_to(&mut self, x1: f32, y1: f32, x: f32, y: f32) {
+       let control = Point::new(x1, y1) * self.scale;
+       let to = Point::new(x, y) * self.scale;
+
+       
+       // if self.scale > 0.02 {
+       if (control - self.previous).norm_squared() < 0.001{
+           log::debug!("+ L {} {} ", to.x, to.y);
+           self.accumulate.line_to(to);
+       }else{
+           log::debug!("+ Q {} {} {} {} ", control.x, control.y, to.x, to.y);
+           self.accumulate.conic_to(control, to);
+       }
+       #[cfg(feature = "debug")]
+       self.path_str.push_str(&format!("Q {} {} {} {} ", control.x, control.y, to.x, to.y));
+       self.svg_endpoints.push([to.x, to.y]);
+       // } else {
+       //     self.rasterizer.draw_quad(
+       //         point(self.previous.x * self.scale, self.previous.y * self.scale),
+       //         point(control.x * self.scale, control.y * self.scale),
+       //         point(to.x * self.scale, to.y * self.scale),
+       //     );
+       // }
+       self.bbox.extend_by(control.x, control.y);
+       self.bbox.extend_by(to.x, to.y);
+       self.previous = to;
+   }
+
+    /// 三次贝塞尔曲线到指定点的方法
+   /// 
+   /// # 参数
+   /// * `control` - 控制线段
+   /// * `to` - 目标点
+   fn curve_to(&mut self,  x1: f32, y1: f32, x2: f32, y2: f32, x: f32, y: f32) {
+       // 字形数据没有三次贝塞尔曲线
+       let control1 = Point::new(x1, y1) * self.scale;
+       let control2 = Point::new(x2, y2) * self.scale;
+       let to = Point::new(x, y) * self.scale;
+
+       log::debug!(
+           "+ C {}, {}, {}, {}, {}, {}",
+           control1.x,
+           control1.y,
+           control2.x,
+           control2.y,
+           to.x,
+           to.y
+       );
+
+       // if self.scale > 0.02 {
+       self.accumulate.cubic_to(control1, control2, to);
+       self.svg_endpoints.push([to.x, to.y]);
+       // } else {
+       //     self.rasterizer.draw_cubic(
+       //         point(self.previous.x * self.scale, self.previous.y * self.scale),
+       //         point(control1.x * self.scale, control1.y * self.scale),
+       //         point(control1.x * self.scale, control1.y * self.scale),
+       //         point(to.x * self.scale, to.y * self.scale),
+       //     );
+       // }
+       // }
+       self.bbox.extend_by(control1.x, control1.y);
+       self.bbox.extend_by(control2.x, control2.y);
+       self.bbox.extend_by(to.x, to.y);
+
+       self.previous = to;
+   }
+
+   /// 关闭路径的方法
+   fn close(&mut self) {
+       if self.previous != self.start {
+           log::debug!("+ L {} {} ", self.start.x, self.start.y);
+           // if self.scale > 0.02 {
+           self.accumulate.line_to(self.start);
+           // #[cfg(feature = "debug")]
+           // self.path_str
+           //     .push_str(&format!("M {} {}", self.start.x, self.start.y));
+           self.svg_endpoints.push([self.start.x, self.start.y]);
+           // } else {
+           //     let x = self.previous.x * self.scale;
+           //     self.rasterizer.draw_line(
+           //         point(x, (self.previous.y) * self.scale),
+           //         point(self.start.x * self.scale, self.start.y * self.scale),
+           //     )
+           // }
+       }
+       log::debug!("+ Z");
+       // if self.scale > 0.02 {
+       self.accumulate.close_path();
+       #[cfg(feature = "debug")]
+       {
+           self.path_str.push_str("Z");
+           self.svg_paths.push(self.path_str.clone());
+           self.path_str.clear();
+       }
+       // }
+
+       // let r = self.compute_direction();
+       // let s = if r { "顺时针" } else { "逆时针" };
+       // log::debug!("{}", s);
+       self.index = self.accumulate.result.len();
+       self.svg_endpoints.push([f32::INFINITY, f32::INFINITY]);
+       // log::debug!("close()");
+   }
+}
+
 
 /// 将输入的矢量数据转换为纹理表示的SDF格式
 ///

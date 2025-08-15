@@ -3,7 +3,7 @@ setlocal
 :: 设置默认路径
 set "projectRoot="
 
-if exist ../temp/cfg.txt (for /f "delims=" %%i in (../temp/cfg.txt) do set "%%i")
+if exist %cfgPath% (for /f "delims=" %%i in (%cfgPath%) do set "%%i")
 
 :: 让用户输入路径
 set /p "projectRoot1=projectRoot path (%projectRoot%): "
@@ -20,5 +20,5 @@ if not exist "%directory%" (
 )
 
 :: 将新的配置写入配置文件中
-(echo projectRoot=%projectRoot1%) >../temp/cfg.txt
+(echo projectRoot=%projectRoot1%) >"%cfgPath%"
 endlocal
