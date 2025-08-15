@@ -1,7 +1,7 @@
 #![feature(trait_alias)]
 
-// #[macro_use]
-// extern crate lazy_static;
+#[macro_use]
+extern crate lazy_static;
 
 use std::io::Read;
 
@@ -11,6 +11,7 @@ pub mod glyphy;
 pub mod shape;
 pub mod svg;
 pub mod utils;
+mod system_font;
 
 pub type Point = parry2d::math::Point<f32>;
 pub type Matrix4 = parry2d::na::Matrix4<f32>;

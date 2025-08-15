@@ -1,6 +1,6 @@
 [package]
 name = "pi_sdf"
-version = "0.1.31"
+version = "0.1.32"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -30,6 +30,17 @@ lyon_geom = "1.0"
 # lol_alloc = "0.4"
 talc = "=4.4.0"
 unicode-segmentation = "1.10"
+lazy_static = "1.4"
+
+[target."cfg(not(target_arch = \"wasm32\"))".dependencies]
+ttf-parser = "0.25"
+
+[target.'cfg(target_os = "android")'.dependencies]
+ndk-glue = "0.7"
+
+[target.'cfg(target_os = "windows")'.dependencies.dwrote]
+version = "0.11"
+default-features = false
 
 [target."cfg(target_arch = \"wasm32\")".dependencies]
 getrandom = {version = "0.2", features = ["js"]}

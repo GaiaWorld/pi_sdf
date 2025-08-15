@@ -1,13 +1,15 @@
 use crate::{
-    glyphy::geometry::segment::{PPoint, PSegment},
+    glyphy::{geometry::segment::{PPoint, PSegment}, util::GLYPHY_EPSILON},
     utils::{compute_cell_range, CellInfo},
 };
 use allsorts::{
     binary::read::ReadScope, font::MatchingPresentation, font_data::{DynamicFontTableProvider, FontData}, gsub::{FeatureMask, Features}, outline::OutlineBuilder, tables::{glyf::GlyfTable, loca::LocaTable, FontTableProvider, HeadTable}, tag, Font
 };
 use pi_share::Share;
-use unicode_segmentation::UnicodeSegmentation;
-
+#[cfg(not(target_arch = "wasm32"))]
+use ttf_parser::GlyphId;
+#[cfg(not(target_arch = "wasm32"))]
+use crate::system_font::{FontLoader, SystemFont};
 use crate::{
     glyphy::{
         blob::recursion_near_arcs_of_cell,
@@ -22,7 +24,7 @@ use crate::{
     utils::{GlyphVisitor, OutlineInfo, SCALE, TOLERANCE},
     Point,
 };
-use std::char;
+use std::{char, sync::RwLock};
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::wasm_bindgen;
 
@@ -31,6 +33,22 @@ fn is_arabic_char(c: char) -> bool {
         0x0600..=0x06FF | 0x0750..=0x077F | 0x08A0..=0x08FF | 0xFB50..=0xFDFF | 0xFE70..=0xFEFF => true,
         _ => false,
     }
+}
+static DEFAULT_GAP: u32 = 65536;
+
+#[cfg(not(target_arch = "wasm32"))]
+lazy_static! {
+    static ref DEFAULT_FONT: RwLock<Option<SystemFont>> = {
+       
+            let font = if let Ok(data) = FontLoader::new().select_family_by_name("微软雅黑"){
+            // let font = if let Ok(data) = std::fs::read("NotoSansCJK-Regular.ttc") {
+                SystemFont::new(data)
+            } else {
+                None
+            };
+            RwLock::new(font)
+        
+    };
 }
 
 /// FontFace 结构体，表示一个字体的面，包含字体数据和相关信息。
@@ -65,7 +83,7 @@ impl FontFace {
         // 初始化日志模块，设置日志级别为 Info。
         #[cfg(target_arch = "wasm32")]
         let _ = console_log::init_with_level(log::Level::Info);
-        println!("FontFace:: new_inner: {:?}", (_data.len(), std::thread::current().id()));
+        log::error!("FontFace:: new_inner: {:?}", (_data.len(), std::thread::current().id()));
         let d: &'static Vec<u8> = unsafe { std::mem::transmute(_data.as_ref()) };
         let scope = ReadScope::new(d);
         let font_file = scope.read::<FontData<'static>>().unwrap();
@@ -116,9 +134,7 @@ impl FontFace {
         // extents.maxs.x += 128.0;
         // extents.maxs.y += 128.0;
 
-        log::error!("=========== 10!! _glyf_data: {}, : _loca_data: {}", _glyf_data.len(), _loca_data.len());
-        // todo!()
-        log::debug!("units_per_em: {}", head_table.units_per_em);
+        log::error!("=========== 10!! _glyf_data: {}, : _loca_data: {}, units_per_em: {}", _glyf_data.len(), _loca_data.len(), head_table.units_per_em);
         Self {
             // _data: pi_share::Share::new(vec![]),
             _data,
@@ -318,17 +334,34 @@ impl FontFace {
 
     /// 水平宽度
     pub fn horizontal_advance(&mut self, char: char) -> f32 {
-        let (glyph_index, _) =
+        let mut glyph_index =
             self.font
-                .lookup_glyph_index(char, MatchingPresentation::NotRequired, None);
+                .lookup_glyph_index(char, MatchingPresentation::NotRequired, None).0 as u32;
+        #[cfg(not(target_arch = "wasm32"))]
+        if glyph_index == 0 {
+            glyph_index = default_glyph_index(char);
+        }
         self.horizontal_advance_of_glyph_index(glyph_index)
     }
 
     /// 水平宽度
-    pub fn horizontal_advance_of_glyph_index(&mut self, glyph_index: u16) -> f32 {
+    pub fn horizontal_advance_of_glyph_index(&mut self, glyph_index: u32) -> f32 {
         if glyph_index != 0 {
             // self.font
-            match self.font.horizontal_advance(glyph_index) {
+            #[cfg(not(target_arch = "wasm32"))]
+            if glyph_index > DEFAULT_GAP {
+                let mut face = DEFAULT_FONT.write().unwrap();
+                match face.as_mut().unwrap().face.glyph_hor_advance(GlyphId((glyph_index - DEFAULT_GAP) as u16)) {
+                    Some(r) => { let horizontal_advance= r as f32 / face.as_mut().unwrap().face.units_per_em() as f32;
+                        log::warn!("{:?}========= use system font: {:?}", glyph_index, horizontal_advance);
+                        return horizontal_advance;
+                    }
+
+                    None => return 0.0,
+                };
+            }
+            
+            match self.font.horizontal_advance(glyph_index as u16) {
                 Some(r) => return r as f32 / self.units_per_em as f32,
                 None => return 0.0,
             }
@@ -393,14 +426,18 @@ impl FontFace {
     /// - `ch`: 查询的字符
     /// # 返回值
     /// 字形索引（u16）
-    pub fn glyph_index(&mut self, ch: char) -> u16 {
-        let (glyph_index, _) =
+    pub fn glyph_index(&mut self, ch: char) -> u32 {
+        let mut glyph_index =
             self.font
-                .lookup_glyph_index(ch, MatchingPresentation::NotRequired, None);
+                .lookup_glyph_index(ch, MatchingPresentation::NotRequired, None).0 as u32;
+        #[cfg(not(target_arch = "wasm32"))]
+        if glyph_index == 0 {
+            glyph_index = default_glyph_index(ch);
+        }
         glyph_index
     }
 
-    pub fn glyph_indexs(&mut self, text: &str, script: u32) -> Vec<u16> {
+    pub fn glyph_indexs(&mut self, text: &str, script: u32) -> Vec<u32> {
         // let g = text.split_word_bounds().collect::<Vec<&str>>();
         // let mut glyphs = Vec::new();
         // let mut str = Vec::new();
@@ -445,7 +482,7 @@ impl FontFace {
 
     }
 
-    fn glyph_indexs_impl(&mut self, text: &str)-> Vec<u16> {
+    fn glyph_indexs_impl(&mut self, text: &str)-> Vec<u32> {
 
         // println!("========== text: {:?}", (text, self._glyf_data.len(), std::thread::current().id()));
         // for c in text.chars(){
@@ -464,7 +501,7 @@ impl FontFace {
             )
             .unwrap();
        
-        let r = glyphs.iter().map(|item|{/* println!("=========== ch: {:?}, glyph_index: {} ", item.glyph.glyph_origin, item.glyph.glyph_index); */ item.glyph.glyph_index} ).collect::<Vec<u16>>();
+        let r = glyphs.iter().map(|item|{/* println!("=========== ch: {:?}, glyph_index: {} ", item.glyph.glyph_origin, item.glyph.glyph_index); */ item.glyph.glyph_index as u32} ).collect::<Vec<u32>>();
         // println!("=========== r: {:?}", r);
         r
     }
@@ -484,9 +521,13 @@ impl FontFace {
     /// # 返回值
     /// 轮廓信息（OutlineInfo）
     pub fn to_outline(&mut self, ch: char) -> OutlineInfo {
-        let (glyph_index, _) =
+        let mut glyph_index =
             self.font
-                .lookup_glyph_index(ch, MatchingPresentation::NotRequired, None);
+                .lookup_glyph_index(ch, MatchingPresentation::NotRequired, None).0 as u32;
+        #[cfg(not(target_arch = "wasm32"))]
+        if glyph_index == 0 {
+            glyph_index = default_glyph_index(ch);
+        }
         let mut o = self.to_outline_of_glyph_index(glyph_index);
         o.char = ch;
         o
@@ -498,24 +539,54 @@ impl FontFace {
     /// - `ch`: 查询的字符
     /// # 返回值
     /// 轮廓信息（OutlineInfo）
-    pub fn to_outline_of_glyph_index(&mut self, glyph_index: u16) -> OutlineInfo {
-        let mut sink = GlyphVisitor::new(SCALE / self.units_per_em as f32);
-        sink.accumulate.tolerance = self.units_per_em as f32 * TOLERANCE;
-        assert_ne!(glyph_index, 0);
-        let advance = self.font.horizontal_advance(glyph_index).unwrap();
-
-        let _ = self.glyf.visit(glyph_index, &mut sink);
-
+    pub fn to_outline_of_glyph_index(&mut self, glyph_index: u32) -> OutlineInfo {
         let mut bbox2 = Aabb::new(Point::new(0.0, 0.0), Point::new(0.0, 0.0));
-        if let Ok(r) = self.glyf.get_parsed_glyph(glyph_index) {
-            if let Some(g) = r {
-                // log::debug!("g.bounding_box:{:?}", g.bounding_box);
-                bbox2.mins.x = g.bounding_box.x_min as f32;
-                bbox2.mins.y = g.bounding_box.y_min as f32;
-                bbox2.maxs.x = g.bounding_box.x_max as f32;
-                bbox2.maxs.y = g.bounding_box.y_max as f32;
+        let mut sink = GlyphVisitor::new(1.0);
+        assert_ne!(glyph_index, 0);
+        let mut advance = 0;
+        let mut is_cw = true;
+        #[cfg(not(target_arch = "wasm32"))]
+        if glyph_index > DEFAULT_GAP {
+            let glyph_index =  GlyphId((glyph_index - DEFAULT_GAP) as u16);
+            let mut lock = DEFAULT_FONT.write().unwrap();
+
+            let units_per_em = lock.as_ref().unwrap().face.units_per_em() ;
+            sink.accumulate.tolerance = units_per_em as f32 * TOLERANCE;
+            sink.scale = SCALE / units_per_em as f32;
+            lock.as_mut().unwrap().face.outline_glyph(glyph_index, &mut sink);
+
+            advance = lock.as_mut().unwrap().face.glyph_hor_advance(glyph_index).unwrap() / units_per_em;
+
+            if let Some(g) = lock.as_mut().unwrap().face.glyph_bounding_box(glyph_index) {
+                bbox2.mins.x = g.x_min as f32 / units_per_em as f32;
+                bbox2.mins.y = g.y_min as f32 / units_per_em as f32;
+                bbox2.maxs.x = g.x_max as f32 / units_per_em as f32;
+                bbox2.maxs.y = g.y_max as f32 / units_per_em as f32;
             }
+            is_cw = lock.as_ref().unwrap().is_cw;
         }
+       
+       if glyph_index <= DEFAULT_GAP {
+            let units_per_em = self.units_per_em;
+            sink.accumulate.tolerance = units_per_em as f32 * TOLERANCE;
+            sink.scale = SCALE / units_per_em as f32;
+
+            advance = self.font.horizontal_advance(glyph_index as u16).unwrap() / units_per_em;
+            let _ = self.glyf.visit(glyph_index as u16, &mut sink);
+
+            if let Ok(r) = self.glyf.get_parsed_glyph(glyph_index as u16) {
+                if let Some(g) = r {
+                    // log::debug!("g.bounding_box:{:?}", g.bounding_box);
+                    bbox2.mins.x = g.bounding_box.x_min as f32 / self.units_per_em as f32;
+                    bbox2.mins.y = g.bounding_box.y_min as f32 / self.units_per_em as f32;
+                    bbox2.maxs.x = g.bounding_box.x_max as f32 / self.units_per_em as f32;
+                    bbox2.maxs.y = g.bounding_box.y_max as f32 / self.units_per_em as f32;
+                }
+            }
+       }
+        // let area = sink.get_contour_direction();
+        // println!("======== area: {:?}", (&area, area.abs()));
+        // assert!(area.abs() > GLYPHY_EPSILON);
 
         let GlyphVisitor {
             accumulate: GlyphyArcAccumulator { result, .. },
@@ -534,6 +605,7 @@ impl FontFace {
             extents: vec![bbox.mins.x, bbox.mins.y, bbox.maxs.x, bbox.maxs.y],
             // #[cfg(feature = "debug")]
             svg_paths,
+            is_cw: is_cw
         }
     }
 
@@ -561,7 +633,7 @@ impl FontFace {
     /// - `ch`: 查询的字符
     /// # 返回值
     /// 轮廓信息（WasmOutlineInfo）
-    pub fn to_outline_of_wasm_glyph_index(&mut self, glyph_index: u16) -> WasmOutlineInfo {
+    pub fn to_outline_of_wasm_glyph_index(&mut self, glyph_index: u32) -> WasmOutlineInfo {
         let outline = self.to_outline_of_glyph_index(glyph_index);
         let buf = bitcode::serialize(&outline).unwrap();
         WasmOutlineInfo {
@@ -589,4 +661,16 @@ pub struct WasmOutlineInfo {
     pub advance: u16,
     pub bbox: Vec<f32>,
     pub extents: Vec<f32>,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn default_glyph_index(ch: char) -> u32 {
+    let mut glyph_index = 0;
+    if let Some(font_face) = DEFAULT_FONT.write().unwrap().as_mut() {
+        if let Some(index) = font_face.face.glyph_index(ch){
+            log::warn!("{} use system font !! GlyphId: {}", ch, index.0);
+            glyph_index = index.0 as u32 + DEFAULT_GAP;
+        }
+    }
+    glyph_index
 }
