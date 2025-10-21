@@ -1,6 +1,6 @@
 use crate::{
     glyphy::{geometry::segment::{PPoint, PSegment}, util::GLYPHY_EPSILON},
-    utils::{compute_cell_range, CellInfo},
+    utils::{compute_cell_range, CellInfo, CHARS},
 };
 use allsorts::{
     binary::read::ReadScope, font::MatchingPresentation, font_data::{DynamicFontTableProvider, FontData}, gsub::{FeatureMask, Features}, outline::OutlineBuilder, tables::{glyf::GlyfTable, loca::LocaTable, FontTableProvider, HeadTable}, tag, Font
@@ -69,6 +69,7 @@ pub struct FontFace {
     pub(crate) units_per_em: u16,
     // temp_glyphs: Vec<u16>,
     // temp_str:Vec<String>;
+    is_cw: bool
 }
 
 impl FontFace {
@@ -83,12 +84,12 @@ impl FontFace {
         // 初始化日志模块，设置日志级别为 Info。
         #[cfg(target_arch = "wasm32")]
         let _ = console_log::init_with_level(log::Level::Info);
-        log::error!("FontFace:: new_inner: {:?}", (_data.len(), std::thread::current().id()));
+        log::warn!("FontFace:: new_inner: {:?}", (_data.len(), std::thread::current().id()));
         let d: &'static Vec<u8> = unsafe { std::mem::transmute(_data.as_ref()) };
         let scope = ReadScope::new(d);
         let font_file = scope.read::<FontData<'static>>().unwrap();
         let provider = font_file.table_provider(0).unwrap();
-        let font: Font<DynamicFontTableProvider<'static>> = Font::new(provider).unwrap().unwrap();
+        let mut font: Font<DynamicFontTableProvider<'static>> = Font::new(provider).unwrap().unwrap();
 
         let head_table = font
             .head_table()
@@ -121,7 +122,7 @@ impl FontFace {
             .to_vec();
         let g: &'static Vec<u8> = unsafe { std::mem::transmute(&_glyf_data) };
         // log::info!("=========== 8");
-        let glyf = ReadScope::new(g)
+        let mut glyf = ReadScope::new(g)
             .read_dep::<GlyfTable<'_>>(loca_ref)
             .unwrap();
         // log::info!("=========== 9");
@@ -134,7 +135,25 @@ impl FontFace {
         // extents.maxs.x += 128.0;
         // extents.maxs.y += 128.0;
 
-        log::error!("=========== 10!! _glyf_data: {}, : _loca_data: {}, units_per_em: {}", _glyf_data.len(), _loca_data.len(), head_table.units_per_em);
+        log::warn!("=========== 10!! _glyf_data: {}, : _loca_data: {}, units_per_em: {}", _glyf_data.len(), _loca_data.len(), head_table.units_per_em);
+        let mut is_cw = true;
+        for c in CHARS.chars() {
+            let glyph_index = 
+                font
+                .lookup_glyph_index(c, MatchingPresentation::NotRequired, None)
+                .0;
+            if glyph_index != 0 {
+                let mut sink = GlyphVisitor::new(1.0);
+                let _ = glyf.visit(glyph_index, &mut sink);
+                let area = sink.get_contour_direction();
+                log::warn!("char {} area is :{}!!!", c, area);
+                if area > 0.0 {
+                    is_cw = false;
+                }
+                break;
+            }
+        }
+        log::warn!("is_cw {}", is_cw);
         Self {
             // _data: pi_share::Share::new(vec![]),
             _data,
@@ -146,6 +165,7 @@ impl FontFace {
             max_box_normaliz,
             max_box: extents,
             units_per_em: head_table.units_per_em,
+            is_cw
         }
     }
 
@@ -583,6 +603,7 @@ impl FontFace {
                     bbox2.maxs.y = g.bounding_box.y_max as f32 / self.units_per_em as f32;
                 }
             }
+            is_cw = self.is_cw;
        }
         // let area = sink.get_contour_direction();
         // println!("======== area: {:?}", (&area, area.abs()));
@@ -605,7 +626,7 @@ impl FontFace {
             extents: vec![bbox.mins.x, bbox.mins.y, bbox.maxs.x, bbox.maxs.y],
             // #[cfg(feature = "debug")]
             svg_paths,
-            is_cw: is_cw
+            is_cw
         }
     }
 
@@ -624,6 +645,7 @@ impl FontFace {
             advance: outline.advance,
             bbox: outline.bbox,
             extents: outline.extents,
+            is_cw: outline.is_cw,
         }
     }
 
@@ -642,6 +664,7 @@ impl FontFace {
             advance: outline.advance,
             bbox: outline.bbox,
             extents: outline.extents,
+            is_cw: outline.is_cw,
         }
     }
 }
@@ -661,6 +684,7 @@ pub struct WasmOutlineInfo {
     pub advance: u16,
     pub bbox: Vec<f32>,
     pub extents: Vec<f32>,
+    pub is_cw:bool,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -668,7 +692,7 @@ fn default_glyph_index(ch: char) -> u32 {
     let mut glyph_index = 0;
     if let Some(font_face) = DEFAULT_FONT.write().unwrap().as_mut() {
         if let Some(index) = font_face.face.glyph_index(ch){
-            log::warn!("{} use system font !! GlyphId: {}", ch, index.0);
+            log::debug!("{} use system font !! GlyphId: {}", ch, index.0);
             glyph_index = index.0 as u32 + DEFAULT_GAP;
         }
     }

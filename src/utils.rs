@@ -263,6 +263,7 @@ impl OutlineInfo {
         pxrange: u32,
         is_outer_glow: bool,
         cur_off: u32,
+        is_cw: bool
     ) -> Vec<u8> {
         let result_arcs: CellInfo = bitcode::deserialize(result_arcs).unwrap();
         let LayoutInfo {
@@ -286,7 +287,7 @@ impl OutlineInfo {
             None, // 可能是其他参数的默认值，暂时保留为None
             is_outer_glow, // 传递是否应用外发光效果的标志
             false, // 可能的其他参数，默认为false
-            None, // 可能的其他参数，默认为None
+            Some(!is_cw), // 可能的其他参数，默认为None
         ); // 调用结束后， pixmap就包含了生成的SDF纹理数据
         // 使用生成的SDF纹理数据和其他布局信息，构造SdfInfo2结构体实例，并将其序列化为字节数组返回
         bitcode::serialize(&SdfInfo2 {
@@ -1561,4 +1562,3 @@ impl<'de> Deserialize<'de> for CellInfo {
         deserializer.deserialize_struct("Point", FIELDS, CellInfoVisitor)
     }
 }
-
