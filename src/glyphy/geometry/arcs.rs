@@ -242,7 +242,8 @@ impl ArcsBezierApproximatorSpringSystem {
             let mut total = 0.0;
             for i in 0..n {
                 let l = t[i + 1] - t[i];
-                let k_inv = l * (e[i] + conditioner).powf(-0.3);
+                let base = (e[i] + conditioner).abs().max(1e-10); // 处理负误差情况
+                let k_inv = l * base.powf(-0.3);
                 total += k_inv;
                 e[i] = k_inv;
             }

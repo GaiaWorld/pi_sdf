@@ -574,6 +574,10 @@ impl FontFace {
             sink.accumulate.tolerance = units_per_em as f32 * TOLERANCE;
             sink.scale = SCALE / units_per_em as f32;
             lock.as_mut().unwrap().face.outline_glyph(glyph_index, &mut sink);
+            if !sink.is_close {
+                use ttf_parser::OutlineBuilder;
+                sink.close();
+            }
 
             advance = lock.as_mut().unwrap().face.glyph_hor_advance(glyph_index).unwrap() / units_per_em;
 

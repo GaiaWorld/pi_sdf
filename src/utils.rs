@@ -49,7 +49,7 @@ use crate::{
         util::{is_inf, GLYPHY_INFINITY},
     },
 };
-pub static CHARS: & 'static str = "1Il-一|";
+pub static CHARS: & 'static str = ".1Il-一|";
 
 pub static MIN_FONT_SIZE: f32 = 10.0;
 
@@ -379,6 +379,7 @@ pub struct GlyphVisitor {
     pub(crate) bbox: Aabb,
      /// 弧的数量
     pub(crate) arcs: usize,
+    pub(crate) is_close: bool,//有些字体文件最后不会调用close 记录一下
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
@@ -408,6 +409,7 @@ impl GlyphVisitor {
                 Point::new(core::f32::MIN, core::f32::MIN),
             ),
             arcs: 0,
+            is_close: false
         }
     }
 
@@ -636,6 +638,7 @@ impl ttf_parser::OutlineBuilder for GlyphVisitor {
        self.bbox.extend_by(to.x, to.y);
        self.start = to;
        self.previous = to;
+       self.is_close = false;
    }
 
    /// 直线到指定点的方法
@@ -658,6 +661,7 @@ impl ttf_parser::OutlineBuilder for GlyphVisitor {
        // }
        self.bbox.extend_by(to.x, to.y);
        self.previous = to;
+       self.is_close = false;
    }
 
     /// 二次贝塞尔曲线到指定点的方法
@@ -691,6 +695,7 @@ impl ttf_parser::OutlineBuilder for GlyphVisitor {
        self.bbox.extend_by(control.x, control.y);
        self.bbox.extend_by(to.x, to.y);
        self.previous = to;
+       self.is_close = false;
    }
 
     /// 三次贝塞尔曲线到指定点的方法
@@ -731,6 +736,7 @@ impl ttf_parser::OutlineBuilder for GlyphVisitor {
        self.bbox.extend_by(to.x, to.y);
 
        self.previous = to;
+       self.is_close = false;
    }
 
    /// 关闭路径的方法
@@ -767,6 +773,7 @@ impl ttf_parser::OutlineBuilder for GlyphVisitor {
        // log::debug!("{}", s);
        self.index = self.accumulate.result.len();
        self.svg_endpoints.push([f32::INFINITY, f32::INFINITY]);
+       self.is_close = true;
        // log::debug!("close()");
    }
 }
