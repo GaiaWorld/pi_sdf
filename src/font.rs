@@ -89,7 +89,7 @@ impl FontFace {
         let scope = ReadScope::new(d);
         let font_file = scope.read::<FontData<'static>>().unwrap();
         let provider = font_file.table_provider(0).unwrap();
-        let mut font: Font<DynamicFontTableProvider<'static>> = Font::new(provider).unwrap().unwrap();
+        let mut font: Font<DynamicFontTableProvider<'static>> = Font::new(provider).unwrap();
 
         let head_table = font
             .head_table()
@@ -517,6 +517,7 @@ impl FontFace {
                 script,
                 Some(lang),
                 &Features::Mask(FeatureMask::default()),
+                None,
                 true,
             )
             .unwrap();
@@ -599,12 +600,12 @@ impl FontFace {
             let _ = self.glyf.visit(glyph_index as u16, &mut sink);
 
             if let Ok(r) = self.glyf.get_parsed_glyph(glyph_index as u16) {
-                if let Some(g) = r {
+                if let Some(r) = r.bounding_box() {
                     // log::debug!("g.bounding_box:{:?}", g.bounding_box);
-                    bbox2.mins.x = g.bounding_box.x_min as f32 / self.units_per_em as f32;
-                    bbox2.mins.y = g.bounding_box.y_min as f32 / self.units_per_em as f32;
-                    bbox2.maxs.x = g.bounding_box.x_max as f32 / self.units_per_em as f32;
-                    bbox2.maxs.y = g.bounding_box.y_max as f32 / self.units_per_em as f32;
+                    bbox2.mins.x = r.x_min as f32 / self.units_per_em as f32;
+                    bbox2.mins.y = r.y_min as f32 / self.units_per_em as f32;
+                    bbox2.maxs.x = r.x_max as f32 / self.units_per_em as f32;
+                    bbox2.maxs.y = r.y_max as f32 / self.units_per_em as f32;
                 }
             }
             is_cw = self.is_cw;
