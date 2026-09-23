@@ -21,6 +21,12 @@ use super::Error;
  * 参数：f — 目标格式化器
  */
 pub fn display(e: &Error, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    // TODO-DECL —— 实现逻辑：①匹配错误变体 ②写入变体名与内部消息 ③返回 Ok(())
-    todo!("TODO-DECL")
+    match e {
+        Error::InvalidFont(msg) => write!(f, "invalid font: {}", msg),
+        Error::InvalidPathVerb(value) => write!(f, "invalid path verb: {}", value),
+        Error::InvalidParam(msg) => write!(f, "invalid param: {}", msg),
+        Error::Decode(msg) => write!(f, "decode failed: {}", msg),
+        Error::Encode(msg) => write!(f, "encode failed: {}", msg),
+        Error::Geometry(msg) => write!(f, "geometry error: {}", msg),
+    }
 }
