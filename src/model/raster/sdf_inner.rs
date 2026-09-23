@@ -20,6 +20,7 @@ use super::SdfTexture;
  * 参数：tex — SDF 纹理
  */
 pub fn sdf_texture_is_consistent(tex: &SdfTexture) -> bool {
-    // TODO-DECL —— 实现逻辑：①取 tex_size 的平方 ②与 pixels 长度比较 ③返回结果
-    todo!("TODO-DECL")
+    // 用 u64 比较避免大边长平方在 32 位目标上溢出（对外路径不得 panic）
+    let expected = (tex.tex_size as u64) * (tex.tex_size as u64);
+    tex.pixels.len() as u64 == expected
 }
