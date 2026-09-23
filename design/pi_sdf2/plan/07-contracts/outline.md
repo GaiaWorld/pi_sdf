@@ -1,12 +1,12 @@
 # 契约：轮廓
 
-**模块：** MOD-003
+**模块：** MOD-002（数据）、MOD-007（算法）
 
 ## 接口
 
 ### API-010 Outline / Contour 轮廓与子轮廓
 
-- 模块：MOD-003
+- 模块：MOD-002
 - 对应需求：REQ-001.1、REQ-005.3
 - 签名：
 
@@ -49,7 +49,7 @@
 
 ### API-011 Winding 绕向判定
 
-- 模块：MOD-003
+- 模块：MOD-002
 - 对应需求：REQ-005.3
 - 签名：
 
@@ -74,12 +74,12 @@
 
 ### API-012 ArcFit 贝塞尔拟合弧
 
-- 模块：MOD-003
+- 模块：MOD-007
 - 对应需求：REQ-001.1
 - 签名：
 
   ```
-  pub fn bezier_to_arcs(b: &Bezier, max_deviation: f32) -> Vec<Arc>;
+  pub fn bezier_to_arcs(b: &Bezier, max_deviation: f32) -> Result<Vec<Arc>>;
   ```
 
 - requires：max_deviation 为正有限值
@@ -103,13 +103,13 @@
 
 ### API-013 Stroke 描边几何
 
-- 模块：MOD-003
+- 模块：MOD-007
 - 对应需求：REQ-001.1
 - 签名：
 
   ```
   pub struct StrokeMesh { pub positions: Vec<f32>, pub uvs: Vec<f32>, pub indices: Vec<u16> }
-  pub fn stroke_mesh(arcs: &[Arc], thickness: f32) -> StrokeMesh
+  pub fn stroke_mesh(arcs: &[Arc], thickness: f32) -> Result<StrokeMesh>
   ```
 
 - requires：thickness 为正有限值；arcs 非空
@@ -140,7 +140,7 @@
 
 | 文件 | 对应 API | 冻结 | 已确认 |
 |---|---|---|---|
-| src/core/outline/contour.rs | API-010、API-011 | 是 | |
-| src/core/outline/contour_inner.rs | API-010、API-011 | 否（实现） | |
+| src/model/outline/contour.rs | API-010、API-011 | 是 | |
+| src/model/outline/contour_inner.rs | API-010、API-011 | 否（实现） | |
 | src/core/outline/fit.rs | API-012、API-013 | 是 | |
 | src/core/outline/fit_inner.rs | API-012、API-013 | 否（实现） | |

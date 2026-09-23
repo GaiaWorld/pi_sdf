@@ -6,10 +6,10 @@
  */
 
 use super::SvgScene;
-use crate::core::base::error::{Error, Result};
-use crate::core::geom::aabb::Aabb;
-use crate::core::raster::raster::SdfTexture;
-use crate::api::path::primitives::Shape;
+use crate::model::base::error::{Error, Result};
+use crate::model::geom::aabb::Aabb;
+use crate::model::raster::sdf::SdfTexture;
+use crate::model::path::path::Shape;
 
 /**
  * 构造空场景。
@@ -95,7 +95,7 @@ pub fn scene_set_view_box(scene: &mut SvgScene, vb: Aabb) {
  * 参数：tex_size — 纹理边长，正整数
  * 参数：pxrange — 距离像素范围，正整数
  */
-pub fn scene_layout(scene: &SvgScene, tex_size: u32, pxrange: u32) -> Result<Vec<(u64, SdfTexture)>> {
+pub fn scene_layout(scene: &SvgScene, tex_size: u32, pxrange: u32) -> Result<Vec<SdfTexture>> {
     // TODO-DECL —— 实现逻辑：①校验参数为正 ②按 key 排序图元 ③逐个生成纹理 ④收集返回
     todo!("TODO-DECL")
 }

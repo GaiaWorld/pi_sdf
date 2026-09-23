@@ -1,12 +1,12 @@
 # 契约：几何
 
-**模块：** MOD-002
+**模块：** MOD-001
 
 ## 接口
 
 ### API-003 Point 点
 
-- 模块：MOD-002
+- 模块：MOD-001
 - 对应需求：REQ-001.1、REQ-003.1
 - 签名：
 
@@ -38,7 +38,7 @@
 
 ### API-004 Vector 向量与有符号向量
 
-- 模块：MOD-002
+- 模块：MOD-001
 - 对应需求：REQ-001.1、REQ-003.1
 - 签名：
 
@@ -83,7 +83,7 @@
 
 ### API-005 Line 直线
 
-- 模块：MOD-002
+- 模块：MOD-001
 - 对应需求：REQ-001.1
 - 签名：
 
@@ -120,7 +120,7 @@
 
 ### API-006 Segment 线段
 
-- 模块：MOD-002
+- 模块：MOD-001
 - 对应需求：REQ-001.1、REQ-005.4
 - 签名：
 
@@ -150,7 +150,7 @@
 
 ### API-007 Bezier 三次贝塞尔曲线
 
-- 模块：MOD-002
+- 模块：MOD-001
 - 对应需求：REQ-001.1、REQ-005.3
 - 签名：
 
@@ -189,7 +189,7 @@
 
 ### API-008 Arc 弧
 
-- 模块：MOD-002
+- 模块：MOD-001
 - 对应需求：REQ-001.1、REQ-005.2
 - 签名：
 
@@ -233,7 +233,7 @@
 
 ### API-009 Aabb 包围盒
 
-- 模块：MOD-002
+- 模块：MOD-001
 - 对应需求：REQ-001.2、REQ-001.4
 - 签名：
 
@@ -252,8 +252,7 @@
       pub fn half(&self) -> (Aabb, Aabb);
       pub fn collision(&self, other: &Aabb) -> Option<Aabb>;
       pub fn bound(&self, dir: Direction) -> Segment;
-      pub fn near_arcs(&self, arcs: &[Arc]) -> Vec<usize>;
-  }
+      }
   pub enum Direction { Top, Bottom, Left, Right }
   ```
 
@@ -261,7 +260,7 @@
 - ensures：is_empty 对 mins 与 maxs 全为无穷的空盒返回真（修正现状只判单分量的缺陷）；extend 后仍满足顺序
 - 错误模式：无
 - 顺序约束：无
-- 性能：near_arcs 为线性扫描，无隐藏复杂度
+- 性能：无
 
 #### 用例
 
@@ -280,9 +279,9 @@
 
 | 文件 | 对应 API | 冻结 | 已确认 |
 |---|---|---|---|
-| src/core/geom/primitive.rs | API-003、API-004、API-005、API-006 | 是 | |
-| src/core/geom/primitive_inner.rs | API-003、API-004、API-005、API-006 | 否（实现） | |
-| src/core/geom/curve.rs | API-007、API-008 | 是 | |
-| src/core/geom/curve_inner.rs | API-007、API-008 | 否（实现） | |
-| src/core/geom/aabb.rs | API-009 | 是 | |
-| src/core/geom/aabb_inner.rs | API-009 | 否（实现） | |
+| src/model/geom/primitive.rs | API-003、API-004、API-005、API-006 | 是 | |
+| src/model/geom/primitive_inner.rs | API-003、API-004、API-005、API-006 | 否（实现） | |
+| src/model/geom/curve.rs | API-001、API-007、API-008 | 是 | |
+| src/model/geom/curve_inner.rs | API-001、API-007、API-008 | 否（实现） | |
+| src/model/geom/aabb.rs | API-009 | 是 | |
+| src/model/geom/aabb_inner.rs | API-009 | 否（实现） | |

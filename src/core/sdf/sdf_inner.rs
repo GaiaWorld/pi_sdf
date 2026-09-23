@@ -6,9 +6,9 @@
  */
 
 use super::SdfSample;
-use crate::core::base::error::{Error, Result};
-use crate::core::geom::primitive::Point;
-use crate::core::geom::curve::Arc;
+use crate::model::base::error::{Error, Result};
+use crate::model::geom::primitive::Point;
+use crate::model::geom::curve::Arc;
 
 /**
  * 由完整弧集合计算某点的距离场采样。

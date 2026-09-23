@@ -42,7 +42,7 @@ pi_sdf 是自研的有符号距离场（SDF）矢量图形库。现状存在内�
 - 描述：内部每个模块的职责与依赖方向明确；平台相关代码与算法代码分离，边界可由静态检查判定。
 - **来源**：用户原话（“把内部模块的 api 解构的更清晰”）
 - 验收标准：
-  - REQ-003.1 WHEN 对算法层源码执行检索，系统 SHALL 不含平台条件编译、不含 unsafe
+  - REQ-003.1 WHEN 对 core 与 platform 层源码执行检索，系统 SHALL 不含平台行为分支与 unsafe；导出注解 `cfg_attr(target_arch = "wasm32", wasm_bindgen)` 仅允许出现在 model 与 api 层
   - REQ-003.2 WHEN 检查任一内部模块的依赖，系统 SHALL 满足单向且无环
   - REQ-003.3 IF 一个源文件承担多于一个职责，THEN 系统 SHALL 按职责拆分
 - 关联 NFR：NFR-004

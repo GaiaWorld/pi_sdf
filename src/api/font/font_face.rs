@@ -4,8 +4,11 @@
  * 设计：design/pi_sdf2/00-index.md
  */
 
-use crate::core::base::error::Result;
-use crate::core::outline::contour::Outline;
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::prelude::wasm_bindgen;
+
+use crate::model::base::error::Result;
+use crate::model::outline::contour::Outline;
 use crate::api::font::font_face_inner::FontState;
 
 /**
@@ -19,11 +22,13 @@ use crate::api::font::font_face_inner::FontState;
  *   - 错误      InvalidFont —— 字体字节非法或损坏；InvalidParam —— 字形索引不存在
  */
 #[derive(Debug, Clone)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub struct FontFace {
     data: Vec<u8>,
     state: FontState,
 }
 
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 impl FontFace {
     /// 由字体字节构造字体面。
     ///

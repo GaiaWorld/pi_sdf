@@ -6,7 +6,7 @@
  */
 
 use super::GlyphMetrics;
-use crate::core::base::error::{Error, Result};
+use crate::model::base::error::{Error, Result};
 use crate::api::font::font_face::FontFace;
 
 /**

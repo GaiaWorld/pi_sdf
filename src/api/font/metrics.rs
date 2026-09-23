@@ -4,8 +4,11 @@
  * 设计：design/pi_sdf2/00-index.md
  */
 
-use crate::core::base::error::Result;
-use crate::core::geom::aabb::Aabb;
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::prelude::wasm_bindgen;
+
+use crate::model::base::error::Result;
+use crate::model::geom::aabb::Aabb;
 use crate::api::font::font_face::FontFace;
 use crate::api::font::metrics_inner;
 
@@ -20,6 +23,7 @@ use crate::api::font::metrics_inner;
  *   - 错误      InvalidParam —— 字符无对应字形
  */
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub struct GlyphMetrics {
     /// 水平步进，非负
     pub advance: f32,
@@ -29,6 +33,7 @@ pub struct GlyphMetrics {
     pub is_clockwise: bool,
 }
 
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 impl FontFace {
     /// 取字符的字形度量。
     ///

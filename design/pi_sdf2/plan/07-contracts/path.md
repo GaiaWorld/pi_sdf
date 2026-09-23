@@ -1,12 +1,12 @@
 # 契约：路径
 
-**模块：** MOD-009
+**模块：** MOD-005（数据）、MOD-013（场景）
 
 ## 接口
 
 ### API-026 PathVerb 路径动词
 
-- 模块：MOD-009
+- 模块：MOD-005
 - 对应需求：REQ-001.4、REQ-004.3
 - 签名：
 
@@ -37,7 +37,7 @@
 
 ### API-027 Path 路径
 
-- 模块：MOD-009
+- 模块：MOD-005
 - 对应需求：REQ-001.4、REQ-004.3
 - 签名：
 
@@ -75,7 +75,7 @@
 
 ### API-028 Primitives 图元
 
-- 模块：MOD-009
+- 模块：MOD-005
 - 对应需求：REQ-001.4、REQ-004.3
 - 签名：
 
@@ -116,7 +116,7 @@
 
 ### API-029 Scene SVG 场景
 
-- 模块：MOD-009
+- 模块：MOD-013
 - 对应需求：REQ-001.4
 - 签名：
 
@@ -159,9 +159,7 @@
 
 | 文件 | 对应 API | 冻结 | 已确认 |
 |---|---|---|---|
-| src/api/path/path.rs | API-027 | 是 | |
-| src/api/path/path_inner.rs | API-027 | 否（实现） | |
-| src/api/path/primitives.rs | API-026、API-028 | 是 | |
-| src/api/path/primitives_inner.rs | API-026、API-028 | 否（实现） | |
+| src/model/path/path.rs | API-026、API-027、API-028 | 是 | |
+| src/model/path/path_inner.rs | API-026、API-027、API-028 | 否（实现） | |
 | src/api/path/scene.rs | API-029 | 是 | |
 | src/api/path/scene_inner.rs | API-029 | 否（实现） | |

@@ -1,34 +1,12 @@
 /**
- * 弧数据索引 arena 与单位弧
+ * 弧数据索引 arena
  *
  * 设计：design/pi_sdf2/00-index.md
  */
 
 use std::collections::HashMap;
-use crate::core::geom::ArcEndpoint;
+use crate::model::raster::texture::UnitArc;
 use crate::core::bake::arena_inner;
-
-/**
- * 单位弧：烘焙时归属某个格元的一条弧记录。
- *
- * 契约：API-019
- *
- * 约束：
- *   - requires  endpoints 非空；sdf_min 不大于 sdf_max
- *   - ensures   距离区间有序
- *   - 错误      无
- */
-#[derive(Debug, Clone)]
-pub struct UnitArc {
-    /// 该单位弧包含的弧端点集合，非空
-    pub endpoints: Vec<ArcEndpoint>,
-    /// 距离区间下限
-    pub sdf_min: f32,
-    /// 距离区间上限
-    pub sdf_max: f32,
-    /// 是否参与渲染
-    pub show: bool,
-}
 
 /**
  * 弧数据的索引 arena：以索引而非裸指针共享单位弧。

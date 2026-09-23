@@ -6,8 +6,8 @@
  */
 
 use super::FontFace;
-use crate::core::base::error::{Error, Result};
-use crate::core::outline::contour::Outline;
+use crate::model::base::error::{Error, Result};
+use crate::model::outline::contour::Outline;
 
 /**
  * 字体解析状态（实现侧自由演化的不透明状态）。

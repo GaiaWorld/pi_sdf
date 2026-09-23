@@ -13,22 +13,26 @@
 | 目录 | 任务 |
 |---|---|
 | 根（Cargo.toml / build/） | TASK-01、TASK-15 |
-| `src/lib.rs` | TASK-01、TASK-15 |
-| `src/core/`（mod.rs、consts.rs、num.rs） | TASK-01 |
-| `src/api/`、`src/platform/`（mod.rs） | TASK-01 |
-| `src/core/base/` | TASK-01、TASK-02 |
-| `src/core/geom/` | TASK-03 |
-| `src/core/outline/` | TASK-04、TASK-05 |
+| `src/lib.rs`、各层 `mod.rs` | TASK-01、TASK-15 |
+| `src/model/base/` | TASK-01、TASK-02 |
+| `src/model/geom/` | TASK-03 |
+| `src/model/outline/` | TASK-04 |
+| `src/model/grid/` | TASK-07 |
+| `src/model/raster/` | TASK-08、TASK-09 |
+| `src/model/path/` | TASK-11 |
+| `src/core/outline/` | TASK-05 |
 | `src/core/sdf/` | TASK-06 |
 | `src/core/grid/` | TASK-07 |
 | `src/core/bake/` | TASK-08 |
 | `src/core/raster/` | TASK-09 |
 | `src/api/font/` | TASK-10 |
-| `src/api/path/` | TASK-11、TASK-12 |
-| `src/platform/native/` | TASK-13 |
-| `src/platform/wasm/` | TASK-01、TASK-14 |
+| `src/api/path/` | TASK-12 |
+| `src/api/entry.rs`、`src/api/codec.rs`（含配对 `_inner`） | TASK-14 |
+| `src/platform/native/` | TASK-01、TASK-13 |
+| `src/platform/wasm/` | TASK-01 |
 | `tests/` | TASK-01..TASK-15 |
-| `benches/`、`examples/`、`wasm/` | TASK-14、TASK-15 |
+| `benches/`、`examples/` | TASK-15 |
+| `wasm/` | TASK-14 |
 
 ## 依赖图
 

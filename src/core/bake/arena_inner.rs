@@ -1,11 +1,12 @@
 /**
- * 弧数据索引 arena 与单位弧（实现）
+ * 弧数据索引 arena（实现）
  *
  * 设计：design/pi_sdf2/00-index.md
  * 实现：src/core/bake/arena.rs
  */
 
-use super::{ArcArena, UnitArc};
+use super::ArcArena;
+use crate::model::raster::texture::UnitArc;
 
 /**
  * 构造空 arena。

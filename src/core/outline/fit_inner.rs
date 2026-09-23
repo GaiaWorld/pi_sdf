@@ -6,8 +6,8 @@
  */
 
 use super::StrokeMesh;
-use crate::core::base::error::{Error, Result};
-use crate::core::geom::curve::{Arc, Bezier};
+use crate::model::base::error::{Error, Result};
+use crate::model::geom::curve::{Arc, Bezier};
 
 /**
  * 把三次贝塞尔拟合为弧序列。

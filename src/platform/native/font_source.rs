@@ -5,7 +5,7 @@
  */
 
 use std::path::PathBuf;
-use crate::core::base::error::Result;
+use crate::model::base::error::Result;
 use crate::platform::native::font_source_inner;
 
 /**

@@ -11,6 +11,7 @@
 
 ## targets
 
+- src/model/**
 - src/core/**
 - src/api/**
 - src/platform/**
@@ -31,7 +32,7 @@
 | 1 | outline.md sdf.md grid.md | 8 | 0 | ✔ | ✔ | d2773ef |
 | 2 | bake.md raster.md | 6 | 0、1 | ✔ | ✔ | d2773ef |
 | 3 | font.md path.md | 6 | 0、1 | ✔ | ✔ | d2773ef |
-| 4 | native.md wasm.md | 3 | 3 | ✔ | ✔ | d2773ef |
+| 4 | native.md entry.md | 3 | 3 | ✔ | ✔ | d2773ef |
 
 ## 术语引用
 
@@ -115,54 +116,62 @@
 
 | ID | 名称 | 目录 | 定义于 |
 |---|---|---|---|
-| MOD-001 | 基础 | src/core/base/ | plan/05-architecture.md |
-| MOD-002 | 几何 | src/core/geom/ | plan/05-architecture.md |
-| MOD-003 | 轮廓 | src/core/outline/ | plan/05-architecture.md |
-| MOD-004 | 距离场 | src/core/sdf/ | plan/05-architecture.md |
-| MOD-005 | 网格 | src/core/grid/ | plan/05-architecture.md |
-| MOD-006 | 烘焙 | src/core/bake/ | plan/05-architecture.md |
-| MOD-007 | 光栅 | src/core/raster/ | plan/05-architecture.md |
-| MOD-008 | 字体 | src/api/font/ | plan/05-architecture.md |
-| MOD-009 | 路径 | src/api/path/ | plan/05-architecture.md |
-| MOD-010 | native 后端 | src/platform/native/ | plan/05-architecture.md |
-| MOD-011 | wasm 后端 | src/platform/wasm/ | plan/05-architecture.md |
+| MOD-001 | model::geom | src/model/geom/ | plan/05-architecture.md |
+| MOD-002 | model::outline | src/model/outline/ | plan/05-architecture.md |
+| MOD-003 | model::grid | src/model/grid/ | plan/05-architecture.md |
+| MOD-004 | model::raster | src/model/raster/ | plan/05-architecture.md |
+| MOD-005 | model::path | src/model/path/ | plan/05-architecture.md |
+| MOD-006 | model::base | src/model/base/ | plan/05-architecture.md |
+| MOD-007 | core::outline | src/core/outline/ | plan/05-architecture.md |
+| MOD-008 | core::sdf | src/core/sdf/ | plan/05-architecture.md |
+| MOD-009 | core::grid | src/core/grid/ | plan/05-architecture.md |
+| MOD-010 | core::bake | src/core/bake/ | plan/05-architecture.md |
+| MOD-011 | core::raster | src/core/raster/ | plan/05-architecture.md |
+| MOD-012 | api::font | src/api/font/ | plan/05-architecture.md |
+| MOD-013 | api::path | src/api/path/ | plan/05-architecture.md |
+| MOD-014 | platform::native | src/platform/native/ | plan/05-architecture.md |
+| MOD-015 | platform::wasm | src/platform/wasm/ | plan/05-architecture.md |
 
 ### 接口
 
 | ID | 名称 | 模块 | 对应需求 | 定义于 | 实现文件（冻结 + 实现） |
 |---|---|---|---|---|---|
-| API-001 | ArcEndpoint 弧端点 | MOD-002 | REQ-001.1、REQ-002.3 | plan/07-contracts/_shared.md | src/core/geom/curve.rs + src/core/geom/curve_inner.rs |
-| API-002 | Error 统一错误类型 | MOD-001 | REQ-003.2、REQ-003.3、REQ-004.1、REQ-004.2、REQ-004.3、REQ-005.1 | plan/07-contracts/base.md | src/core/base/error.rs + src/core/base/error_inner.rs |
-| API-003 | Point 点 | MOD-002 | REQ-001.1、REQ-003.1、NFR-004 | plan/07-contracts/geom.md | src/core/geom/primitive.rs + src/core/geom/primitive_inner.rs |
-| API-004 | Vector 向量与有符号向量 | MOD-002 | REQ-001.1、REQ-003.1 | plan/07-contracts/geom.md | src/core/geom/primitive.rs + src/core/geom/primitive_inner.rs |
-| API-005 | Line 直线 | MOD-002 | REQ-001.1 | plan/07-contracts/geom.md | src/core/geom/primitive.rs + src/core/geom/primitive_inner.rs |
-| API-006 | Segment 线段 | MOD-002 | REQ-001.1、REQ-005.4 | plan/07-contracts/geom.md | src/core/geom/primitive.rs + src/core/geom/primitive_inner.rs |
-| API-007 | Bezier 三次贝塞尔曲线 | MOD-002 | REQ-001.1、REQ-005.3 | plan/07-contracts/geom.md | src/core/geom/curve.rs + src/core/geom/curve_inner.rs |
-| API-008 | Arc 弧 | MOD-002 | REQ-001.1、REQ-005.2 | plan/07-contracts/geom.md | src/core/geom/curve.rs + src/core/geom/curve_inner.rs |
-| API-009 | Aabb 包围盒 | MOD-002 | REQ-001.2、REQ-001.4 | plan/07-contracts/geom.md | src/core/geom/aabb.rs + src/core/geom/aabb_inner.rs |
-| API-010 | Outline / Contour 轮廓与子轮廓 | MOD-003 | REQ-001.1、REQ-005.3 | plan/07-contracts/outline.md | src/core/outline/contour.rs + src/core/outline/contour_inner.rs |
-| API-011 | Winding 绕向判定 | MOD-003 | REQ-005.3 | plan/07-contracts/outline.md | src/core/outline/contour.rs + src/core/outline/contour_inner.rs |
-| API-012 | ArcFit 贝塞尔拟合弧 | MOD-003 | REQ-001.1 | plan/07-contracts/outline.md | src/core/outline/fit.rs + src/core/outline/fit_inner.rs |
-| API-013 | Stroke 描边几何 | MOD-003 | REQ-001.1 | plan/07-contracts/outline.md | src/core/outline/fit.rs + src/core/outline/fit_inner.rs |
-| API-014 | Sdf 弧列表距离场 | MOD-004 | REQ-001.1、REQ-001.3、REQ-005.4 | plan/07-contracts/sdf.md | src/core/sdf/sdf.rs + src/core/sdf/sdf_inner.rs |
-| API-015 | Cell 格元 | MOD-005 | REQ-001.2 | plan/07-contracts/grid.md | src/core/grid/grid.rs + src/core/grid/grid_inner.rs |
-| API-016 | CellGrid 近邻弧网格 | MOD-005 | REQ-001.2、REQ-002.3 | plan/07-contracts/grid.md | src/core/grid/grid.rs + src/core/grid/grid_inner.rs |
-| API-017 | Subdivision 细分 | MOD-005 | REQ-001.2、REQ-005.1 | plan/07-contracts/grid.md | src/core/grid/grid.rs + src/core/grid/grid_inner.rs |
-| API-018 | ArcArena 弧数据索引 arena | MOD-006 | REQ-001.2、REQ-004.3、NFR-002 | plan/07-contracts/bake.md | src/core/bake/arena.rs + src/core/bake/arena_inner.rs |
-| API-019 | UnitArc 单位弧 | MOD-006 | REQ-001.2 | plan/07-contracts/bake.md | src/core/bake/arena.rs + src/core/bake/arena_inner.rs |
-| API-020 | DataTexture 数据纹理 | MOD-006 | REQ-001.3 | plan/07-contracts/bake.md | src/core/bake/texture.rs + src/core/bake/texture_inner.rs |
-| API-021 | IndexTexture 索引纹理 | MOD-006 | REQ-001.3、REQ-005.1 | plan/07-contracts/bake.md | src/core/bake/texture.rs + src/core/bake/texture_inner.rs |
-| API-022 | TextureLayout 纹理布局 | MOD-007 | REQ-001.2、REQ-001.3、REQ-001.4 | plan/07-contracts/raster.md | src/core/raster/layout.rs + src/core/raster/layout_inner.rs |
-| API-023 | Raster SDF 纹理光栅化 | MOD-007 | REQ-001.2、REQ-001.3、REQ-001.4、REQ-004.3 | plan/07-contracts/raster.md | src/core/raster/raster.rs + src/core/raster/raster_inner.rs |
-| API-024 | FontFace 字体面与轮廓提取 | MOD-008 | REQ-001.1、REQ-002.1、REQ-002.2、REQ-002.3、REQ-004.2 | plan/07-contracts/font.md | src/api/font/font_face.rs + src/api/font/font_face_inner.rs |
-| API-025 | Metrics 字形度量 | MOD-008 | REQ-001.1 | plan/07-contracts/font.md | src/api/font/metrics.rs + src/api/font/metrics_inner.rs |
-| API-026 | PathVerb 路径动词 | MOD-009 | REQ-001.4、REQ-004.3 | plan/07-contracts/path.md | src/api/path/primitives.rs + src/api/path/primitives_inner.rs |
-| API-027 | Path 路径 | MOD-009 | REQ-001.4、REQ-004.3 | plan/07-contracts/path.md | src/api/path/path.rs + src/api/path/path_inner.rs |
-| API-028 | Primitives 图元 | MOD-009 | REQ-001.4、REQ-004.3 | plan/07-contracts/path.md | src/api/path/primitives.rs + src/api/path/primitives_inner.rs |
-| API-029 | Scene SVG 场景 | MOD-009 | REQ-001.4 | plan/07-contracts/path.md | src/api/path/scene.rs + src/api/path/scene_inner.rs |
-| API-030 | FontSource 字体来源 | MOD-010 | REQ-002.1、REQ-003.1、REQ-004.2 | plan/07-contracts/native.md | src/platform/native/font_source.rs + src/platform/native/font_source_inner.rs |
-| API-031 | Exports wasm 导出边界壳 | MOD-011 | REQ-002.2、REQ-004.1、REQ-006.1 | plan/07-contracts/wasm.md | src/platform/wasm/exports.rs + src/platform/wasm/exports_inner.rs |
-| API-032 | Codec 边界编解码 | MOD-011 | REQ-002.2、REQ-004.1 | plan/07-contracts/wasm.md | src/platform/wasm/codec.rs + src/platform/wasm/codec_inner.rs |
+| API-001 | ArcEndpoint 弧端点 | MOD-001 | REQ-001.1、REQ-002.3 | plan/07-contracts/_shared.md | src/model/geom/curve.rs + src/model/geom/curve_inner.rs |
+| API-002 | Error 统一错误类型 | MOD-006 | REQ-003.2、REQ-003.3、REQ-004.1、REQ-004.2、REQ-004.3、REQ-005.1 | plan/07-contracts/base.md | src/model/base/error.rs + src/model/base/error_inner.rs |
+| API-003 | Point 点 | MOD-001 | REQ-001.1、REQ-003.1、NFR-004 | plan/07-contracts/geom.md | src/model/geom/primitive.rs + src/model/geom/primitive_inner.rs |
+| API-004 | Vector 向量与有符号向量 | MOD-001 | REQ-001.1、REQ-003.1 | plan/07-contracts/geom.md | src/model/geom/primitive.rs + src/model/geom/primitive_inner.rs |
+| API-005 | Line 直线 | MOD-001 | REQ-001.1 | plan/07-contracts/geom.md | src/model/geom/primitive.rs + src/model/geom/primitive_inner.rs |
+| API-006 | Segment 线段 | MOD-001 | REQ-001.1、REQ-005.4 | plan/07-contracts/geom.md | src/model/geom/primitive.rs + src/model/geom/primitive_inner.rs |
+| API-007 | Bezier 三次贝塞尔曲线 | MOD-001 | REQ-001.1、REQ-005.3 | plan/07-contracts/geom.md | src/model/geom/curve.rs + src/model/geom/curve_inner.rs |
+| API-008 | Arc 弧 | MOD-001 | REQ-001.1、REQ-005.2 | plan/07-contracts/geom.md | src/model/geom/curve.rs + src/model/geom/curve_inner.rs |
+| API-009 | Aabb 包围盒 | MOD-001 | REQ-001.2、REQ-001.4 | plan/07-contracts/geom.md | src/model/geom/aabb.rs + src/model/geom/aabb_inner.rs |
+| API-010 | Outline / Contour 轮廓与子轮廓 | MOD-002 | REQ-001.1、REQ-005.3 | plan/07-contracts/outline.md | src/model/outline/contour.rs + src/model/outline/contour_inner.rs |
+| API-011 | Winding 绕向判定 | MOD-002 | REQ-005.3 | plan/07-contracts/outline.md | src/model/outline/contour.rs + src/model/outline/contour_inner.rs |
+| API-012 | ArcFit 贝塞尔拟合弧 | MOD-007 | REQ-001.1 | plan/07-contracts/outline.md | src/core/outline/fit.rs + src/core/outline/fit_inner.rs |
+| API-013 | Stroke 描边几何 | MOD-007 | REQ-001.1 | plan/07-contracts/outline.md | src/core/outline/fit.rs + src/core/outline/fit_inner.rs |
+| API-014 | Sdf 弧列表距离场 | MOD-008 | REQ-001.1、REQ-001.3、REQ-005.4 | plan/07-contracts/sdf.md | src/core/sdf/sdf.rs + src/core/sdf/sdf_inner.rs |
+| API-015 | Cell 格元 | MOD-003 | REQ-001.2 | plan/07-contracts/grid.md | src/model/grid/grid.rs + src/model/grid/grid_inner.rs |
+| API-016 | CellGrid 近邻弧网格 | MOD-003 | REQ-001.2、REQ-002.3 | plan/07-contracts/grid.md | src/model/grid/grid.rs + src/model/grid/grid_inner.rs |
+| API-017 | Subdivision 细分 | MOD-009 | REQ-001.2、REQ-005.1 | plan/07-contracts/grid.md | src/core/grid/grid.rs + src/core/grid/grid_inner.rs |
+| API-018 | ArcArena 弧数据索引 arena | MOD-010 | REQ-001.2、REQ-004.3、NFR-002 | plan/07-contracts/bake.md | src/core/bake/arena.rs + src/core/bake/arena_inner.rs |
+| API-019 | UnitArc 单位弧 | MOD-004 | REQ-001.2 | plan/07-contracts/raster.md | src/model/raster/texture.rs + src/model/raster/texture_inner.rs |
+| API-020 | DataTexture 数据纹理 | MOD-004 | REQ-001.3 | plan/07-contracts/raster.md | src/model/raster/texture.rs + src/model/raster/texture_inner.rs |
+| API-021 | IndexTexture 索引纹理 | MOD-004 | REQ-001.3、REQ-005.1 | plan/07-contracts/raster.md | src/model/raster/texture.rs + src/model/raster/texture_inner.rs |
+| API-022 | TextureLayout 纹理布局 | MOD-004 | REQ-001.2、REQ-001.3、REQ-001.4 | plan/07-contracts/raster.md | src/model/raster/sdf.rs + src/model/raster/sdf_inner.rs |
+| API-023 | Raster SDF 纹理光栅化 | MOD-004 | REQ-001.2、REQ-001.3、REQ-001.4、REQ-004.3 | plan/07-contracts/raster.md | src/model/raster/sdf.rs + src/model/raster/sdf_inner.rs |
+| API-024 | FontFace 字体面与轮廓提取 | MOD-012 | REQ-001.1、REQ-002.1、REQ-002.2、REQ-002.3、REQ-004.2 | plan/07-contracts/font.md | src/api/font/font_face.rs + src/api/font/font_face_inner.rs |
+| API-025 | Metrics 字形度量 | MOD-012 | REQ-001.1 | plan/07-contracts/font.md | src/api/font/metrics.rs + src/api/font/metrics_inner.rs |
+| API-026 | PathVerb 路径动词 | MOD-005 | REQ-001.4、REQ-004.3 | plan/07-contracts/path.md | src/model/path/path.rs + src/model/path/path_inner.rs |
+| API-027 | Path 路径 | MOD-005 | REQ-001.4、REQ-004.3 | plan/07-contracts/path.md | src/model/path/path.rs + src/model/path/path_inner.rs |
+| API-028 | Primitives 图元 | MOD-005 | REQ-001.4、REQ-004.3 | plan/07-contracts/path.md | src/model/path/path.rs + src/model/path/path_inner.rs |
+| API-029 | Scene SVG 场景 | MOD-013 | REQ-001.4 | plan/07-contracts/path.md | src/api/path/scene.rs + src/api/path/scene_inner.rs |
+| API-030 | FontSource 字体来源 | MOD-014 | REQ-002.1、REQ-003.1、REQ-004.2 | plan/07-contracts/native.md | src/platform/native/font_source.rs + src/platform/native/font_source_inner.rs |
+| API-031 | Exports wasm 导出边界壳 | MOD-013 | REQ-002.2、REQ-004.1、REQ-006.1 | plan/07-contracts/entry.md | src/api/entry.rs + src/api/entry_inner.rs |
+| API-032 | Codec 边界编解码 | MOD-013 | REQ-002.2、REQ-004.1 | plan/07-contracts/entry.md | src/api/codec.rs + src/api/codec_inner.rs |
+| API-033 | 数据纹理编码 | MOD-010 | REQ-001.3 | plan/07-contracts/bake.md | src/core/bake/texture.rs + src/core/bake/texture_inner.rs |
+| API-034 | 索引纹理编码 | MOD-010 | REQ-001.3、REQ-005.1 | plan/07-contracts/bake.md | src/core/bake/texture.rs + src/core/bake/texture_inner.rs |
+| API-035 | 纹理布局计算 | MOD-011 | REQ-001.2、REQ-001.3、REQ-001.4 | plan/07-contracts/raster.md | src/core/raster/layout.rs + src/core/raster/layout_inner.rs |
+| API-036 | 光栅化 | MOD-011 | REQ-001.3、REQ-001.4 | plan/07-contracts/raster.md | src/core/raster/raster.rs + src/core/raster/raster_inner.rs |
 
 ### 用例
 
@@ -203,7 +212,7 @@
 | CASE-033 | 细分与现状一致 | REQ-001.2 | plan/07-contracts/grid.md |
 | CASE-034 | arena 同键去重 | REQ-001.2 | plan/07-contracts/bake.md |
 | CASE-035 | arena 越界返回 None | REQ-004.3 | plan/07-contracts/bake.md |
-| CASE-036 | 单位弧区间有序 | REQ-001.2 | plan/07-contracts/bake.md |
+| CASE-036 | 单位弧区间有序 | REQ-001.2 | plan/07-contracts/raster.md |
 | CASE-037 | 数据纹理往返 | REQ-001.3 | plan/07-contracts/bake.md |
 | CASE-038 | 量化溢出返回 Err | REQ-001.3 | plan/07-contracts/bake.md |
 | CASE-039 | 索引纹理终止 | REQ-005.1 | plan/07-contracts/bake.md |
@@ -232,12 +241,12 @@
 | CASE-062 | Windows 系统字体加载 | REQ-002.1 | plan/07-contracts/native.md |
 | CASE-063 | 不存在路径返回 Err | REQ-004.2 | plan/07-contracts/native.md |
 | CASE-064 | 算法核心无平台引用 | REQ-003.1、NFR-004 | plan/07-contracts/native.md |
-| CASE-065 | 乱码字节不 trap | REQ-004.1 | plan/07-contracts/wasm.md |
-| CASE-066 | 字符调试接口可用 | REQ-006.1 | plan/07-contracts/wasm.md |
-| CASE-067 | SVG 调试接口可用 | REQ-006.1 | plan/07-contracts/wasm.md |
-| CASE-068 | wasm 接口可用 | REQ-002.2 | plan/07-contracts/wasm.md |
-| CASE-069 | 编解码往返 | REQ-002.2 | plan/07-contracts/wasm.md |
-| CASE-070 | 随机字节解码返回 Err | REQ-004.1 | plan/07-contracts/wasm.md |
+| CASE-065 | 乱码字节不 trap | REQ-004.1 | plan/07-contracts/entry.md |
+| CASE-066 | 字符调试接口可用 | REQ-006.1 | plan/07-contracts/entry.md |
+| CASE-067 | SVG 调试接口可用 | REQ-006.1 | plan/07-contracts/entry.md |
+| CASE-068 | wasm 接口可用 | REQ-002.2 | plan/07-contracts/entry.md |
+| CASE-069 | 编解码往返 | REQ-002.2 | plan/07-contracts/entry.md |
+| CASE-070 | 随机字节解码返回 Err | REQ-004.1 | plan/07-contracts/entry.md |
 | CASE-073 | 直线退化不崩溃 | REQ-001.1 | plan/07-contracts/geom.md |
 | CASE-074 | 贝塞尔退化不崩溃 | REQ-001.1 | plan/07-contracts/geom.md |
 | CASE-075 | 弧退化不崩溃 | REQ-001.1 | plan/07-contracts/geom.md |
@@ -252,6 +261,11 @@
 | CASE-084 | 算法层按职责拆分 | REQ-003.3 | plan/07-contracts/base.md |
 | CASE-085 | 基准不劣于基线 | NFR-001 | plan/07-contracts/raster.md |
 | CASE-086 | 三目标编译通过 | NFR-003 | plan/07-contracts/base.md |
+| CASE-087 | 类型投影入口：网格 | REQ-002.2 | plan/07-contracts/entry.md |
+| CASE-088 | 类型投影入口：布局与光栅化 | REQ-002.2 | plan/07-contracts/entry.md |
+| CASE-089 | 数据纹理尺寸自洽 | REQ-001.3 | plan/07-contracts/raster.md |
+| CASE-090 | 索引纹理尺寸自洽 | REQ-001.3 | plan/07-contracts/raster.md |
+| CASE-091 | 纹理布局字段自洽 | REQ-001.2 | plan/07-contracts/raster.md |
 
 ### 任务
 
@@ -304,3 +318,7 @@
 | 2026-09-22 | D9 | 重审完成：设计层 ❌ 清零（C5/C8/C9/C12/C15/C16/C32/C43/C50 均已修复并经子代理复核）；余 C45 未验证（无 git 基线）、C48 ❌（测试待实现阶段） | 无 |
 | 2026-09-23 | D9 | D9 收口：设计层通过，登记完成。已知遗留——C45 冻结无基线（待建 git 基线）、C48 测试待实现阶段写入 | 无 |
 | 2026-09-23 | D9 | 建立 git 基线并推送远端新分支 pi_sdf2（commit d2773ef）；冻结文件自落地 diff 为空，C45 核销 | 无 |
+| 2026-09-23 | 返工 | 作废旧 09 报告 | 09-review.md |
+| 2026-09-23 | D9→D1 | 返工：被推翻的判断——wasm 导出面写成 4 个字节 RPC（未枚举可导出类型），导致 JS 无法驱动核心链路；改为「model 数据层 + core/api 类型直接导出」。作废：plan/05、06、07-contracts 全部、tasks/、09-review.md、src/ 全部骨架。旧基线 d2773ef/aa3a6f2，新基线待重落后提交 | 无 |
+| 2026-09-23 | D5/D7(返工) | 索引回填：模块表 11→15；接口表模块与实现文件列按新四层全量更新；新增 API-033..036 | 无 |
+| 2026-09-23 | D9(返工后) | 返工后重审：设计层 ❌ 清零（C1-C59 除 C48 实现阶段项）；C3/C14 复核为 ddt 工具误报；C6/C16/C55/C56/C58 与 6 条反向孤儿均已修复；登记完成 | 无 |

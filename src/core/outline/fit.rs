@@ -4,8 +4,8 @@
  * 设计：design/pi_sdf2/00-index.md
  */
 
-use crate::core::base::error::Result;
-use crate::core::geom::curve::{Arc, Bezier};
+use crate::model::base::error::Result;
+use crate::model::geom::curve::{Arc, Bezier};
 use crate::core::outline::fit_inner;
 
 /**

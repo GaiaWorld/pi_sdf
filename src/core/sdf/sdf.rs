@@ -4,9 +4,9 @@
  * 设计：design/pi_sdf2/00-index.md
  */
 
-use crate::core::base::error::Result;
-use crate::core::geom::primitive::Point;
-use crate::core::geom::curve::Arc;
+use crate::model::base::error::Result;
+use crate::model::geom::primitive::Point;
+use crate::model::geom::curve::Arc;
 use crate::core::sdf::sdf_inner;
 
 /**

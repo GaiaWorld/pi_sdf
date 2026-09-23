@@ -1,12 +1,12 @@
 # 契约：网格
 
-**模块：** MOD-005
+**模块：** MOD-003（数据）、MOD-009（算法）
 
 ## 接口
 
 ### API-015 Cell 格元
 
-- 模块：MOD-005
+- 模块：MOD-003
 - 对应需求：REQ-001.2
 - 签名：
 
@@ -28,7 +28,7 @@
 
 ### API-016 CellGrid 近邻弧网格
 
-- 模块：MOD-005
+- 模块：MOD-003
 - 对应需求：REQ-001.2、REQ-002.3
 - 签名：
 
@@ -58,7 +58,7 @@
 
 ### API-017 Subdivision 细分
 
-- 模块：MOD-005
+- 模块：MOD-009
 - 对应需求：REQ-001.2、REQ-005.1
 - 签名：
 
@@ -95,5 +95,7 @@
 
 | 文件 | 对应 API | 冻结 | 已确认 |
 |---|---|---|---|
-| src/core/grid/grid.rs | API-015、API-016、API-017 | 是 | |
-| src/core/grid/grid_inner.rs | API-015、API-016、API-017 | 否（实现） | |
+| src/model/grid/grid.rs | API-015、API-016 | 是 | |
+| src/model/grid/grid_inner.rs | API-015、API-016 | 否（实现） | |
+| src/core/grid/grid.rs | API-017 | 是 | |
+| src/core/grid/grid_inner.rs | API-017 | 否（实现） | |

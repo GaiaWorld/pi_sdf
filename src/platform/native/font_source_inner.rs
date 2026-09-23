@@ -6,7 +6,7 @@
  */
 
 use super::FontSource;
-use crate::core::base::error::{Error, Result};
+use crate::model::base::error::{Error, Result};
 
 /**
  * 加载字体字节。

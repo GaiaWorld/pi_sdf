@@ -1,12 +1,12 @@
 # 契约：基础
 
-**模块：** MOD-001
+**模块：** MOD-006
 
 ## 接口
 
 ### API-002 Error 与 ErrorKind（统一错误类型）
 
-- 模块：MOD-001
+- 模块：MOD-006
 - 对应需求：REQ-004.1、REQ-004.2、REQ-004.3、REQ-005.1
 - 签名：
 
@@ -56,5 +56,5 @@
 
 | 文件 | 对应 API | 冻结 | 已确认 |
 |---|---|---|---|
-| src/core/base/error.rs | API-002 | 是 | |
-| src/core/base/error_inner.rs | API-002 | 否（实现） | |
+| src/model/base/error.rs | API-002 | 是 | |
+| src/model/base/error_inner.rs | API-002 | 否（实现） | |

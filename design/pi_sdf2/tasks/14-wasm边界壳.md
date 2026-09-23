@@ -4,7 +4,7 @@
 
 **关联：** REQ-002.2、REQ-004.1、REQ-006.1
 
-**触及：** `src/platform/wasm/exports_inner.rs`、`src/platform/wasm/codec_inner.rs`、`wasm/index.html`、`wasm/app.js`、`wasm/draw_text.js`、`tests/platform_wasm.rs`
+**触及：** `src/api/entry_inner.rs`、`src/api/codec_inner.rs`、`wasm/index.html`、`wasm/app.js`、`wasm/draw_text.js`、`tests/platform_wasm.rs`
 
 **阻塞于：** TASK-10、TASK-11
 
