@@ -6,6 +6,7 @@
  */
 
 use super::{Contour, Outline};
+use crate::model::base::num;
 use crate::model::geom::ArcEndpoint;
 use crate::model::geom::primitive::Point;
 use crate::model::geom::curve::Arc;
@@ -25,8 +26,7 @@ use crate::model::geom::aabb::Aabb;
  * 参数：is_closed — 是否闭合
  */
 pub fn contour_new(arcs: Vec<Arc>, is_closed: bool) -> Contour {
-    // TODO-DECL —— 实现逻辑：①写入弧序列 ②写入闭合标志 ③返回 Contour
-    todo!("TODO-DECL")
+    Contour { arcs, is_closed }
 }
 
 /**
@@ -42,8 +42,21 @@ pub fn contour_new(arcs: Vec<Arc>, is_closed: bool) -> Contour {
  * 参数：eps — 弧端点序列
  */
 pub fn contour_from_endpoints(eps: Vec<ArcEndpoint>) -> Contour {
-    // TODO-DECL —— 实现逻辑：①把端点两两成弧 ②判断首尾是否相接得闭合标志 ③返回
-    todo!("TODO-DECL")
+    let num_endpoints = eps.len();
+    let mut arcs = Vec::with_capacity(num_endpoints.saturating_sub(1));
+    // 端点序列为「起、终」成对：第 i 条弧由 eps[i] 到 eps[i+1]，
+    // 曲率参数取该弧终点所携带的 d（与 glyphy 端点约定一致）。
+    for i in 0..num_endpoints.saturating_sub(1) {
+        let p0 = Point { x: eps[i].px, y: eps[i].py };
+        let p1 = Point { x: eps[i + 1].px, y: eps[i + 1].py };
+        let d = eps[i + 1].d;
+        arcs.push(Arc { p0, p1, d });
+    }
+    // 首尾端点坐标相接即视为闭合；不接时返回未闭合轮廓（非错误路径）。
+    let is_closed = num_endpoints >= 2
+        && num::float_equals(eps[0].px, eps[num_endpoints - 1].px, None)
+        && num::float_equals(eps[0].py, eps[num_endpoints - 1].py, None);
+    contour_new(arcs, is_closed)
 }
 
 /**
@@ -59,8 +72,28 @@ pub fn contour_from_endpoints(eps: Vec<ArcEndpoint>) -> Contour {
  * 参数：c — 子轮廓
  */
 pub fn contour_endpoints(c: &Contour) -> Vec<ArcEndpoint> {
-    // TODO-DECL —— 实现逻辑：①遍历弧 ②逐个转弧端点 ③收集返回
-    todo!("TODO-DECL")
+    let num_arcs = c.arcs.len();
+    let mut eps = Vec::with_capacity(num_arcs + 1);
+    if num_arcs == 0 {
+        return eps;
+    }
+    // 闭合时首端点的 d 取收尾弧；开放时取首弧，保证与 from_endpoints 往返一致。
+    let head_d = if c.is_closed { c.arcs[num_arcs - 1].d } else { c.arcs[0].d };
+    eps.push(ArcEndpoint {
+        px: c.arcs[0].p0.x,
+        py: c.arcs[0].p0.y,
+        d: head_d,
+        tag: None,
+    });
+    for arc in c.arcs.iter() {
+        eps.push(ArcEndpoint {
+            px: arc.p1.x,
+            py: arc.p1.y,
+            d: arc.d,
+            tag: None,
+        });
+    }
+    eps
 }
 
 /**
@@ -76,8 +109,7 @@ pub fn contour_endpoints(c: &Contour) -> Vec<ArcEndpoint> {
  * 参数：c — 子轮廓
  */
 pub fn contour_is_clockwise(c: &Contour) -> bool {
-    // TODO-DECL —— 实现逻辑：①取子轮廓代表点 ②累加有符号面积 ③按符号判定顺逆
-    todo!("TODO-DECL")
+    contour_signed_area(c) < 0.0
 }
 
 /**
@@ -93,8 +125,12 @@ pub fn contour_is_clockwise(c: &Contour) -> bool {
  * 参数：c — 子轮廓，原地改写
  */
 pub fn contour_reverse(c: &mut Contour) {
-    // TODO-DECL —— 实现逻辑：①反转弧序列顺序 ②逐弧交换端点并取反 d ③原地写回
-    todo!("TODO-DECL")
+    // 原地改写：不复制弧序列，保证调用方可见（REQ-005.3）。
+    c.arcs.reverse();
+    for arc in c.arcs.iter_mut() {
+        std::mem::swap(&mut arc.p0, &mut arc.p1);
+        arc.d = -arc.d;
+    }
 }
 
 /**
@@ -110,8 +146,11 @@ pub fn contour_reverse(c: &mut Contour) {
  * 参数：c — 子轮廓
  */
 pub fn contour_extents(c: &Contour) -> Aabb {
-    // TODO-DECL —— 实现逻辑：①以空盒初始化 ②并入每条弧包围盒 ③返回
-    todo!("TODO-DECL")
+    let mut bb = Aabb::new_invalid();
+    for arc in c.arcs.iter() {
+        bb.extend_by(&arc.extents());
+    }
+    bb
 }
 
 /**
@@ -127,8 +166,7 @@ pub fn contour_extents(c: &Contour) -> Aabb {
  * 参数：contours — 子轮廓集合
  */
 pub fn outline_new(contours: Vec<Contour>) -> Outline {
-    // TODO-DECL —— 实现逻辑：①写入子轮廓集合 ②返回 Outline
-    todo!("TODO-DECL")
+    Outline { contours }
 }
 
 /**
@@ -144,8 +182,11 @@ pub fn outline_new(contours: Vec<Contour>) -> Outline {
  * 参数：o — 轮廓
  */
 pub fn outline_extents(o: &Outline) -> Aabb {
-    // TODO-DECL —— 实现逻辑：①以空盒初始化 ②并入各子轮廓包围盒 ③返回
-    todo!("TODO-DECL")
+    let mut bb = Aabb::new_invalid();
+    for c in o.contours.iter() {
+        bb.extend_by(&contour_extents(c));
+    }
+    bb
 }
 
 /**
@@ -161,8 +202,9 @@ pub fn outline_extents(o: &Outline) -> Aabb {
  * 参数：o — 轮廓，原地改写
  */
 pub fn outline_reverse(o: &mut Outline) {
-    // TODO-DECL —— 实现逻辑：①遍历子轮廓 ②逐个原地反转 ③保持顺序不变
-    todo!("TODO-DECL")
+    for c in o.contours.iter_mut() {
+        contour_reverse(c);
+    }
 }
 
 /**
@@ -178,8 +220,11 @@ pub fn outline_reverse(o: &mut Outline) {
  * 参数：o — 轮廓
  */
 pub fn outline_is_clockwise(o: &Outline) -> bool {
-    // TODO-DECL —— 实现逻辑：①累加各子轮廓有符号面积 ②按符号判定顺逆
-    todo!("TODO-DECL")
+    let mut area = 0.0f32;
+    for c in o.contours.iter() {
+        area += contour_signed_area(c);
+    }
+    area < 0.0
 }
 
 /**
@@ -196,8 +241,16 @@ pub fn outline_is_clockwise(o: &Outline) -> bool {
  * 参数：inverse — 是否需要反转
  */
 pub fn contour_winding(contour: &mut Contour, inverse: bool) {
-    // TODO-DECL —— 实现逻辑：①按需求方向与当前绕向比较 ②不一致时原地反转 ③返回
-    todo!("TODO-DECL")
+    if contour.arcs.is_empty() {
+        return;
+    }
+    // 与 glyphy 一致：r = inverse XOR 当前顺时针 XOR 奇偶修正项。
+    // 单子轮廓无其它轮廓上下文，奇偶修正项取「不在任何其它轮廓内」（even）。
+    let even_odd_correction = true;
+    let need_reverse = num::xor(num::xor(inverse, contour_is_clockwise(contour)), even_odd_correction);
+    if need_reverse {
+        contour_reverse(contour);
+    }
 }
 
 /**
@@ -214,8 +267,31 @@ pub fn contour_winding(contour: &mut Contour, inverse: bool) {
  * 参数：inverse — 是否需要反转
  */
 pub fn outline_winding(outline: &mut Outline, inverse: bool) {
-    // TODO-DECL —— 实现逻辑：①遍历子轮廓记录索引 ②按需求决定反转集合 ③原地反转并对齐方向
-    todo!("TODO-DECL")
+    let num_contours = outline.contours.len();
+    for i in 0..num_contours {
+        if outline.contours[i].arcs.is_empty() {
+            continue;
+        }
+        // 以子轮廓首个端点为采样点，统计它落在多少个「其它」子轮廓内（奇偶）。
+        let sample = outline.contours[i].arcs[0].p0;
+        let mut inside_odd = false;
+        for j in 0..num_contours {
+            if j == i || outline.contours[j].arcs.is_empty() {
+                continue;
+            }
+            if even_odd(&outline.contours[j], sample) {
+                inside_odd = !inside_odd;
+            }
+        }
+        let even_odd_correction = !inside_odd;
+        let need_reverse = num::xor(
+            num::xor(inverse, contour_is_clockwise(&outline.contours[i])),
+            even_odd_correction,
+        );
+        if need_reverse {
+            contour_reverse(&mut outline.contours[i]);
+        }
+    }
 }
 
 /**
@@ -232,6 +308,103 @@ pub fn outline_winding(outline: &mut Outline, inverse: bool) {
  * 参数：p — 目标点
  */
 pub fn even_odd(contour: &Contour, p: Point) -> bool {
-    // TODO-DECL —— 实现逻辑：①从点引射线 ②统计与子轮廓的交点奇偶 ③奇数为内
-    todo!("TODO-DECL")
+    let mut count = 0.0f32;
+    for arc in contour.arcs.iter() {
+        let s0 = categorize(arc.p0.y, p.y);
+        let s1 = categorize(arc.p1.y, p.y);
+        if arc.d == 0.0 {
+            // 线段分支
+            if s0 == 0 || s1 == 0 {
+                let t = arc.tangents();
+                if s0 == 0 && arc.p0.x < p.x + num::EPSILON {
+                    count += 0.5 * categorize(t.0.y, 0.0) as f32;
+                }
+                if s1 == 0 && arc.p1.x < p.x + num::EPSILON {
+                    count += 0.5 * categorize(t.1.y, 0.0) as f32;
+                }
+                continue;
+            }
+            if s0 == s1 {
+                continue;
+            }
+            let x = arc.p0.x + (arc.p1.x - arc.p0.x) * ((p.y - arc.p0.y) / (arc.p1.y - arc.p0.y));
+            if x >= p.x - num::EPSILON {
+                continue;
+            }
+            count += 1.0;
+        } else {
+            // 圆弧分支
+            if s0 == 0 || s1 == 0 {
+                let (mut t0, mut t1) = arc.tangents();
+                if num::is_zero(t0.y, None) {
+                    t0.y = s1 as f32;
+                }
+                if num::is_zero(t1.y, None) {
+                    t1.y = -(s0 as f32);
+                }
+                if s0 == 0 && arc.p0.x < p.x + num::EPSILON {
+                    count += 0.5 * categorize(t0.y, 0.0) as f32;
+                }
+                if s1 == 0 && arc.p1.x < p.x + num::EPSILON {
+                    count += 0.5 * categorize(t1.y, 0.0) as f32;
+                }
+            }
+            let c = arc.center();
+            let r = arc.radius();
+            if c.x - r >= p.x {
+                continue;
+            }
+            let y = p.y - c.y;
+            let x2 = r * r - y * y;
+            if x2 <= num::EPSILON {
+                continue;
+            }
+            let dx = x2.sqrt();
+            let candidates = [
+                Point { x: c.x - dx, y: p.y },
+                Point { x: c.x + dx, y: p.y },
+            ];
+            for q in candidates.iter() {
+                if !point_equals(*q, arc.p0)
+                    && !point_equals(*q, arc.p1)
+                    && q.x < p.x - num::EPSILON
+                    && arc.wedge_contains_point(*q)
+                {
+                    count += 1.0;
+                }
+            }
+        }
+    }
+    (count.floor() as i32) & 1 == 1
+}
+
+/// 单条弧贡献的有符号面积分量（与 pi_sdf glyphy 一致）。
+fn arc_signed_area(arc: &Arc) -> f32 {
+    let cross = arc.p0.x * arc.p1.y - arc.p0.y * arc.p1.x;
+    let dx = arc.p1.x - arc.p0.x;
+    let dy = arc.p1.y - arc.p0.y;
+    cross - 0.5 * arc.d * (dx * dx + dy * dy)
+}
+
+/// 子轮廓的有符号面积；负值表示顺时针。
+fn contour_signed_area(c: &Contour) -> f32 {
+    let mut area = 0.0f32;
+    for arc in c.arcs.iter() {
+        area += arc_signed_area(arc);
+    }
+    area
+}
+
+fn categorize(v: f32, r: f32) -> i32 {
+    if v < r - num::EPSILON {
+        -1
+    } else if v > r + num::EPSILON {
+        1
+    } else {
+        0
+    }
+}
+
+fn point_equals(a: Point, b: Point) -> bool {
+    num::float_equals(a.x, b.x, None) && num::float_equals(a.y, b.y, None)
 }
