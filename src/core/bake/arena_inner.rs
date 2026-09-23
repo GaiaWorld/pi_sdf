@@ -5,7 +5,7 @@
  * 实现：src/core/bake/arena.rs
  */
 
-use super::ArcArena;
+use super::arena::ArcArena;
 use crate::model::raster::texture::UnitArc;
 
 /**

@@ -5,7 +5,7 @@
  * 实现：src/core/outline/fit.rs
  */
 
-use super::StrokeMesh;
+use super::fit::StrokeMesh;
 use crate::model::base::error::{Error, Result};
 use crate::model::geom::curve::{Arc, Bezier};
 

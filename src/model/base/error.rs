@@ -19,6 +19,7 @@ use crate::model::base::error_inner;
  *   - ensures   Display 输出可读短语；构造与格式化均不 panic
  *   - 错误      不适用（Error 是错误载体本身）
  */
+#[derive(Debug)]
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub enum Error {
     /// 字体字节非法或损坏

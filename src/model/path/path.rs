@@ -14,6 +14,60 @@ use crate::model::raster::sdf::SdfTexture;
 use crate::model::path::path_inner;
 
 /**
+ * 路径动词，判别值与 JS 侧 u8 契约一致（1..=19）。
+ *
+ * 契约：API-026
+ *
+ * 约束：
+ *   - requires  判别值落在 1..=19
+ *   - ensures   非法判别值返回 Err；判别值与 JS u8 契约一致
+ *   - 错误      InvalidPathVerb —— 判别值不在 1..=19
+ */
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
+pub enum PathVerb {
+    /// 移动到绝对位置
+    MoveTo = 1,
+    /// 相对当前位置移动
+    MoveToRelative = 2,
+    /// 直线到绝对位置
+    LineTo = 3,
+    /// 相对直线
+    LineToRelative = 4,
+    /// 二次贝塞尔到绝对位置
+    QuadTo = 5,
+    /// 相对二次贝塞尔
+    QuadToRelative = 6,
+    /// 平滑二次贝塞尔到绝对位置
+    SmoothQuadTo = 7,
+    /// 相对平滑二次贝塞尔
+    SmoothQuadToRelative = 8,
+    /// 三次贝塞尔到绝对位置
+    CubicTo = 9,
+    /// 相对三次贝塞尔
+    CubicToRelative = 10,
+    /// 平滑三次贝塞尔到绝对位置
+    SmoothCubicTo = 11,
+    /// 相对平滑三次贝塞尔
+    SmoothCubicToRelative = 12,
+    /// 水平线到绝对位置
+    HorizontalLineTo = 13,
+    /// 相对水平线
+    HorizontalLineToRelative = 14,
+    /// 垂直线到绝对位置
+    VerticalLineTo = 15,
+    /// 相对垂直线
+    VerticalLineToRelative = 16,
+    /// 椭圆弧到绝对位置
+    EllipticalArcTo = 17,
+    /// 相对椭圆弧
+    EllipticalArcToRelative = 18,
+    /// 关闭路径
+    Close = 19,
+}
+
+/**
  * 路径动词的 JS 友好构造与取值（trait impl 无法导出，故另加固有方法）。
  *
  * 契约：API-026

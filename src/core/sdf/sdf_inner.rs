@@ -5,7 +5,7 @@
  * 实现：src/core/sdf/sdf.rs
  */
 
-use super::SdfSample;
+use super::sdf::SdfSample;
 use crate::model::base::error::{Error, Result};
 use crate::model::geom::primitive::Point;
 use crate::model::geom::curve::Arc;

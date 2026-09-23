@@ -5,7 +5,7 @@
  * 实现：src/platform/native/font_source.rs
  */
 
-use super::FontSource;
+use super::font_source::FontSource;
 use crate::model::base::error::{Error, Result};
 
 /**
