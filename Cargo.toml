@@ -7,8 +7,12 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+allsorts = { version = "=0.15.1", default-features = false, features = ["flate2_rust", "outline"] }
 serde = "1.0"
 talc = "=4.4.0"
+
+[target."cfg(not(target_arch = \"wasm32\"))".dependencies]
+ttf-parser = "0.25"
 
 [target."cfg(target_arch = \"wasm32\")".dependencies]
 wasm-bindgen = "0.2"

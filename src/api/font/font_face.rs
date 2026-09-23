@@ -24,8 +24,8 @@ use crate::api::font::font_face_inner::FontState;
 #[derive(Debug, Clone)]
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub struct FontFace {
-    data: Vec<u8>,
-    state: FontState,
+    pub(crate) data: Vec<u8>,
+    pub(crate) state: FontState,
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]

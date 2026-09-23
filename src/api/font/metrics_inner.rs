@@ -23,8 +23,23 @@ use crate::api::font::font_face::FontFace;
  * 参数：ch — 目标字符
  */
 pub fn font_glyph_metrics(face: &FontFace, ch: char) -> Result<GlyphMetrics> {
-    // TODO-DECL —— 实现逻辑：①校验字形存在 ②求步进 ③求轮廓包围盒与绕向 ④返回度量
-    todo!("TODO-DECL")
+    // ①校验字形存在：cmap 未命中（索引 0）即无对应字形
+    let index = face.glyph_index(ch);
+    if index == 0 {
+        return Err(Error::InvalidParam("字符无对应字形"));
+    }
+    // ②求轮廓，直接以其包围盒与绕向作为度量（extents 即轮廓包围盒）
+    let outline = face.glyph_outline(ch)?;
+    let extents = outline.extents();
+    let is_clockwise = outline.is_clockwise();
+    // ③求非负步进（字体单位；解析异常时兜底为 0）
+    let advance = super::font_face_inner::font_horizontal_advance(face, index);
+    debug_assert!(advance >= 0.0);
+    Ok(GlyphMetrics {
+        advance,
+        extents,
+        is_clockwise,
+    })
 }
 
 /**
@@ -40,8 +55,8 @@ pub fn font_glyph_metrics(face: &FontFace, ch: char) -> Result<GlyphMetrics> {
  * 参数：face — 字体面
  */
 pub fn font_ascender(face: &FontFace) -> f32 {
-    // TODO-DECL —— 实现逻辑：①读 hhea 或 os2 表 ②返回上升部
-    todo!("TODO-DECL")
+    // ①读 hhea 表 ②返回上升部（字体单位）
+    super::font_face_inner::font_ascender_value(face)
 }
 
 /**
@@ -57,6 +72,6 @@ pub fn font_ascender(face: &FontFace) -> f32 {
  * 参数：face — 字体面
  */
 pub fn font_descender(face: &FontFace) -> f32 {
-    // TODO-DECL —— 实现逻辑：①读 hhea 或 os2 表 ②返回下降部
-    todo!("TODO-DECL")
+    // ①读 hhea 表 ②返回下降部（字体单位，通常为负）
+    super::font_face_inner::font_descender_value(face)
 }
