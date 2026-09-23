@@ -111,6 +111,7 @@
 | ADR-004 | 以 stable Rust 为基准而非 nightly | plan/04-decisions/004-toolchain-stable.md | accepted |
 | ADR-005 | 不引入替代几何库，评估整体去除 parry2d/nalgebra | plan/04-decisions/005-geometry-deps.md | accepted |
 | ADR-006 | 对外入口返回错误而非 panic | plan/04-decisions/006-failure-behavior.md | accepted |
+| ADR-007 | wasm 边界投影按成员级规则裁剪，native 接口保持全量 | plan/04-decisions/007-wasm-boundary-projection.md | accepted |
 
 ### 模块
 
@@ -322,3 +323,4 @@
 | 2026-09-23 | D9→D1 | 返工：被推翻的判断——wasm 导出面写成 4 个字节 RPC（未枚举可导出类型），导致 JS 无法驱动核心链路；改为「model 数据层 + core/api 类型直接导出」。作废：plan/05、06、07-contracts 全部、tasks/、09-review.md、src/ 全部骨架。旧基线 d2773ef/aa3a6f2，新基线待重落后提交 | 无 |
 | 2026-09-23 | D5/D7(返工) | 索引回填：模块表 11→15；接口表模块与实现文件列按新四层全量更新；新增 API-033..036 | 无 |
 | 2026-09-23 | D9(返工后) | 返工后重审：设计层 ❌ 清零（C1-C59 除 C48 实现阶段项）；C3/C14 复核为 ddt 工具误报；C6/C16/C55/C56/C58 与 6 条反向孤儿均已修复；登记完成 | 无 |
+| 2026-09-23 | 返工 | wasm 边界适配：新增 ADR-007（成员级投影规则）；边界类型清单补成员级小节；契约同步（Shape 改 opaque + 静态构造器、Error 加 From<JsValue>、Vec 字段 skip+getter、元组/借用返回标注 JS 不导出、Contour::from_endpoints 切片改 Vec）；src 相应改造，双目标 cargo build 通过 | plan/04-decisions/007-*.md、plan/05-architecture.md、plan/06-layout.md、plan/07-contracts/*.md、src/** |

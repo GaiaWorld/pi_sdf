@@ -178,6 +178,20 @@ flowchart TD
 | get_char_arc_debug、compute_svg_debug、brotli_decompressor | MOD-013 | 导出为函数 |
 | 内存分配器、字体来源 | MOD-014、MOD-015 | 不投影（宿主内部能力） |
 
+### 成员级投影规则（ADR-007）
+
+上表只回答「哪些类型跨边界」。落到成员的投影规则：
+
+| wasm_bindgen 限制 | 规则 | 受影响成员 |
+|---|---|---|
+| 带数据的 enum | 改 opaque 类 + 静态构造器 | Shape |
+| 元组返回 | 移入无注解 impl 块，JS 不导出（native 保留） | Aabb::half、Bezier::split、Arc::tangents、Segment::nearest_points_on_line_segments |
+| 借用返回 | 同上 | Line::normal |
+| `pub` 字段 getter 要求 `Copy` | 字段 `wasm_bindgen(skip)` + 同名 `getter` 方法返回克隆（JS 访问形式不变） | Contour.arcs、Outline.contours、Cell.arc_indices、CellGrid.arcs、CellGrid.cells、UnitArc.endpoints、DataTexture.pixels、IndexTexture.pixels、SdfTexture.pixels、Path.verbs、Path.points |
+| 带数据的错误 enum | `impl From<Error> for JsValue`（转字符串），不导出 enum | Error |
+
+判定基准为 REQ-002.1 的核心链路：字体 → 轮廓 → 近邻弧 → SDF 纹理。
+
 ## 存疑的边界
 
 已由用户裁决：描边几何（顶点与 UV）归 **MOD-007 core::outline**，不单列模块。

@@ -171,6 +171,7 @@ D7b 落地后，本表「冻结文件」列谁都不能改，下游只能改「�
 
 - `#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]` **只允许**出现在 `model` 与 `api` 两层的类型与函数上。
 - `core` 与 `platform` **禁止**出现该注解，也禁止 `wasm_bindgen` 依赖。
+- 成员级投影（ADR-007）：不可导出的成员（元组返回、借用返回）移入**无注解**的同名 impl 块；`Vec<T>` 字段加 `wasm_bindgen(skip)` 并另加仅 wasm32 定义的同名 `#[wasm_bindgen(getter)]` 方法返回克隆；带数据的 enum 改为 opaque 类 + 静态构造器。
 - 正例：src/model/geom/curve.rs 的 `pub struct Arc` 带注解。反例：src/core/sdf/sdf.rs 的函数带注解。
 
 ### 错误处理

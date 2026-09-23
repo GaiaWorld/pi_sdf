@@ -21,6 +21,7 @@
   }
   impl std::error::Error for Error {}
   impl std::fmt::Display for Error {}
+  #[cfg(target_arch = "wasm32")] impl From<Error> for wasm_bindgen::JsValue {}   // 转为 JS 字符串，作为 Result 的 Err
   pub type Result<T> = std::result::Result<T, Error>;
   ```
 

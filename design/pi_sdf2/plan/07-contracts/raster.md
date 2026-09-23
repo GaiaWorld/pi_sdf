@@ -11,7 +11,7 @@
 - 签名：
 
   ```
-  pub struct UnitArc { pub endpoints: Vec<ArcEndpoint>, pub sdf_min: f32, pub sdf_max: f32, pub show: bool }
+  pub struct UnitArc { pub endpoints: Vec<ArcEndpoint>, pub sdf_min: f32, pub sdf_max: f32, pub show: bool }   // wasm 投影：字段 skip + 同名 getter，JS 访问形式不变（ADR-007）
   ```
 
 - requires：endpoints 非空；sdf_min 不大于 sdf_max
@@ -38,7 +38,7 @@
 - 签名：
 
   ```
-  pub struct DataTexture { pub pixels: Vec<u8>, pub width: u32, pub height: u32 }
+  pub struct DataTexture { pub pixels: Vec<u8>, pub width: u32, pub height: u32 }   // wasm 投影：字段 skip + 同名 getter，JS 访问形式不变（ADR-007）
   ```
 
 - requires：像素数据长度为宽乘高
@@ -60,7 +60,7 @@
 - 签名：
 
   ```
-  pub struct IndexTexture { pub pixels: Vec<u8>, pub width: u32, pub height: u32 }
+  pub struct IndexTexture { pub pixels: Vec<u8>, pub width: u32, pub height: u32 }   // wasm 投影：字段 skip + 同名 getter，JS 访问形式不变（ADR-007）
   ```
 
 - requires：像素数据长度为宽乘高
@@ -105,7 +105,7 @@
 
   ```
   pub struct TextureInfo { pub plane_bounds: Aabb, pub atlas_bounds: Aabb, pub sdf_offset_x: f32, pub sdf_offset_y: f32 }
-  pub struct SdfTexture { pub pixels: Vec<u8>, pub tex_size: u32, pub tex_info: TextureInfo }
+  pub struct SdfTexture { pub pixels: Vec<u8>, pub tex_size: u32, pub tex_info: TextureInfo }   // wasm 投影：字段 skip + 同名 getter，JS 访问形式不变（ADR-007）
   pub struct RasterOptions { pub is_outer_glow: bool, pub is_svg: bool, pub is_reverse: Option<bool> }
   ```
 

@@ -11,11 +11,11 @@
 - 签名：
 
   ```
-  pub struct Contour { pub arcs: Vec<Arc>, pub is_closed: bool }
-  pub struct Outline { pub contours: Vec<Contour> }
+  pub struct Contour { pub arcs: Vec<Arc>, pub is_closed: bool }   // wasm 投影：字段 skip + 同名 getter，JS 访问形式不变（ADR-007）
+  pub struct Outline { pub contours: Vec<Contour> }   // wasm 投影：字段 skip + 同名 getter，JS 访问形式不变（ADR-007）
   impl Contour {
       pub fn new(arcs: Vec<Arc>, is_closed: bool) -> Self;
-      pub fn from_endpoints(eps: &[ArcEndpoint]) -> Self;
+      pub fn from_endpoints(eps: Vec<ArcEndpoint>) -> Self;
       pub fn endpoints(&self) -> Vec<ArcEndpoint>;
       pub fn is_clockwise(&self) -> bool;
       pub fn reverse(&mut self);

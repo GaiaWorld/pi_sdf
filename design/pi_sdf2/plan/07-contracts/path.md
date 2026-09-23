@@ -42,7 +42,7 @@
 - 签名：
 
   ```
-  pub struct Path { pub verbs: Vec<PathVerb>, pub points: Vec<[f32; 2]> }
+  pub struct Path { pub verbs: Vec<PathVerb>, pub points: Vec<f32> }   // points 拍平存放，每点 2 个分量
   impl Path {
       pub fn new(verbs: Vec<u8>, points: Vec<f32>) -> Result<Self>;
       pub fn from_verbs(verbs: Vec<PathVerb>, points: Vec<f32>) -> Result<Self>;
@@ -64,6 +64,7 @@
 
 - 顺序约束：无
 - 性能：同现状
+- wasm 投影：verbs 与 points 字段被 skip，由同名 getter 暴露，JS 侧访问形式不变（ADR-007）
 
 #### 用例
 
@@ -80,15 +81,14 @@
 - 签名：
 
   ```
-  pub enum Shape {
-      Circle  { cx: f32, cy: f32, r: f32 },
-      Rect    { x: f32, y: f32, w: f32, h: f32 },
-      Line    { ax: f32, ay: f32, bx: f32, by: f32, step: Option<f32> },
-      Ellipse { cx: f32, cy: f32, rx: f32, ry: f32 },
-      Polygon { points: Vec<[f32; 2]> },
-      Polyline{ points: Vec<[f32; 2]>, is_close: bool },
-  }
+  pub struct Shape;                       // opaque 类；内部为 pub(crate) enum ShapeKind
   impl Shape {
+      pub fn circle(cx: f32, cy: f32, r: f32) -> Self;
+      pub fn rect(x: f32, y: f32, w: f32, h: f32) -> Self;
+      pub fn line(ax: f32, ay: f32, bx: f32, by: f32, step: Option<f32>) -> Self;
+      pub fn ellipse(cx: f32, cy: f32, rx: f32, ry: f32) -> Self;
+      pub fn polygon(points: Vec<f32>) -> Self;       // 扁平坐标，每点 2 个分量
+      pub fn polyline(points: Vec<f32>, is_close: bool) -> Self;
       pub fn to_outline(&self) -> Result<Outline>;
       pub fn extents(&self) -> Aabb;
       pub fn is_area(&self) -> bool;

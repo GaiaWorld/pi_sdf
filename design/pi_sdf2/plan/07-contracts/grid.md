@@ -11,7 +11,7 @@
 - 签名：
 
   ```
-  pub struct Cell { pub bounds: Aabb, pub arc_indices: Vec<usize> }
+  pub struct Cell { pub bounds: Aabb, pub arc_indices: Vec<usize> }   // wasm 投影：字段 skip + 同名 getter，JS 访问形式不变（ADR-007）
   ```
 
 - requires：arc_indices 是全局弧列表的合法下标
@@ -35,8 +35,8 @@
   ```
   pub struct CellGrid {
       pub extents: Aabb,
-      pub arcs: Vec<Arc>,
-      pub cells: Vec<Cell>,
+      pub arcs: Vec<Arc>,      // 同左：wasm 投影 getter（ADR-007）
+      pub cells: Vec<Cell>,    // 同左：wasm 投影 getter（ADR-007）
       pub min_width: f32,
       pub min_height: f32,
       pub is_area: bool,

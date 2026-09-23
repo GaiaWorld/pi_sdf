@@ -93,7 +93,7 @@
       pub fn new(a: f32, b: f32, c: f32) -> Self;
       pub fn from_points(p0: Point, p1: Point) -> Self;
       pub fn normalized(self) -> Self;
-      pub fn normal(&self) -> &Vector;
+      pub fn normal(&self) -> &Vector;                                   // wasm 不导出（借用返回，ADR-007）
       pub fn intersect(&self, other: &Line) -> Option<Point>;
       pub fn sub(&self, p: &Point) -> SignedVector;
   }
@@ -130,7 +130,7 @@
       pub fn new(a: Point, b: Point) -> Self;
       pub fn distance_to_point(&self, p: Point) -> f32;
       pub fn squared_distance_to_point(&self, p: Point) -> f32;
-      pub fn nearest_points_on_line_segments(a: &Segment, b: &Segment) -> (Point, Point);
+      pub fn nearest_points_on_line_segments(a: &Segment, b: &Segment) -> (Point, Point);   // wasm 不导出（元组返回，ADR-007）
       pub fn contains_in_span(&self, p: Point) -> bool;
   }
   ```
@@ -162,7 +162,7 @@
       pub fn tangent(&self, t: f32) -> Vector;
       pub fn derivative_tangent(&self, t: f32) -> Vector;
       pub fn curvature(&self, t: f32) -> f32;
-      pub fn split(&self, t: f32) -> (Bezier, Bezier);
+      pub fn split(&self, t: f32) -> (Bezier, Bezier);                    // wasm 不导出（元组返回，ADR-007）
       pub fn segment(&self, t0: f32, t1: f32) -> Bezier;
       pub fn midpoint(&self) -> Point;
   }
@@ -203,7 +203,7 @@
       pub fn len(&self) -> f32;
       pub fn distance_to_point(&self, p: Point) -> f32;
       pub fn squared_distance_to_point(&self, p: Point) -> f32;
-      pub fn tangents(&self) -> (Vector, Vector);
+      pub fn tangents(&self) -> (Vector, Vector);                        // wasm 不导出（元组返回，ADR-007）
       pub fn extents(&self) -> Aabb;
       pub fn wedge_contains_point(&self, p: Point) -> bool;
       pub fn approximate_bezier(&self) -> Bezier;
@@ -249,7 +249,7 @@
       pub fn width(&self) -> f32;
       pub fn height(&self) -> f32;
       pub fn scale(&mut self, s: f32);
-      pub fn half(&self) -> (Aabb, Aabb);
+      pub fn half(&self) -> (Aabb, Aabb);                            // wasm 不导出（元组返回，ADR-007）
       pub fn collision(&self, other: &Aabb) -> Option<Aabb>;
       pub fn bound(&self, dir: Direction) -> Segment;
       }
