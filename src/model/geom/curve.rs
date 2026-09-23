@@ -8,6 +8,7 @@
 use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::model::geom::curve_inner;
+use crate::model::base::error::Result;
 use crate::model::geom::primitive::{Point, Vector};
 use crate::model::geom::aabb::Aabb;
 
@@ -330,30 +331,30 @@ impl Arc {
         curve_inner::arc_approximate_bezier(self)
     }
 
-    /// 转为可传递的弧端点。
+    /// 转为可传递的弧端点对（起点、终点）。
     ///
     /// 契约：API-008
     ///
     /// 约束：
     ///   - requires  p0 与 p1 不重合；d 为有限值且不为裸 NaN
-    ///   - ensures   d=0 时等价线段；大弧与小弧的包含判定均与几何定义一致
+    ///   - ensures   返回 [起点端点, 终点端点]，d 均为本弧曲率参数；tag 一律 None
     ///   - 错误      Geometry —— p0 与 p1 重合时返回退化弧
-    pub fn to_endpoint(&self) -> ArcEndpoint {
-        curve_inner::arc_to_endpoint(self)
+    pub fn endpoints(&self) -> Vec<ArcEndpoint> {
+        curve_inner::arc_endpoints(self)
     }
 
-    /// 由弧端点还原弧。
+    /// 由弧端点对（起点、终点）还原弧。
     ///
     /// 契约：API-008
     ///
     /// 约束：
-    ///   - requires  p0 与 p1 不重合；d 为有限值且不为裸 NaN
-    ///   - ensures   d=0 时等价线段；大弧与小弧的包含判定均与几何定义一致
-    ///   - 错误      Geometry —— p0 与 p1 重合时返回退化弧
+    ///   - requires  eps 长度为 2；d 为有限值且不为裸 NaN
+    ///   - ensures   以 eps[0] 为起点、eps[1] 为终点、eps[0].d 为曲率参数构造弧
+    ///   - 错误      InvalidParam —— eps 长度不为 2
     ///
-    /// 参数：e — 弧端点
-    pub fn from_endpoint(e: &ArcEndpoint) -> Self {
-        curve_inner::arc_from_endpoint(e)
+    /// 参数：eps — 弧端点对（起、终）
+    pub fn from_endpoints(eps: Vec<ArcEndpoint>) -> Result<Self> {
+        curve_inner::arc_from_endpoints(eps)
     }
 }
 

@@ -8,6 +8,7 @@
 use super::{Arc, ArcEndpoint, Bezier};
 use crate::model::geom::primitive::{Point, Vector};
 use crate::model::geom::aabb::Aabb;
+use crate::model::base::error::{Error, Result};
 
 /**
  * 由四个控制点构造贝塞尔。
@@ -25,8 +26,7 @@ use crate::model::geom::aabb::Aabb;
  * 参数：p3 — 终点
  */
 pub fn bezier_new(p0: Point, p1: Point, p2: Point, p3: Point) -> Bezier {
-    // TODO-DECL —— 实现逻辑：①写入四个控制点 ②返回 Bezier
-    todo!("TODO-DECL")
+    Bezier { p0, p1, p2, p3 }
 }
 
 /**
@@ -43,8 +43,12 @@ pub fn bezier_new(p0: Point, p1: Point, p2: Point, p3: Point) -> Bezier {
  * 参数：t — 参数，范围 [0,1]
  */
 pub fn bezier_point(b: &Bezier, t: f32) -> Point {
-    // TODO-DECL —— 实现逻辑：①按德卡斯特里奥或多项式展开 ②按 t 求点 ③返回
-    todo!("TODO-DECL")
+    let p01 = lerp_point(b.p0, b.p1, t);
+    let p12 = lerp_point(b.p1, b.p2, t);
+    let p23 = lerp_point(b.p2, b.p3, t);
+    let p012 = lerp_point(p01, p12, t);
+    let p123 = lerp_point(p12, p23, t);
+    lerp_point(p012, p123, t)
 }
 
 /**
@@ -61,8 +65,14 @@ pub fn bezier_point(b: &Bezier, t: f32) -> Point {
  * 参数：t — 参数，范围 [0,1]
  */
 pub fn bezier_tangent(b: &Bezier, t: f32) -> Vector {
-    // TODO-DECL —— 实现逻辑：①对控制点求一阶差分 ②按 t 插值 ③返回方向向量
-    todo!("TODO-DECL")
+    let mt = 1.0 - t;
+    let c0 = 3.0 * mt * mt;
+    let c1 = 6.0 * mt * t;
+    let c2 = 3.0 * t * t;
+    Vector {
+        x: c0 * (b.p1.x - b.p0.x) + c1 * (b.p2.x - b.p1.x) + c2 * (b.p3.x - b.p2.x),
+        y: c0 * (b.p1.y - b.p0.y) + c1 * (b.p2.y - b.p1.y) + c2 * (b.p3.y - b.p2.y),
+    }
 }
 
 /**
@@ -79,8 +89,12 @@ pub fn bezier_tangent(b: &Bezier, t: f32) -> Vector {
  * 参数：t — 参数，范围 [0,1]
  */
 pub fn bezier_derivative_tangent(b: &Bezier, t: f32) -> Vector {
-    // TODO-DECL —— 实现逻辑：①对控制点求二阶差分 ②按 t 插值 ③返回
-    todo!("TODO-DECL")
+    let c0 = 6.0 * (1.0 - t);
+    let c1 = 6.0 * t;
+    Vector {
+        x: c0 * (b.p0.x - 2.0 * b.p1.x + b.p2.x) + c1 * (b.p1.x - 2.0 * b.p2.x + b.p3.x),
+        y: c0 * (b.p0.y - 2.0 * b.p1.y + b.p2.y) + c1 * (b.p1.y - 2.0 * b.p2.y + b.p3.y),
+    }
 }
 
 /**
@@ -97,8 +111,15 @@ pub fn bezier_derivative_tangent(b: &Bezier, t: f32) -> Vector {
  * 参数：t — 参数，范围 [0,1]
  */
 pub fn bezier_curvature(b: &Bezier, t: f32) -> f32 {
-    // TODO-DECL —— 实现逻辑：①求一阶与二阶导 ②按叉积除以模长立方 ③返回曲率
-    todo!("TODO-DECL")
+    let d1 = bezier_tangent(b, t);
+    let d2 = bezier_derivative_tangent(b, t);
+    let cross = d1.x * d2.y - d1.y * d2.x;
+    let n2 = d1.x * d1.x + d1.y * d1.y;
+    let len3 = n2 * n2.sqrt();
+    if len3 == 0.0 {
+        return 0.0;
+    }
+    cross / len3
 }
 
 /**
@@ -115,8 +136,26 @@ pub fn bezier_curvature(b: &Bezier, t: f32) -> f32 {
  * 参数：t — 分割参数，范围 [0,1]
  */
 pub fn bezier_split(b: &Bezier, t: f32) -> (Bezier, Bezier) {
-    // TODO-DECL —— 实现逻辑：①按德卡斯特里奥逐层插值 ②取左右控制点 ③返回两段
-    todo!("TODO-DECL")
+    let p01 = lerp_point(b.p0, b.p1, t);
+    let p12 = lerp_point(b.p1, b.p2, t);
+    let p23 = lerp_point(b.p2, b.p3, t);
+    let p012 = lerp_point(p01, p12, t);
+    let p123 = lerp_point(p12, p23, t);
+    let p0123 = lerp_point(p012, p123, t);
+    (
+        Bezier {
+            p0: b.p0,
+            p1: p01,
+            p2: p012,
+            p3: p0123,
+        },
+        Bezier {
+            p0: p0123,
+            p1: p123,
+            p2: p23,
+            p3: b.p3,
+        },
+    )
 }
 
 /**
@@ -134,8 +173,31 @@ pub fn bezier_split(b: &Bezier, t: f32) -> (Bezier, Bezier) {
  * 参数：t1 — 结束参数
  */
 pub fn bezier_segment(b: &Bezier, t0: f32, t1: f32) -> Bezier {
-    // TODO-DECL —— 实现逻辑：①先按 t1 分割取左 ②再按 t0/t1 分割取右 ③返回子段
-    todo!("TODO-DECL")
+    if t1 <= 0.0 || t0 >= 1.0 || t0 >= t1 {
+        let tp = if t0 >= 1.0 {
+            1.0
+        } else if t0 <= 0.0 {
+            0.0
+        } else {
+            t0
+        };
+        let p = bezier_point(b, tp);
+        return Bezier {
+            p0: p,
+            p1: p,
+            p2: p,
+            p3: p,
+        };
+    }
+    if t0 <= 0.0 {
+        return bezier_split(b, t1).0;
+    }
+    if t1 >= 1.0 {
+        return bezier_split(b, t0).1;
+    }
+    let (left, _right) = bezier_split(b, t1);
+    let (_before, sub) = bezier_split(&left, t0 / t1);
+    sub
 }
 
 /**
@@ -151,8 +213,7 @@ pub fn bezier_segment(b: &Bezier, t0: f32, t1: f32) -> Bezier {
  * 参数：b — 曲线
  */
 pub fn bezier_midpoint(b: &Bezier) -> Point {
-    // TODO-DECL —— 实现逻辑：①取 t=0.5 的曲线点 ②返回
-    todo!("TODO-DECL")
+    bezier_point(b, 0.5)
 }
 
 /**
@@ -170,8 +231,8 @@ pub fn bezier_midpoint(b: &Bezier) -> Point {
  * 参数：d — 曲率参数 = tan(圆心角/4)；0 表示线段
  */
 pub fn arc_new(p0: Point, p1: Point, d: f32) -> Arc {
-    // TODO-DECL —— 实现逻辑：①写入端点与曲率参数 ②返回 Arc
-    todo!("TODO-DECL")
+    debug_assert!(d.is_finite());
+    Arc { p0, p1, d }
 }
 
 /**
@@ -187,8 +248,14 @@ pub fn arc_new(p0: Point, p1: Point, d: f32) -> Arc {
  * 参数：a — 弧
  */
 pub fn arc_radius(a: &Arc) -> f32 {
-    // TODO-DECL —— 实现逻辑：①求弦长 ②按 弦长/(2·sin(2·atan(d))) 求半径 ③d=0 返回无穷
-    todo!("TODO-DECL")
+    let dx = a.p1.x - a.p0.x;
+    let dy = a.p1.y - a.p0.y;
+    let chord = (dx * dx + dy * dy).sqrt();
+    let denom = 2.0 * sin2atan(a.d);
+    if denom == 0.0 {
+        return f32::INFINITY;
+    }
+    (chord / denom).abs()
 }
 
 /**
@@ -204,8 +271,18 @@ pub fn arc_radius(a: &Arc) -> f32 {
  * 参数：a — 弧
  */
 pub fn arc_center(a: &Arc) -> Point {
-    // TODO-DECL —— 实现逻辑：①求弦中点与法向 ②按半径与 d 求偏移 ③返回圆心
-    todo!("TODO-DECL")
+    let mx = (a.p0.x + a.p1.x) * 0.5;
+    let my = (a.p0.y + a.p1.y) * 0.5;
+    if a.d == 0.0 {
+        return Point { x: mx, y: my };
+    }
+    let dx = a.p1.x - a.p0.x;
+    let dy = a.p1.y - a.p0.y;
+    let t = 1.0 / (2.0 * tan2atan(a.d));
+    Point {
+        x: mx - dy * t,
+        y: my + dx * t,
+    }
 }
 
 /**
@@ -221,8 +298,7 @@ pub fn arc_center(a: &Arc) -> Point {
  * 参数：a — 弧
  */
 pub fn arc_angle(a: &Arc) -> f32 {
-    // TODO-DECL —— 实现逻辑：①按 4·atan(d) 求圆心角 ②返回
-    todo!("TODO-DECL")
+    4.0 * a.d.atan().abs()
 }
 
 /**
@@ -238,8 +314,10 @@ pub fn arc_angle(a: &Arc) -> f32 {
  * 参数：a — 弧
  */
 pub fn arc_len(a: &Arc) -> f32 {
-    // TODO-DECL —— 实现逻辑：①求半径与圆心角 ②半径乘圆心角 ③返回弧长
-    todo!("TODO-DECL")
+    if a.d == 0.0 {
+        return point_distance(a.p0, a.p1);
+    }
+    arc_radius(a) * arc_angle(a)
 }
 
 /**
@@ -256,8 +334,14 @@ pub fn arc_len(a: &Arc) -> f32 {
  * 参数：p — 目标点
  */
 pub fn arc_distance_to_point(a: &Arc, p: Point) -> f32 {
-    // TODO-DECL —— 实现逻辑：①求到圆心距离减半径 ②按投影是否落在弧内决定取端点距离 ③返回
-    todo!("TODO-DECL")
+    if a.d == 0.0 {
+        return point_segment_squared_distance(a.p0.x, a.p0.y, a.p1.x, a.p1.y, p.x, p.y).sqrt();
+    }
+    if arc_wedge_contains_point(a, p) {
+        let c = arc_center(a);
+        return (point_distance(p, c) - arc_radius(a)).abs();
+    }
+    point_distance(p, a.p0).min(point_distance(p, a.p1))
 }
 
 /**
@@ -274,8 +358,8 @@ pub fn arc_distance_to_point(a: &Arc, p: Point) -> f32 {
  * 参数：p — 目标点
  */
 pub fn arc_squared_distance_to_point(a: &Arc, p: Point) -> f32 {
-    // TODO-DECL —— 实现逻辑：①复用距离计算 ②返回其平方
-    todo!("TODO-DECL")
+    let dist = arc_distance_to_point(a, p);
+    dist * dist
 }
 
 /**
@@ -291,8 +375,22 @@ pub fn arc_squared_distance_to_point(a: &Arc, p: Point) -> f32 {
  * 参数：a — 弧
  */
 pub fn arc_tangents(a: &Arc) -> (Vector, Vector) {
-    // TODO-DECL —— 实现逻辑：①按圆心与端点半径求垂直方向 ②按 d 符号定向 ③返回两端切线
-    todo!("TODO-DECL")
+    let dx = (a.p1.x - a.p0.x) * 0.5;
+    let dy = (a.p1.y - a.p0.y) * 0.5;
+    let sd = -sin2atan(a.d);
+    let cd = cos2atan(a.d);
+    let ppx = -dy * sd;
+    let ppy = dx * sd;
+    (
+        Vector {
+            x: dx * cd + ppx,
+            y: dy * cd + ppy,
+        },
+        Vector {
+            x: dx * cd - ppx,
+            y: dy * cd - ppy,
+        },
+    )
 }
 
 /**
@@ -308,8 +406,32 @@ pub fn arc_tangents(a: &Arc) -> (Vector, Vector) {
  * 参数：a — 弧
  */
 pub fn arc_extents(a: &Arc) -> Aabb {
-    // TODO-DECL —— 实现逻辑：①以两端点初始化 ②若弧跨越极值角度则并入象限点 ③返回
-    todo!("TODO-DECL")
+    let mins = Point {
+        x: a.p0.x.min(a.p1.x),
+        y: a.p0.y.min(a.p1.y),
+    };
+    let maxs = Point {
+        x: a.p0.x.max(a.p1.x),
+        y: a.p0.y.max(a.p1.y),
+    };
+    let mut bb = Aabb::new(mins, maxs);
+    if a.d == 0.0 {
+        return bb;
+    }
+    let c = arc_center(a);
+    let r = arc_radius(a);
+    let candidates = [
+        Point { x: c.x - r, y: c.y },
+        Point { x: c.x + r, y: c.y },
+        Point { x: c.x, y: c.y - r },
+        Point { x: c.x, y: c.y + r },
+    ];
+    for q in candidates.iter() {
+        if arc_wedge_contains_point(a, *q) {
+            bb.extend(*q);
+        }
+    }
+    bb
 }
 
 /**
@@ -326,8 +448,29 @@ pub fn arc_extents(a: &Arc) -> Aabb {
  * 参数：p — 目标点
  */
 pub fn arc_wedge_contains_point(a: &Arc, p: Point) -> bool {
-    // TODO-DECL —— 实现逻辑：①按圆心角与点方位判角度区间 ②大弧（|d|>1）取反 ③返回
-    todo!("TODO-DECL")
+    if a.d == 0.0 {
+        let dx = a.p1.x - a.p0.x;
+        let dy = a.p1.y - a.p0.y;
+        let l2 = dx * dx + dy * dy;
+        if l2 == 0.0 {
+            return p.x == a.p0.x && p.y == a.p0.y;
+        }
+        let t = ((p.x - a.p0.x) * dx + (p.y - a.p0.y) * dy) / l2;
+        return t >= 0.0 && t <= 1.0;
+    }
+    let c = arc_center(a);
+    let rpx = p.x - c.x;
+    let rpy = p.y - c.y;
+    if rpx == 0.0 && rpy == 0.0 {
+        return true;
+    }
+    let r0x = a.p0.x - c.x;
+    let r0y = a.p0.y - c.y;
+    let ang0 = r0y.atan2(r0x);
+    let angp = rpy.atan2(rpx);
+    let sigma = if a.d > 0.0 { 1.0 } else { -1.0 };
+    let delta = (sigma * (angp - ang0)).rem_euclid(std::f32::consts::TAU);
+    delta <= arc_angle(a) + 1e-5
 }
 
 /**
@@ -343,40 +486,124 @@ pub fn arc_wedge_contains_point(a: &Arc, p: Point) -> bool {
  * 参数：a — 弧
  */
 pub fn arc_approximate_bezier(a: &Arc) -> Bezier {
-    // TODO-DECL —— 实现逻辑：①由 d 求控制点权重 ②以端点与切线构造控制点 ③返回贝塞尔
-    todo!("TODO-DECL")
+    let dx = a.p1.x - a.p0.x;
+    let dy = a.p1.y - a.p0.y;
+    let d = a.d;
+    let rdx = dx * ((1.0 - d * d) / 3.0);
+    let rdy = dy * ((1.0 - d * d) / 3.0);
+    let rpx = -dy * (2.0 * d / 3.0);
+    let rpy = dx * (2.0 * d / 3.0);
+    Bezier {
+        p0: a.p0,
+        p1: Point {
+            x: a.p0.x + rdx - rpx,
+            y: a.p0.y + rdy - rpy,
+        },
+        p2: Point {
+            x: a.p1.x - rdx - rpx,
+            y: a.p1.y - rdy - rpy,
+        },
+        p3: a.p1,
+    }
 }
 
 /**
- * 弧转为弧端点。
+ * 弧转为弧端点对（起点、终点）。
  *
  * 契约：API-008
  *
  * 约束：
  *   - requires  p0 与 p1 不重合；d 为有限值且不为裸 NaN
- *   - ensures   d=0 时等价线段；大弧与小弧的包含判定均与几何定义一致
- *   - 错误      Geometry —— p0 与 p1 重合时返回退化弧
+ *   - ensures   返回 [起点端点, 终点端点]，d 均为 a.d，tag 一律 None
+ *   - 错误      无
  *
  * 参数：a — 弧
  */
-pub fn arc_to_endpoint(a: &Arc) -> ArcEndpoint {
-    // TODO-DECL —— 实现逻辑：①取终点坐标与曲率参数 ②线段时置共享键 ③返回端点
-    todo!("TODO-DECL")
+pub fn arc_endpoints(a: &Arc) -> Vec<ArcEndpoint> {
+    vec![
+        ArcEndpoint {
+            px: a.p0.x,
+            py: a.p0.y,
+            d: a.d,
+            tag: None,
+        },
+        ArcEndpoint {
+            px: a.p1.x,
+            py: a.p1.y,
+            d: a.d,
+            tag: None,
+        },
+    ]
 }
 
 /**
- * 由弧端点还原弧。
+ * 由弧端点对（起点、终点）还原弧。
  *
  * 契约：API-008
  *
  * 约束：
- *   - requires  p0 与 p1 不重合；d 为有限值且不为裸 NaN
- *   - ensures   d=0 时等价线段；大弧与小弧的包含判定均与几何定义一致
- *   - 错误      Geometry —— p0 与 p1 重合时返回退化弧
+ *   - requires  eps 长度为 2；d 为有限值且不为裸 NaN
+ *   - ensures   以 eps[0] 为起点、eps[1] 为终点、eps[0].d 为曲率参数构造弧
+ *   - 错误      InvalidParam —— eps 长度不为 2
  *
- * 参数：e — 弧端点
+ * 参数：eps — 弧端点对（起、终）
  */
-pub fn arc_from_endpoint(e: &ArcEndpoint) -> Arc {
-    // TODO-DECL —— 实现逻辑：①由端点坐标与曲率参数构造 ②返回弧
-    todo!("TODO-DECL")
+pub fn arc_from_endpoints(eps: Vec<ArcEndpoint>) -> Result<Arc> {
+    if eps.len() != 2 {
+        return Err(Error::InvalidParam("arc endpoints must be exactly two"));
+    }
+    debug_assert!(eps[0].d.is_finite() && eps[1].d.is_finite());
+    let p0 = Point {
+        x: eps[0].px,
+        y: eps[0].py,
+    };
+    let p1 = Point {
+        x: eps[1].px,
+        y: eps[1].py,
+    };
+    Ok(Arc {
+        p0,
+        p1,
+        d: eps[0].d,
+    })
+}
+
+fn lerp_point(a: Point, b: Point, t: f32) -> Point {
+    Point {
+        x: a.x + (b.x - a.x) * t,
+        y: a.y + (b.y - a.y) * t,
+    }
+}
+
+fn point_distance(a: Point, b: Point) -> f32 {
+    let dx = a.x - b.x;
+    let dy = a.y - b.y;
+    (dx * dx + dy * dy).sqrt()
+}
+
+fn point_segment_squared_distance(ax: f32, ay: f32, bx: f32, by: f32, px: f32, py: f32) -> f32 {
+    let dx = bx - ax;
+    let dy = by - ay;
+    let l2 = dx * dx + dy * dy;
+    if l2 == 0.0 {
+        let ex = px - ax;
+        let ey = py - ay;
+        return ex * ex + ey * ey;
+    }
+    let t = (((px - ax) * dx + (py - ay) * dy) / l2).clamp(0.0, 1.0);
+    let cx = ax + t * dx - px;
+    let cy = ay + t * dy - py;
+    cx * cx + cy * cy
+}
+
+fn sin2atan(d: f32) -> f32 {
+    2.0 * d / (1.0 + d * d)
+}
+
+fn cos2atan(d: f32) -> f32 {
+    (1.0 - d * d) / (1.0 + d * d)
+}
+
+fn tan2atan(d: f32) -> f32 {
+    2.0 * d / (1.0 - d * d)
 }

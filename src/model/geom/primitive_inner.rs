@@ -21,8 +21,7 @@ use super::{Line, Point, Segment, SignedVector, Vector};
  * 参数：y — y 坐标，有限值
  */
 pub fn point_new(x: f32, y: f32) -> Point {
-    // TODO-DECL —— 实现逻辑：①按字段写入 x ②写入 y ③返回 Point
-    todo!("TODO-DECL")
+    Point { x, y }
 }
 
 /**
@@ -39,8 +38,9 @@ pub fn point_new(x: f32, y: f32) -> Point {
  * 参数：other — 目标点
  */
 pub fn point_distance_to(p: Point, other: Point) -> f32 {
-    // TODO-DECL —— 实现逻辑：①求分量差 ②平方和开方 ③返回非负距离
-    todo!("TODO-DECL")
+    let dx = p.x - other.x;
+    let dy = p.y - other.y;
+    (dx * dx + dy * dy).sqrt()
 }
 
 /**
@@ -57,8 +57,9 @@ pub fn point_distance_to(p: Point, other: Point) -> f32 {
  * 参数：other — 目标点
  */
 pub fn point_squared_distance_to(p: Point, other: Point) -> f32 {
-    // TODO-DECL —— 实现逻辑：①求分量差 ②返回平方和
-    todo!("TODO-DECL")
+    let dx = p.x - other.x;
+    let dy = p.y - other.y;
+    dx * dx + dy * dy
 }
 
 /**
@@ -75,8 +76,10 @@ pub fn point_squared_distance_to(p: Point, other: Point) -> f32 {
  * 参数：other — 第二点
  */
 pub fn point_midpoint(p: Point, other: Point) -> Point {
-    // TODO-DECL —— 实现逻辑：①分量分别取平均 ②返回 Point
-    todo!("TODO-DECL")
+    Point {
+        x: (p.x + other.x) * 0.5,
+        y: (p.y + other.y) * 0.5,
+    }
 }
 
 /**
@@ -92,8 +95,7 @@ pub fn point_midpoint(p: Point, other: Point) -> Point {
  * 参数：p — 输入点
  */
 pub fn point_to_vector(p: Point) -> Vector {
-    // TODO-DECL —— 实现逻辑：①按同分量构造 Vector ②返回
-    todo!("TODO-DECL")
+    Vector { x: p.x, y: p.y }
 }
 
 /**
@@ -110,8 +112,7 @@ pub fn point_to_vector(p: Point) -> Vector {
  * 参数：v — 位移向量
  */
 pub fn point_add_vector(p: Point, v: Vector) -> Point {
-    // TODO-DECL —— 实现逻辑：①分量相加 ②返回 Point
-    todo!("TODO-DECL")
+    Point { x: p.x + v.x, y: p.y + v.y }
 }
 
 /**
@@ -128,8 +129,23 @@ pub fn point_add_vector(p: Point, v: Vector) -> Point {
  * 参数：line — 目标直线
  */
 pub fn point_shortest_distance_to_line(p: Point, line: &Line) -> SignedVector {
-    // TODO-DECL —— 实现逻辑：①求点相对直线的偏置 n·p - c ②取绝对值作长度 ③按偏置符号置 negative
-    todo!("TODO-DECL")
+    let offset = line.n.x * p.x + line.n.y * p.y - line.c;
+    let norm_sq = line.n.x * line.n.x + line.n.y * line.n.y;
+    if norm_sq == 0.0 {
+        return SignedVector {
+            vec2: Vector { x: 0.0, y: 0.0 },
+            negative: false,
+        };
+    }
+    let d = norm_sq.sqrt();
+    let mag = offset.abs() / d;
+    SignedVector {
+        vec2: Vector {
+            x: line.n.x / d * mag,
+            y: line.n.y / d * mag,
+        },
+        negative: offset < 0.0,
+    }
 }
 
 /**
@@ -146,8 +162,7 @@ pub fn point_shortest_distance_to_line(p: Point, line: &Line) -> SignedVector {
  * 参数：y — y 分量，有限值
  */
 pub fn vector_new(x: f32, y: f32) -> Vector {
-    // TODO-DECL —— 实现逻辑：①按字段写入分量 ②返回 Vector
-    todo!("TODO-DECL")
+    Vector { x, y }
 }
 
 /**
@@ -164,8 +179,7 @@ pub fn vector_new(x: f32, y: f32) -> Vector {
  * 参数：other — 另一向量
  */
 pub fn vector_dot(v: Vector, other: Vector) -> f32 {
-    // TODO-DECL —— 实现逻辑：①分量乘积累加 ②返回标量
-    todo!("TODO-DECL")
+    v.x * other.x + v.y * other.y
 }
 
 /**
@@ -182,8 +196,7 @@ pub fn vector_dot(v: Vector, other: Vector) -> f32 {
  * 参数：other — 另一向量
  */
 pub fn vector_cross(v: Vector, other: Vector) -> f32 {
-    // TODO-DECL —— 实现逻辑：①按 x*y - y*x 计算 ②返回标量
-    todo!("TODO-DECL")
+    v.x * other.y - v.y * other.x
 }
 
 /**
@@ -199,8 +212,7 @@ pub fn vector_cross(v: Vector, other: Vector) -> f32 {
  * 参数：v — 向量
  */
 pub fn vector_norm_squared(v: Vector) -> f32 {
-    // TODO-DECL —— 实现逻辑：①分量平方和 ②返回
-    todo!("TODO-DECL")
+    v.x * v.x + v.y * v.y
 }
 
 /**
@@ -216,8 +228,7 @@ pub fn vector_norm_squared(v: Vector) -> f32 {
  * 参数：v — 向量
  */
 pub fn vector_norm(v: Vector) -> f32 {
-    // TODO-DECL —— 实现逻辑：①调用模长平方 ②开方 ③返回
-    todo!("TODO-DECL")
+    (v.x * v.x + v.y * v.y).sqrt()
 }
 
 /**
@@ -233,8 +244,11 @@ pub fn vector_norm(v: Vector) -> f32 {
  * 参数：v — 向量
  */
 pub fn vector_normalized(v: Vector) -> Vector {
-    // TODO-DECL —— 实现逻辑：①求模长 ②模长为 0 则返回零向量 ③否则分量除以模长
-    todo!("TODO-DECL")
+    let len = (v.x * v.x + v.y * v.y).sqrt();
+    if len == 0.0 {
+        return Vector { x: 0.0, y: 0.0 };
+    }
+    Vector { x: v.x / len, y: v.y / len }
 }
 
 /**
@@ -250,8 +264,7 @@ pub fn vector_normalized(v: Vector) -> Vector {
  * 参数：v — 向量
  */
 pub fn vector_ortho(v: Vector) -> Vector {
-    // TODO-DECL —— 实现逻辑：①交换分量并取负其一 ②返回新向量
-    todo!("TODO-DECL")
+    Vector { x: -v.y, y: v.x }
 }
 
 /**
@@ -267,8 +280,7 @@ pub fn vector_ortho(v: Vector) -> Vector {
  * 参数：v — 向量
  */
 pub fn vector_angle(v: Vector) -> f32 {
-    // TODO-DECL —— 实现逻辑：①按 atan2(y, x) 计算 ②返回弧度
-    todo!("TODO-DECL")
+    v.y.atan2(v.x)
 }
 
 /**
@@ -286,8 +298,10 @@ pub fn vector_angle(v: Vector) -> f32 {
  * 参数：by — 基向量 y 分量
  */
 pub fn vector_rebase(v: Vector, bx: f32, by: f32) -> Vector {
-    // TODO-DECL —— 实现逻辑：①按基分量分解 ②重组分量 ③返回新向量
-    todo!("TODO-DECL")
+    Vector {
+        x: v.x * bx + v.y * by,
+        y: -v.x * by + v.y * bx,
+    }
 }
 
 /**
@@ -305,8 +319,10 @@ pub fn vector_rebase(v: Vector, bx: f32, by: f32) -> Vector {
  * 参数：negative — 是否取负方向
  */
 pub fn signed_vector_new(x: f32, y: f32, negative: bool) -> SignedVector {
-    // TODO-DECL —— 实现逻辑：①构造方向向量 ②写入符号位 ③返回
-    todo!("TODO-DECL")
+    SignedVector {
+        vec2: Vector { x, y },
+        negative,
+    }
 }
 
 /**
@@ -323,8 +339,7 @@ pub fn signed_vector_new(x: f32, y: f32, negative: bool) -> SignedVector {
  * 参数：negative — 是否取负方向
  */
 pub fn signed_vector_from_vector(v: Vector, negative: bool) -> SignedVector {
-    // TODO-DECL —— 实现逻辑：①保存方向向量 ②写入符号位 ③返回
-    todo!("TODO-DECL")
+    SignedVector { vec2: v, negative }
 }
 
 /**
@@ -340,8 +355,10 @@ pub fn signed_vector_from_vector(v: Vector, negative: bool) -> SignedVector {
  * 参数：sv — 输入
  */
 pub fn signed_vector_neg(sv: SignedVector) -> SignedVector {
-    // TODO-DECL —— 实现逻辑：①翻转符号位 ②保留方向向量 ③返回
-    todo!("TODO-DECL")
+    SignedVector {
+        vec2: sv.vec2,
+        negative: !sv.negative,
+    }
 }
 
 /**
@@ -359,8 +376,10 @@ pub fn signed_vector_neg(sv: SignedVector) -> SignedVector {
  * 参数：c — 常数项
  */
 pub fn line_new(a: f32, b: f32, c: f32) -> Line {
-    // TODO-DECL —— 实现逻辑：①构造法向量 ②写入常数项 ③返回
-    todo!("TODO-DECL")
+    Line {
+        n: Vector { x: a, y: b },
+        c,
+    }
 }
 
 /**
@@ -377,8 +396,12 @@ pub fn line_new(a: f32, b: f32, c: f32) -> Line {
  * 参数：p1 — 第二点
  */
 pub fn line_from_points(p0: Point, p1: Point) -> Line {
-    // TODO-DECL —— 实现逻辑：①求方向向量 ②取正交法向量 ③由点求常数项
-    todo!("TODO-DECL")
+    let n = Vector {
+        x: -(p1.y - p0.y),
+        y: p1.x - p0.x,
+    };
+    let c = n.x * p0.x + n.y * p0.y;
+    Line { n, c }
 }
 
 /**
@@ -394,8 +417,18 @@ pub fn line_from_points(p0: Point, p1: Point) -> Line {
  * 参数：line — 输入直线
  */
 pub fn line_normalized(line: Line) -> Line {
-    // TODO-DECL —— 实现逻辑：①求法向量模长 ②分别除以模长 ③返回新直线
-    todo!("TODO-DECL")
+    let norm_sq = line.n.x * line.n.x + line.n.y * line.n.y;
+    if norm_sq == 0.0 {
+        return line;
+    }
+    let d = norm_sq.sqrt();
+    Line {
+        n: Vector {
+            x: line.n.x / d,
+            y: line.n.y / d,
+        },
+        c: line.c / d,
+    }
 }
 
 /**
@@ -412,8 +445,14 @@ pub fn line_normalized(line: Line) -> Line {
  * 参数：other — 另一条直线
  */
 pub fn line_intersect(line: &Line, other: &Line) -> Option<Point> {
-    // TODO-DECL —— 实现逻辑：①求法向量叉积 ②接近零则返回 None ③否则解线性方程求交点
-    todo!("TODO-DECL")
+    let det = line.n.x * other.n.y - line.n.y * other.n.x;
+    if det == 0.0 {
+        return None;
+    }
+    Some(Point {
+        x: (line.c * other.n.y - line.n.y * other.c) / det,
+        y: (line.n.x * other.c - line.c * other.n.x) / det,
+    })
 }
 
 /**
@@ -430,8 +469,23 @@ pub fn line_intersect(line: &Line, other: &Line) -> Option<Point> {
  * 参数：p — 目标点
  */
 pub fn line_sub(line: &Line, p: &Point) -> SignedVector {
-    // TODO-DECL —— 实现逻辑：①求 n·p - c ②取大小 ③按符号置 negative
-    todo!("TODO-DECL")
+    let offset = line.n.x * p.x + line.n.y * p.y - line.c;
+    let norm_sq = line.n.x * line.n.x + line.n.y * line.n.y;
+    if norm_sq == 0.0 {
+        return SignedVector {
+            vec2: Vector { x: 0.0, y: 0.0 },
+            negative: false,
+        };
+    }
+    let d = norm_sq.sqrt();
+    let mag = offset.abs() / d;
+    SignedVector {
+        vec2: Vector {
+            x: line.n.x / d * mag,
+            y: line.n.y / d * mag,
+        },
+        negative: offset < 0.0,
+    }
 }
 
 /**
@@ -448,8 +502,7 @@ pub fn line_sub(line: &Line, p: &Point) -> SignedVector {
  * 参数：b — 终点
  */
 pub fn segment_new(a: Point, b: Point) -> Segment {
-    // TODO-DECL —— 实现逻辑：①写入两端点 ②返回 Segment
-    todo!("TODO-DECL")
+    Segment { a, b }
 }
 
 /**
@@ -466,8 +519,18 @@ pub fn segment_new(a: Point, b: Point) -> Segment {
  * 参数：p — 目标点
  */
 pub fn segment_distance_to_point(s: &Segment, p: Point) -> f32 {
-    // TODO-DECL —— 实现逻辑：①参数化投影到段 ②参数夹到 [0,1] ③求最近点距离
-    todo!("TODO-DECL")
+    let dx = s.b.x - s.a.x;
+    let dy = s.b.y - s.a.y;
+    let l2 = dx * dx + dy * dy;
+    if l2 == 0.0 {
+        let px = p.x - s.a.x;
+        let py = p.y - s.a.y;
+        return (px * px + py * py).sqrt();
+    }
+    let t = (((p.x - s.a.x) * dx + (p.y - s.a.y) * dy) / l2).clamp(0.0, 1.0);
+    let cx = s.a.x + t * dx - p.x;
+    let cy = s.a.y + t * dy - p.y;
+    (cx * cx + cy * cy).sqrt()
 }
 
 /**
@@ -484,8 +547,18 @@ pub fn segment_distance_to_point(s: &Segment, p: Point) -> f32 {
  * 参数：p — 目标点
  */
 pub fn segment_squared_distance_to_point(s: &Segment, p: Point) -> f32 {
-    // TODO-DECL —— 实现逻辑：①投影并夹参数 ②求最近点 ③返回平方距离
-    todo!("TODO-DECL")
+    let dx = s.b.x - s.a.x;
+    let dy = s.b.y - s.a.y;
+    let l2 = dx * dx + dy * dy;
+    if l2 == 0.0 {
+        let px = p.x - s.a.x;
+        let py = p.y - s.a.y;
+        return px * px + py * py;
+    }
+    let t = (((p.x - s.a.x) * dx + (p.y - s.a.y) * dy) / l2).clamp(0.0, 1.0);
+    let cx = s.a.x + t * dx - p.x;
+    let cy = s.a.y + t * dy - p.y;
+    cx * cx + cy * cy
 }
 
 /**
@@ -502,8 +575,58 @@ pub fn segment_squared_distance_to_point(s: &Segment, p: Point) -> f32 {
  * 参数：b — 第二条线段
  */
 pub fn segment_nearest_points(a: &Segment, b: &Segment) -> (Point, Point) {
-    // TODO-DECL —— 实现逻辑：①求两段方向 ②构造二次求解 ③分别夹参数到 [0,1] 返回两点
-    todo!("TODO-DECL")
+    let ux = a.b.x - a.a.x;
+    let uy = a.b.y - a.a.y;
+    let vx = b.b.x - b.a.x;
+    let vy = b.b.y - b.a.y;
+    let wx = a.a.x - b.a.x;
+    let wy = a.a.y - b.a.y;
+
+    let aa = ux * ux + uy * uy;
+    let ee = vx * vx + vy * vy;
+    let ff = vx * wx + vy * wy;
+
+    let mut s;
+    let mut t;
+    if aa == 0.0 && ee == 0.0 {
+        s = 0.0;
+        t = 0.0;
+    } else if aa == 0.0 {
+        s = 0.0;
+        t = (ff / ee).clamp(0.0, 1.0);
+    } else {
+        let cc = ux * wx + uy * wy;
+        if ee == 0.0 {
+            t = 0.0;
+            s = (-cc / aa).clamp(0.0, 1.0);
+        } else {
+            let bb = ux * vx + uy * vy;
+            let denom = aa * ee - bb * bb;
+            s = if denom == 0.0 {
+                0.0
+            } else {
+                ((bb * ff - cc * ee) / denom).clamp(0.0, 1.0)
+            };
+            t = (bb * s + ff) / ee;
+            if t < 0.0 {
+                t = 0.0;
+                s = (-cc / aa).clamp(0.0, 1.0);
+            } else if t > 1.0 {
+                t = 1.0;
+                s = ((bb - cc) / aa).clamp(0.0, 1.0);
+            }
+        }
+    }
+
+    let pa = Point {
+        x: a.a.x + ux * s,
+        y: a.a.y + uy * s,
+    };
+    let pb = Point {
+        x: b.a.x + vx * t,
+        y: b.a.y + vy * t,
+    };
+    (pa, pb)
 }
 
 /**
@@ -520,6 +643,12 @@ pub fn segment_nearest_points(a: &Segment, b: &Segment) -> (Point, Point) {
  * 参数：p — 目标点
  */
 pub fn segment_contains_in_span(s: &Segment, p: Point) -> bool {
-    // TODO-DECL —— 实现逻辑：①求投影参数 ②判断是否落在 [0,1]
-    todo!("TODO-DECL")
+    let dx = s.b.x - s.a.x;
+    let dy = s.b.y - s.a.y;
+    let l2 = dx * dx + dy * dy;
+    if l2 == 0.0 {
+        return p.x == s.a.x && p.y == s.a.y;
+    }
+    let t = ((p.x - s.a.x) * dx + (p.y - s.a.y) * dy) / l2;
+    t >= 0.0 && t <= 1.0
 }

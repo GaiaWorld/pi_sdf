@@ -22,8 +22,7 @@ use crate::model::geom::primitive::{Point, Segment};
  * 参数：maxs — 最大点
  */
 pub fn aabb_new(mins: Point, maxs: Point) -> Aabb {
-    // TODO-DECL —— 实现逻辑：①写入 mins 与 maxs ②返回 Aabb
-    todo!("TODO-DECL")
+    Aabb { mins, maxs }
 }
 
 /**
@@ -37,8 +36,16 @@ pub fn aabb_new(mins: Point, maxs: Point) -> Aabb {
  *   - 错误      无
  */
 pub fn aabb_new_invalid() -> Aabb {
-    // TODO-DECL —— 实现逻辑：①两分量均置正无穷 ②返回
-    todo!("TODO-DECL")
+    Aabb {
+        mins: Point {
+            x: f32::INFINITY,
+            y: f32::INFINITY,
+        },
+        maxs: Point {
+            x: f32::INFINITY,
+            y: f32::INFINITY,
+        },
+    }
 }
 
 /**
@@ -54,8 +61,9 @@ pub fn aabb_new_invalid() -> Aabb {
  * 参数：b — 盒
  */
 pub fn aabb_is_empty(b: &Aabb) -> bool {
-    // TODO-DECL —— 实现逻辑：①比较 mins 与 maxs 的 x、y 两个分量 ②任意一对反序即为空 ③返回判定
-    todo!("TODO-DECL")
+    let min_x_inf = crate::model::base::num::is_inf(b.mins.x);
+    let min_y_inf = crate::model::base::num::is_inf(b.mins.y);
+    min_x_inf || min_y_inf || b.mins.x > b.maxs.x || b.mins.y > b.maxs.y
 }
 
 /**
@@ -72,8 +80,15 @@ pub fn aabb_is_empty(b: &Aabb) -> bool {
  * 参数：p — 待包含的点
  */
 pub fn aabb_extend(b: &mut Aabb, p: Point) {
-    // TODO-DECL —— 实现逻辑：①mins 取分量较小者 ②maxs 取分量较大者
-    todo!("TODO-DECL")
+    if aabb_is_empty(b) {
+        b.mins = p;
+        b.maxs = p;
+        return;
+    }
+    b.mins.x = b.mins.x.min(p.x);
+    b.mins.y = b.mins.y.min(p.y);
+    b.maxs.x = b.maxs.x.max(p.x);
+    b.maxs.y = b.maxs.y.max(p.y);
 }
 
 /**
@@ -90,8 +105,11 @@ pub fn aabb_extend(b: &mut Aabb, p: Point) {
  * 参数：other — 另一个盒
  */
 pub fn aabb_extend_by(b: &mut Aabb, other: &Aabb) {
-    // TODO-DECL —— 实现逻辑：①用另一个盒的两个角点分别扩张本盒
-    todo!("TODO-DECL")
+    if aabb_is_empty(other) {
+        return;
+    }
+    aabb_extend(b, other.mins);
+    aabb_extend(b, other.maxs);
 }
 
 /**
@@ -108,8 +126,10 @@ pub fn aabb_extend_by(b: &mut Aabb, other: &Aabb) {
  * 参数：other — 待判定的盒
  */
 pub fn aabb_includes(b: &Aabb, other: &Aabb) -> bool {
-    // TODO-DECL —— 实现逻辑：①比较 mins 与 maxs 四个边界 ②全数包含则真
-    todo!("TODO-DECL")
+    b.mins.x <= other.mins.x
+        && b.mins.y <= other.mins.y
+        && other.maxs.x <= b.maxs.x
+        && other.maxs.y <= b.maxs.y
 }
 
 /**
@@ -125,8 +145,7 @@ pub fn aabb_includes(b: &Aabb, other: &Aabb) -> bool {
  * 参数：b — 盒
  */
 pub fn aabb_width(b: &Aabb) -> f32 {
-    // TODO-DECL —— 实现逻辑：①maxs.x 减 mins.x ②返回非负值
-    todo!("TODO-DECL")
+    b.maxs.x - b.mins.x
 }
 
 /**
@@ -142,8 +161,7 @@ pub fn aabb_width(b: &Aabb) -> f32 {
  * 参数：b — 盒
  */
 pub fn aabb_height(b: &Aabb) -> f32 {
-    // TODO-DECL —— 实现逻辑：①maxs.y 减 mins.y ②返回非负值
-    todo!("TODO-DECL")
+    b.maxs.y - b.mins.y
 }
 
 /**
@@ -160,8 +178,18 @@ pub fn aabb_height(b: &Aabb) -> f32 {
  * 参数：s — 缩放比例，正数
  */
 pub fn aabb_scale(b: &mut Aabb, s: f32) {
-    // TODO-DECL —— 实现逻辑：①以中心为基准 ②四边界按 s 缩放 ③写回
-    todo!("TODO-DECL")
+    let cx = (b.mins.x + b.maxs.x) * 0.5;
+    let cy = (b.mins.y + b.maxs.y) * 0.5;
+    let hw = (b.maxs.x - b.mins.x) * 0.5 * s;
+    let hh = (b.maxs.y - b.mins.y) * 0.5 * s;
+    b.mins = Point {
+        x: cx - hw,
+        y: cy - hh,
+    };
+    b.maxs = Point {
+        x: cx + hw,
+        y: cy + hh,
+    };
 }
 
 /**
@@ -177,8 +205,45 @@ pub fn aabb_scale(b: &mut Aabb, s: f32) {
  * 参数：b — 盒
  */
 pub fn aabb_half(b: &Aabb) -> (Aabb, Aabb) {
-    // TODO-DECL —— 实现逻辑：①比较宽高确定长边 ②在中线切分 ③返回两个子盒
-    todo!("TODO-DECL")
+    let w = b.maxs.x - b.mins.x;
+    let h = b.maxs.y - b.mins.y;
+    if w >= h {
+        let mx = (b.mins.x + b.maxs.x) * 0.5;
+        (
+            Aabb {
+                mins: b.mins,
+                maxs: Point {
+                    x: mx,
+                    y: b.maxs.y,
+                },
+            },
+            Aabb {
+                mins: Point {
+                    x: mx,
+                    y: b.mins.y,
+                },
+                maxs: b.maxs,
+            },
+        )
+    } else {
+        let my = (b.mins.y + b.maxs.y) * 0.5;
+        (
+            Aabb {
+                mins: b.mins,
+                maxs: Point {
+                    x: b.maxs.x,
+                    y: my,
+                },
+            },
+            Aabb {
+                mins: Point {
+                    x: b.mins.x,
+                    y: my,
+                },
+                maxs: b.maxs,
+            },
+        )
+    }
 }
 
 /**
@@ -195,8 +260,17 @@ pub fn aabb_half(b: &Aabb) -> (Aabb, Aabb) {
  * 参数：other — 另一个盒
  */
 pub fn aabb_collision(b: &Aabb, other: &Aabb) -> Option<Aabb> {
-    // TODO-DECL —— 实现逻辑：①取各分量较大 mins 与较小 maxs ②无重叠返回 None ③否则返回交盒
-    todo!("TODO-DECL")
+    let minx = b.mins.x.max(other.mins.x);
+    let miny = b.mins.y.max(other.mins.y);
+    let maxx = b.maxs.x.min(other.maxs.x);
+    let maxy = b.maxs.y.min(other.maxs.y);
+    if minx <= maxx && miny <= maxy {
+        return Some(Aabb {
+            mins: Point { x: minx, y: miny },
+            maxs: Point { x: maxx, y: maxy },
+        });
+    }
+    None
 }
 
 /**
@@ -213,6 +287,10 @@ pub fn aabb_collision(b: &Aabb, other: &Aabb) -> Option<Aabb> {
  * 参数：dir — 边的方向
  */
 pub fn aabb_bound(b: &Aabb, dir: Direction) -> Segment {
-    // TODO-DECL —— 实现逻辑：①按方向取两端点 ②构造线段 ③返回
-    todo!("TODO-DECL")
+    match dir {
+        Direction::Top => Segment::new(b.mins, Point { x: b.maxs.x, y: b.mins.y }),
+        Direction::Bottom => Segment::new(Point { x: b.mins.x, y: b.maxs.y }, b.maxs),
+        Direction::Left => Segment::new(b.mins, Point { x: b.mins.x, y: b.maxs.y }),
+        Direction::Right => Segment::new(Point { x: b.maxs.x, y: b.mins.y }, b.maxs),
+    }
 }

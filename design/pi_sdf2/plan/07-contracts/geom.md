@@ -207,8 +207,8 @@
       pub fn extents(&self) -> Aabb;
       pub fn wedge_contains_point(&self, p: Point) -> bool;
       pub fn approximate_bezier(&self) -> Bezier;
-      pub fn to_endpoint(&self) -> ArcEndpoint;
-      pub fn from_endpoint(e: &ArcEndpoint) -> Self;
+      pub fn endpoints(&self) -> Vec<ArcEndpoint>;
+      pub fn from_endpoints(eps: Vec<ArcEndpoint>) -> Result<Self>;
   }
   ```
 
@@ -228,7 +228,7 @@
 | ID | 关联 | 前置 | 动作 | 期望 |
 |---|---|---|---|---|
 | CASE-016 | REQ-005.2 | 大圆弧（d 绝对值 > 1）与其外侧一点 | wedge_contains_point | 按几何定义判定为不包含 |
-| CASE-017 | REQ-001.1 | 弧与其端点 | from_endpoint(to_endpoint()) | 与原弧逐位一致 |
+| CASE-017 | REQ-001.1 | 一条弧 | Arc::from_endpoints(arc.endpoints()) | 与原弧逐位一致 |
 | CASE-075 | REQ-001.1 | p0 与 p1 重合 | Arc::new | 返回退化弧，不 panic |
 
 ### API-009 Aabb 包围盒
