@@ -20,8 +20,8 @@ use crate::core::bake::arena_inner;
  */
 #[derive(Debug, Default, Clone)]
 pub struct ArcArena {
-    key_index: HashMap<u64, usize>,
-    pool: Vec<UnitArc>,
+    pub(crate) key_index: HashMap<u64, usize>,
+    pub(crate) pool: Vec<UnitArc>,
 }
 
 impl ArcArena {

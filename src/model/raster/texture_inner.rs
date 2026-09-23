@@ -20,6 +20,6 @@ use super::UnitArc;
  * 参数：unit — 单位弧
  */
 pub fn unit_arc_is_ordered(unit: &UnitArc) -> bool {
-    // TODO-DECL —— 实现逻辑：①比较 sdf_min 与 sdf_max ②返回比较结果
-    todo!("TODO-DECL")
+    // ①比较区间两端 ②NaN 参与比较恒为假，即非有限区间视为无序
+    unit.sdf_min <= unit.sdf_max
 }
