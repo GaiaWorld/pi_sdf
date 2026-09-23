@@ -127,7 +127,7 @@
 
 | ID | 关联 | 前置 | 动作 | 期望 |
 |---|---|---|---|---|
-| CASE-026 | REQ-001.1 | 一条含 3 弧的轮廓 | stroke_mesh | 位置字段 12 个分量、索引 18 个 |
+| CASE-026 | REQ-001.1 | 一条含 3 弧的轮廓 | stroke_mesh | 12 个顶点（位置 24 个分量、UV 24 个分量）、索引 18 个 |
 | CASE-077 | REQ-001.1 | thickness 为 0 或负 | stroke_mesh | 返回 Err(InvalidParam)，不 panic |
 
 ## 未实现标记
