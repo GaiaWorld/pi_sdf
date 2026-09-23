@@ -4,9 +4,6 @@
  * 设计：design/pi_sdf2/00-index.md
  */
 
-#[cfg(target_arch = "wasm32")]
-use wasm_bindgen::prelude::wasm_bindgen;
-
 use crate::model::base::error_inner;
 
 /**
@@ -20,7 +17,6 @@ use crate::model::base::error_inner;
  *   - 错误      不适用（Error 是错误载体本身）
  */
 #[derive(Debug)]
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub enum Error {
     /// 字体字节非法或损坏
     InvalidFont(&'static str),
@@ -75,3 +71,20 @@ impl std::fmt::Display for Error {
  *   - 错误      不适用
  */
 impl std::error::Error for Error {}
+
+/**
+ * 错误的 JS 投影。
+ *
+ * 契约：API-002
+ *
+ * 约束：
+ *   - requires  无
+ *   - ensures   转为 JS 字符串，作为 Result 的 Err 跨边界
+ *   - 错误      不适用
+ */
+#[cfg(target_arch = "wasm32")]
+impl From<Error> for wasm_bindgen::JsValue {
+    fn from(e: Error) -> Self {
+        wasm_bindgen::JsValue::from_str(&e.to_string())
+    }
+}

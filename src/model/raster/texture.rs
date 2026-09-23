@@ -24,6 +24,7 @@ use crate::model::raster::texture_inner;
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub struct UnitArc {
     /// 该单位弧包含的弧端点集合，非空
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen(skip))]
     pub endpoints: Vec<ArcEndpoint>,
     /// 距离区间下限
     pub sdf_min: f32,
@@ -47,6 +48,7 @@ pub struct UnitArc {
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub struct DataTexture {
     /// 像素数据，每像素 1 字节
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen(skip))]
     pub pixels: Vec<u8>,
     /// 纹理宽度
     pub width: u32,
@@ -68,6 +70,7 @@ pub struct DataTexture {
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub struct IndexTexture {
     /// 像素数据，每像素 1 字节
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen(skip))]
     pub pixels: Vec<u8>,
     /// 纹理宽度
     pub width: u32,
@@ -87,5 +90,53 @@ impl UnitArc {
     ///   - 错误      无
     pub fn is_ordered(&self) -> bool {
         texture_inner::unit_arc_is_ordered(self)
+    }
+
+    /// 数据副本（wasm 投影：字段被 skip，改由 getter 暴露）。
+    ///
+    /// 契约：API-019
+    ///
+    /// 约束：
+    ///   - requires  无
+    ///   - ensures   返回内部数据的副本，与字段内容一致
+    ///   - 错误      无
+    #[cfg(target_arch = "wasm32")]
+    #[wasm_bindgen(getter)]
+    pub fn endpoints(&self) -> Vec<ArcEndpoint> {
+        self.endpoints.clone()
+    }
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
+impl DataTexture {
+    /// 数据副本（wasm 投影：字段被 skip，改由 getter 暴露）。
+    ///
+    /// 契约：API-020
+    ///
+    /// 约束：
+    ///   - requires  无
+    ///   - ensures   返回内部数据的副本，与字段内容一致
+    ///   - 错误      无
+    #[cfg(target_arch = "wasm32")]
+    #[wasm_bindgen(getter)]
+    pub fn pixels(&self) -> Vec<u8> {
+        self.pixels.clone()
+    }
+}
+
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
+impl IndexTexture {
+    /// 数据副本（wasm 投影：字段被 skip，改由 getter 暴露）。
+    ///
+    /// 契约：API-021
+    ///
+    /// 约束：
+    ///   - requires  无
+    ///   - ensures   返回内部数据的副本，与字段内容一致
+    ///   - 错误      无
+    #[cfg(target_arch = "wasm32")]
+    #[wasm_bindgen(getter)]
+    pub fn pixels(&self) -> Vec<u8> {
+        self.pixels.clone()
     }
 }

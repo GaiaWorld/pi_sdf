@@ -170,8 +170,10 @@ impl From<PathVerb> for u8 {
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub struct Path {
     /// 路径动词序列
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen(skip))]
     pub verbs: Vec<PathVerb>,
     /// 路径坐标序列，拍平存放（每点 2 个分量）
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen(skip))]
     pub points: Vec<f32>,
 }
 
@@ -272,6 +274,34 @@ impl Path {
     pub fn reverse(&mut self) {
         path_inner::path_reverse(self)
     }
+
+    /// 路径动词序列（wasm 投影：字段被 skip，改由 getter 暴露）。
+    ///
+    /// 契约：API-027
+    ///
+    /// 约束：
+    ///   - requires  无
+    ///   - ensures   返回内部数据的副本，与字段内容一致
+    ///   - 错误      无
+    #[cfg(target_arch = "wasm32")]
+    #[wasm_bindgen(getter)]
+    pub fn verbs(&self) -> Vec<PathVerb> {
+        self.verbs.clone()
+    }
+
+    /// 扁平坐标序列（wasm 投影：字段被 skip，改由 getter 暴露）。
+    ///
+    /// 契约：API-027
+    ///
+    /// 约束：
+    ///   - requires  无
+    ///   - ensures   返回内部数据的副本，与字段内容一致
+    ///   - 错误      无
+    #[cfg(target_arch = "wasm32")]
+    #[wasm_bindgen(getter)]
+    pub fn points(&self) -> Vec<f32> {
+        self.points.clone()
+    }
 }
 
 /**
@@ -284,9 +314,11 @@ impl Path {
  *   - ensures   六种图元轮廓与现状等价；非法尺寸返回 Err
  *   - 错误      InvalidParam —— 半径或宽高为负，或点数不足
  */
+/**
+ * 图形元的内部表示（不跨语言边界；wasm_bindgen 不支持带数据的 enum）。
+ */
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
-pub enum Shape {
+pub(crate) enum ShapeKind {
     /// 圆
     Circle { cx: f32, cy: f32, r: f32 },
     /// 矩形
@@ -301,8 +333,136 @@ pub enum Shape {
     Polyline { points: Vec<f32>, is_close: bool },
 }
 
+#[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
+pub struct Shape {
+    pub(crate) kind: ShapeKind,
+}
+
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 impl Shape {
+/**
+ * 构造圆。
+ *
+ * 契约：API-028
+ *
+ * 约束：
+ *   - requires  半径为非负值
+ *   - ensures   返回圆图元
+ *   - 错误      InvalidParam —— 半径或宽高为负，或点数不足
+ *
+ * 参数：cx — 圆心横坐标
+ *
+ * 参数：cy — 圆心纵坐标
+ *
+ * 参数：r — 半径
+ */
+    pub fn circle(cx: f32, cy: f32, r: f32) -> Self {
+        path_inner::shape_circle(cx, cy, r)
+    }
+
+/**
+ * 构造矩形。
+ *
+ * 契约：API-028
+ *
+ * 约束：
+ *   - requires  宽高为非负值
+ *   - ensures   返回矩形图元
+ *   - 错误      InvalidParam —— 半径或宽高为负，或点数不足
+ *
+ * 参数：x — 左上角横坐标
+ *
+ * 参数：y — 左上角纵坐标
+ *
+ * 参数：w — 宽
+ *
+ * 参数：h — 高
+ */
+    pub fn rect(x: f32, y: f32, w: f32, h: f32) -> Self {
+        path_inner::shape_rect(x, y, w, h)
+    }
+
+/**
+ * 构造线段。
+ *
+ * 契约：API-028
+ *
+ * 约束：
+ *   - requires  step 为 None 或正数
+ *   - ensures   返回线段图元
+ *   - 错误      InvalidParam —— 半径或宽高为负，或点数不足
+ *
+ * 参数：ax — 起点横坐标
+ *
+ * 参数：ay — 起点纵坐标
+ *
+ * 参数：bx — 终点横坐标
+ *
+ * 参数：by — 终点纵坐标
+ *
+ * 参数：step — 离散步长，None 表示自适应
+ */
+    pub fn line(ax: f32, ay: f32, bx: f32, by: f32, step: Option<f32>) -> Self {
+        path_inner::shape_line(ax, ay, bx, by, step)
+    }
+
+/**
+ * 构造椭圆。
+ *
+ * 契约：API-028
+ *
+ * 约束：
+ *   - requires  半径为非负值
+ *   - ensures   返回椭圆图元
+ *   - 错误      InvalidParam —— 半径或宽高为负，或点数不足
+ *
+ * 参数：cx — 中心横坐标
+ *
+ * 参数：cy — 中心纵坐标
+ *
+ * 参数：rx — 横半径
+ *
+ * 参数：ry — 纵半径
+ */
+    pub fn ellipse(cx: f32, cy: f32, rx: f32, ry: f32) -> Self {
+        path_inner::shape_ellipse(cx, cy, rx, ry)
+    }
+
+/**
+ * 构造多边形。
+ *
+ * 契约：API-028
+ *
+ * 约束：
+ *   - requires  至少 3 点
+ *   - ensures   返回多边形图元
+ *   - 错误      InvalidParam —— 半径或宽高为负，或点数不足
+ *
+ * 参数：points — 扁平坐标序列，每点 2 个分量
+ */
+    pub fn polygon(points: Vec<f32>) -> Self {
+        path_inner::shape_polygon(points)
+    }
+
+/**
+ * 构造折线。
+ *
+ * 契约：API-028
+ *
+ * 约束：
+ *   - requires  至少 2 点
+ *   - ensures   返回折线图元
+ *   - 错误      InvalidParam —— 半径或宽高为负，或点数不足
+ *
+ * 参数：points — 扁平坐标序列，每点 2 个分量
+ *
+ * 参数：is_close — 是否闭合
+ */
+    pub fn polyline(points: Vec<f32>, is_close: bool) -> Self {
+        path_inner::shape_polyline(points, is_close)
+    }
+
 /**
  * 图形元轮廓。
  *

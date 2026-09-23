@@ -132,20 +132,6 @@ impl Bezier {
         curve_inner::bezier_curvature(self, t)
     }
 
-    /// 在 t 处分割为两段。
-    ///
-    /// 契约：API-007
-    ///
-    /// 约束：
-    ///   - requires  t 落在 [0,1]；segment 的 t1 不为 0、t0 不为 1
-    ///   - ensures   split 的两段拼接后与原曲线一致；point(0)=p0、point(1)=p3
-    ///   - 错误      Geometry —— segment 分母退化时返回退化曲线
-    ///
-    /// 参数：t — 分割参数，范围 [0,1]
-    pub fn split(&self, t: f32) -> (Bezier, Bezier) {
-        curve_inner::bezier_split(self, t)
-    }
-
     /// 取子段 [t0, t1]。
     ///
     /// 契约：API-007
@@ -171,6 +157,23 @@ impl Bezier {
     ///   - 错误      Geometry —— segment 分母退化时返回退化曲线
     pub fn midpoint(&self) -> Point {
         curve_inner::bezier_midpoint(self)
+    }
+}
+
+// wasm_bindgen 不支持元组返回，故本块不加导出注解（native 目标仍全量可用）。
+impl Bezier {
+    /// 在 t 处分割为两段。
+    ///
+    /// 契约：API-007
+    ///
+    /// 约束：
+    ///   - requires  t 落在 [0,1]；segment 的 t1 不为 0、t0 不为 1
+    ///   - ensures   split 的两段拼接后与原曲线一致；point(0)=p0、point(1)=p3
+    ///   - 错误      Geometry —— segment 分母退化时返回退化曲线
+    ///
+    /// 参数：t — 分割参数，范围 [0,1]
+    pub fn split(&self, t: f32) -> (Bezier, Bezier) {
+        curve_inner::bezier_split(self, t)
     }
 }
 
@@ -289,18 +292,6 @@ impl Arc {
         curve_inner::arc_squared_distance_to_point(self, p)
     }
 
-    /// 两端点切线。
-    ///
-    /// 契约：API-008
-    ///
-    /// 约束：
-    ///   - requires  p0 与 p1 不重合；d 为有限值且不为裸 NaN
-    ///   - ensures   d=0 时等价线段；大弧与小弧的包含判定均与几何定义一致
-    ///   - 错误      Geometry —— p0 与 p1 重合时返回退化弧
-    pub fn tangents(&self) -> (Vector, Vector) {
-        curve_inner::arc_tangents(self)
-    }
-
     /// 弧的包围盒。
     ///
     /// 契约：API-008
@@ -363,5 +354,20 @@ impl Arc {
     /// 参数：e — 弧端点
     pub fn from_endpoint(e: &ArcEndpoint) -> Self {
         curve_inner::arc_from_endpoint(e)
+    }
+}
+
+// wasm_bindgen 不支持元组返回，故本块不加导出注解（native 目标仍全量可用）。
+impl Arc {
+    /// 两端点切线。
+    ///
+    /// 契约：API-008
+    ///
+    /// 约束：
+    ///   - requires  p0 与 p1 不重合；d 为有限值且不为裸 NaN
+    ///   - ensures   d=0 时等价线段；大弧与小弧的包含判定均与几何定义一致
+    ///   - 错误      Geometry —— p0 与 p1 重合时返回退化弧
+    pub fn tangents(&self) -> (Vector, Vector) {
+        curve_inner::arc_tangents(self)
     }
 }

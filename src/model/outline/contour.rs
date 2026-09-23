@@ -27,6 +27,7 @@ use crate::model::outline::contour_inner;
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub struct Contour {
     /// 构成子轮廓的弧序列
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen(skip))]
     pub arcs: Vec<Arc>,
     /// 是否闭合
     pub is_closed: bool,
@@ -46,6 +47,7 @@ pub struct Contour {
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub struct Outline {
     /// 子轮廓集合
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen(skip))]
     pub contours: Vec<Contour>,
 }
 
@@ -127,6 +129,20 @@ impl Contour {
     pub fn extents(&self) -> Aabb {
         contour_inner::contour_extents(self)
     }
+
+    /// 弧序列（wasm 投影：字段被 skip，改由 getter 暴露）。
+    ///
+    /// 契约：API-010
+    ///
+    /// 约束：
+    ///   - requires  无
+    ///   - ensures   返回内部数据的副本，与字段内容一致
+    ///   - 错误      无
+    #[cfg(target_arch = "wasm32")]
+    #[wasm_bindgen(getter)]
+    pub fn arcs(&self) -> Vec<Arc> {
+        self.arcs.clone()
+    }
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
@@ -179,6 +195,20 @@ impl Outline {
     ///   - 错误      Geometry —— 端点序列首尾不接时返回未闭合轮廓
     pub fn is_clockwise(&self) -> bool {
         contour_inner::outline_is_clockwise(self)
+    }
+
+    /// 子轮廓集合（wasm 投影：字段被 skip，改由 getter 暴露）。
+    ///
+    /// 契约：API-010
+    ///
+    /// 约束：
+    ///   - requires  无
+    ///   - ensures   返回内部数据的副本，与字段内容一致
+    ///   - 错误      无
+    #[cfg(target_arch = "wasm32")]
+    #[wasm_bindgen(getter)]
+    pub fn contours(&self) -> Vec<Contour> {
+        self.contours.clone()
     }
 }
 

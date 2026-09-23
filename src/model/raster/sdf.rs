@@ -70,6 +70,7 @@ pub struct TextureInfo {
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub struct SdfTexture {
     /// 像素数据，每像素 1 字节，长度等于 tex_size 的平方
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen(skip))]
     pub pixels: Vec<u8>,
     /// 纹理边长
     pub tex_size: u32,
@@ -110,5 +111,19 @@ impl SdfTexture {
     ///   - 错误      无
     pub fn is_consistent(&self) -> bool {
         sdf_inner::sdf_texture_is_consistent(self)
+    }
+
+    /// 数据副本（wasm 投影：字段被 skip，改由 getter 暴露）。
+    ///
+    /// 契约：API-023
+    ///
+    /// 约束：
+    ///   - requires  无
+    ///   - ensures   返回内部数据的副本，与字段内容一致
+    ///   - 错误      无
+    #[cfg(target_arch = "wasm32")]
+    #[wasm_bindgen(getter)]
+    pub fn pixels(&self) -> Vec<u8> {
+        self.pixels.clone()
     }
 }

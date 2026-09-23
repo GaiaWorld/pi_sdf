@@ -205,3 +205,94 @@ pub fn shape_is_area(shape: &Shape) -> bool {
     // TODO-DECL —— 实现逻辑：①线段类返回假 ②其余返回真
     todo!("TODO-DECL")
 }
+
+/**
+ * 构造圆。
+ *
+ * 契约：API-028
+ *
+ * 约束：
+ *   - requires  半径为非负值
+ *   - ensures   返回对应图元
+ *   - 错误      InvalidParam —— 半径或宽高为负，或点数不足
+ */
+pub fn shape_circle(cx: f32, cy: f32, r: f32) -> Shape {
+    // TODO-DECL —— 实现逻辑：①包装对应 ShapeKind ②返回
+    todo!("TODO-DECL")
+}
+
+/**
+ * 构造矩形。
+ *
+ * 契约：API-028
+ *
+ * 约束：
+ *   - requires  宽高为非负值
+ *   - ensures   返回对应图元
+ *   - 错误      InvalidParam —— 半径或宽高为负，或点数不足
+ */
+pub fn shape_rect(x: f32, y: f32, w: f32, h: f32) -> Shape {
+    // TODO-DECL —— 实现逻辑：①包装对应 ShapeKind ②返回
+    todo!("TODO-DECL")
+}
+
+/**
+ * 构造线段。
+ *
+ * 契约：API-028
+ *
+ * 约束：
+ *   - requires  step 为 None 或正数
+ *   - ensures   返回对应图元
+ *   - 错误      InvalidParam —— 半径或宽高为负，或点数不足
+ */
+pub fn shape_line(ax: f32, ay: f32, bx: f32, by: f32, step: Option<f32>) -> Shape {
+    // TODO-DECL —— 实现逻辑：①包装对应 ShapeKind ②返回
+    todo!("TODO-DECL")
+}
+
+/**
+ * 构造椭圆。
+ *
+ * 契约：API-028
+ *
+ * 约束：
+ *   - requires  半径为非负值
+ *   - ensures   返回对应图元
+ *   - 错误      InvalidParam —— 半径或宽高为负，或点数不足
+ */
+pub fn shape_ellipse(cx: f32, cy: f32, rx: f32, ry: f32) -> Shape {
+    // TODO-DECL —— 实现逻辑：①包装对应 ShapeKind ②返回
+    todo!("TODO-DECL")
+}
+
+/**
+ * 构造多边形。
+ *
+ * 契约：API-028
+ *
+ * 约束：
+ *   - requires  至少 3 点
+ *   - ensures   返回对应图元
+ *   - 错误      InvalidParam —— 半径或宽高为负，或点数不足
+ */
+pub fn shape_polygon(points: Vec<f32>) -> Shape {
+    // TODO-DECL —— 实现逻辑：①包装对应 ShapeKind ②返回
+    todo!("TODO-DECL")
+}
+
+/**
+ * 构造折线。
+ *
+ * 契约：API-028
+ *
+ * 约束：
+ *   - requires  至少 2 点
+ *   - ensures   返回对应图元
+ *   - 错误      InvalidParam —— 半径或宽高为负，或点数不足
+ */
+pub fn shape_polyline(points: Vec<f32>, is_close: bool) -> Shape {
+    // TODO-DECL —— 实现逻辑：①包装对应 ShapeKind ②返回
+    todo!("TODO-DECL")
+}
+

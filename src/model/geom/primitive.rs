@@ -397,18 +397,6 @@ impl Line {
         primitive_inner::line_normalized(self)
     }
 
-    /// 取法向量引用。
-    ///
-    /// 契约：API-005
-    ///
-    /// 约束：
-    ///   - requires  from_points 的两点不重合
-    ///   - ensures   normalized 后法向量模长为 1
-    ///   - 错误      Geometry —— 两点重合时退化为零法向量
-    pub fn normal(&self) -> &Vector {
-        &self.n
-    }
-
     /// 与另一条直线求交；平行返回 None。
     ///
     /// 契约：API-005
@@ -435,6 +423,21 @@ impl Line {
     /// 参数：p — 目标点
     pub fn sub(&self, p: &Point) -> SignedVector {
         primitive_inner::line_sub(self, p)
+    }
+}
+
+// wasm_bindgen 不支持借用返回，故本块不加导出注解（native 目标仍全量可用）。
+impl Line {
+    /// 取法向量引用。
+    ///
+    /// 契约：API-005
+    ///
+    /// 约束：
+    ///   - requires  from_points 的两点不重合
+    ///   - ensures   normalized 后法向量模长为 1
+    ///   - 错误      Geometry —— 两点重合时退化为零法向量
+    pub fn normal(&self) -> &Vector {
+        &self.n
     }
 }
 
@@ -502,6 +505,23 @@ impl Segment {
         primitive_inner::segment_squared_distance_to_point(self, p)
     }
 
+    /// 点是否落在段内。
+    ///
+    /// 契约：API-006
+    ///
+    /// 约束：
+    ///   - requires  端点为有限点
+    ///   - ensures   distance_to_point 恒非负且不超过到任一端点的距离
+    ///   - 错误      无
+    ///
+    /// 参数：p — 目标点
+    pub fn contains_in_span(&self, p: Point) -> bool {
+        primitive_inner::segment_contains_in_span(self, p)
+    }
+}
+
+// wasm_bindgen 不支持元组返回，故本块不加导出注解（native 目标仍全量可用）。
+impl Segment {
     /// 两条线段上的最近点对。
     ///
     /// 契约：API-006
@@ -515,19 +535,5 @@ impl Segment {
     /// 参数：b — 第二条线段
     pub fn nearest_points_on_line_segments(a: &Segment, b: &Segment) -> (Point, Point) {
         primitive_inner::segment_nearest_points(a, b)
-    }
-
-    /// 点是否落在段内。
-    ///
-    /// 契约：API-006
-    ///
-    /// 约束：
-    ///   - requires  端点为有限点
-    ///   - ensures   distance_to_point 恒非负且不超过到任一端点的距离
-    ///   - 错误      无
-    ///
-    /// 参数：p — 目标点
-    pub fn contains_in_span(&self, p: Point) -> bool {
-        primitive_inner::segment_contains_in_span(self, p)
     }
 }

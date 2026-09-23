@@ -173,18 +173,6 @@ impl Aabb {
         aabb_inner::aabb_scale(self, s)
     }
 
-    /// 沿长边一分为二。
-    ///
-    /// 契约：API-009
-    ///
-    /// 约束：
-    ///   - requires  非空盒满足 mins 分量不大于 maxs 分量
-    ///   - ensures   is_empty 对 mins 与 maxs 全为无穷的空盒返回真
-    ///   - 错误      无
-    pub fn half(&self) -> (Aabb, Aabb) {
-        aabb_inner::aabb_half(self)
-    }
-
     /// 与另一个盒的交集。
     ///
     /// 契约：API-009
@@ -213,4 +201,19 @@ impl Aabb {
         aabb_inner::aabb_bound(self, dir)
     }
 
+}
+
+// wasm_bindgen 不支持元组返回，故本块不加导出注解（native 目标仍全量可用）。
+impl Aabb {
+    /// 沿长边一分为二。
+    ///
+    /// 契约：API-009
+    ///
+    /// 约束：
+    ///   - requires  非空盒满足 mins 分量不大于 maxs 分量
+    ///   - ensures   is_empty 对 mins 与 maxs 全为无穷的空盒返回真
+    ///   - 错误      无
+    pub fn half(&self) -> (Aabb, Aabb) {
+        aabb_inner::aabb_half(self)
+    }
 }

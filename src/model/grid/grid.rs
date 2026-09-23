@@ -27,6 +27,7 @@ pub struct Cell {
     /// 格元范围，非空盒
     pub bounds: Aabb,
     /// 近邻弧在全局弧列表中的下标，去重且升序
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen(skip))]
     pub arc_indices: Vec<usize>,
 }
 
@@ -46,8 +47,10 @@ pub struct CellGrid {
     /// 网格整体范围
     pub extents: Aabb,
     /// 全局弧集合
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen(skip))]
     pub arcs: Vec<Arc>,
     /// 格元集合
+    #[cfg_attr(target_arch = "wasm32", wasm_bindgen(skip))]
     pub cells: Vec<Cell>,
     /// 该字形最小笔画宽度，用于纹理布局
     pub min_width: f32,
@@ -72,6 +75,20 @@ impl Cell {
     pub fn is_valid(&self, arc_count: usize) -> bool {
         grid_inner::cell_is_valid(self, arc_count)
     }
+
+    /// 近邻弧索引（wasm 投影：字段被 skip，改由 getter 暴露）。
+    ///
+    /// 契约：API-015
+    ///
+    /// 约束：
+    ///   - requires  无
+    ///   - ensures   返回内部数据的副本，与字段内容一致
+    ///   - 错误      无
+    #[cfg(target_arch = "wasm32")]
+    #[wasm_bindgen(getter)]
+    pub fn arc_indices(&self) -> Vec<usize> {
+        self.arc_indices.clone()
+    }
 }
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
@@ -86,5 +103,33 @@ impl CellGrid {
     ///   - 错误      无
     pub fn is_valid(&self) -> bool {
         grid_inner::cell_grid_is_valid(self)
+    }
+
+    /// 全局弧集合（wasm 投影：字段被 skip，改由 getter 暴露）。
+    ///
+    /// 契约：API-016
+    ///
+    /// 约束：
+    ///   - requires  无
+    ///   - ensures   返回内部数据的副本，与字段内容一致
+    ///   - 错误      无
+    #[cfg(target_arch = "wasm32")]
+    #[wasm_bindgen(getter)]
+    pub fn arcs(&self) -> Vec<Arc> {
+        self.arcs.clone()
+    }
+
+    /// 格元集合（wasm 投影：字段被 skip，改由 getter 暴露）。
+    ///
+    /// 契约：API-016
+    ///
+    /// 约束：
+    ///   - requires  无
+    ///   - ensures   返回内部数据的副本，与字段内容一致
+    ///   - 错误      无
+    #[cfg(target_arch = "wasm32")]
+    #[wasm_bindgen(getter)]
+    pub fn cells(&self) -> Vec<Cell> {
+        self.cells.clone()
     }
 }
