@@ -28,8 +28,8 @@ use crate::model::raster::sdf::{RasterOptions, SdfTexture, TextureLayout};
  * 参数：is_area — 是否按面积图元处理
  */
 pub fn compute_cell_grid(outline: &Outline, scale: f32, is_area: bool) -> Result<CellGrid> {
-    // TODO-DECL —— 实现逻辑：①转发 core::grid::compute_cell_grid ②返回结果
-    todo!("TODO-DECL")
+    // ①转发 core::grid::compute_cell_grid ②返回结果
+    crate::core::grid::grid::compute_cell_grid(outline, scale, is_area)
 }
 
 /**

@@ -21,8 +21,8 @@ use super::{Cell, CellGrid};
  * 参数：arc_count — 全局弧数量
  */
 pub fn cell_is_valid(cell: &Cell, arc_count: usize) -> bool {
-    // TODO-DECL —— 实现逻辑：①遍历 arc_indices ②逐个与 arc_count 比较 ③全落界返回真
-    todo!("TODO-DECL")
+    // ①遍历 arc_indices ②逐个与 arc_count 比较 ③全落界返回真
+    cell.arc_indices.iter().all(|&index| index < arc_count)
 }
 
 /**
@@ -38,6 +38,7 @@ pub fn cell_is_valid(cell: &Cell, arc_count: usize) -> bool {
  * 参数：grid — 近邻弧网格
  */
 pub fn cell_grid_is_valid(grid: &CellGrid) -> bool {
-    // TODO-DECL —— 实现逻辑：①取全局弧数量 ②逐格元调用校验 ③全部通过返回真
-    todo!("TODO-DECL")
+    // ①取全局弧数量 ②逐格元调用校验 ③全部通过返回真
+    let arc_count = grid.arcs.len();
+    grid.cells.iter().all(|cell| cell_is_valid(cell, arc_count))
 }
