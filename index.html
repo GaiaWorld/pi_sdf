@@ -22,133 +22,57 @@
     <script>
 
         var c = document.getElementById("myCanvas");
-        ctx = c.getContext("2d")
-        ctx.fillStyle = '#ffffff';
+        let width = c.width;
+        let height = c.height;
+        let gl = c.getContext("webgl2");
 
-        ctx.fillRect(0, 0, 512, 512);//绘制填充白色背景
+        const testFBO = gl.createFramebuffer();
+        const depthTex = gl.createTexture();
 
-        // 设置阴影属性
-        // ctx.shadowColor = 'rgba(0, 0, 0, 1.0)'; // 半透明黑色阴影
-        // ctx.shadowBlur = 5.0; // 模糊程度
-        // ctx.shadowOffsetX = 10; // 水平偏移量
-        // ctx.shadowOffsetY = 10.; // 垂直偏移量
+        gl.bindFramebuffer(gl.FRAMEBUFFER, testFBO);
 
-        ctx.fillStyle = '#00ff00';
-        ctx.font = " 64px MyFont";
-        // ctx.fillText("回", 50, 90);
-        ctx.lineWidth = 5.0;
-        ctx.strokeStyle = '#ff0000';
-        ctx.strokeText("放", 50, 90)
-        ctx.fillText("放", 50, 90);
+        // 2. 创建并附加一个最简化的颜色附件（可选但推荐，某些驱动需要）
+        const colorTex = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, colorTex);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+        // 设置必要的纹理参数，防止采样时出错
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, colorTex, 0);
 
-        // ctx.font = "bold 64px MyFont";
-        // ctx.fillText("回", 90, 90);
-        // ctx.lineWidth = 1.0;
-        // ctx.strokeStyle = '#00ff00';
-        // ctx.strokeText("间", 50, 90)
+        // // 3. 【核心】创建并附加深度纹理
+        gl.bindTexture(gl.TEXTURE_2D, depthTex);
 
+        // 使用最广泛支持的格式：DEPTH_COMPONENT + UNSIGNED_SHORT
+        // 注意：在WebGL 2.0中，可以尝试 gl.DEPTH_COMPONENT24 以获得更高精度
+        gl.texImage2D(
+            gl.TEXTURE_2D,
+            0,
+            gl.DEPTH_COMPONENT32F, // 内部格式：使用基础格式，兼容性最好
+            width, // 宽度，必须与颜色附件相同
+            height, // 高度
+            0,
+            gl.DEPTH_COMPONENT, // 格式
+            gl.FLOAT,  // 类型：32位浮点数，支持最广泛
+            null // 只分配空间，不传入数据
+        );
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        // 防止深度纹理被采样时返回“超出[0,1]范围”的错误（某些平台需要）
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
-        // ctx.moveTo(240, 60);
-        // ctx.bezierCurveTo(222.09138, 20, 240, 37.90861, 200, 20);
-        // ctx.bezierCurveTo(160, 20, 177.90862, 37.90861, 160, 60);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, depthTex, 0);
 
-        // ctx.bezierCurveTo(160, 82.09139, 177.90862, 100, 200, 100);
-        // ctx.bezierCurveTo(222.09138, 82.09139, 240, 100, 240, 60);
-        // ctx.bezierCurveTo(347.61423, 35, 370, 46.192883, 370, 60);
+        // 4. 检查状态并尝试清空
+        const fboStatus = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+        console.log(`深度纹理FBO状态: ${fboStatus} (${fboStatus === gl.FRAMEBUFFER_COMPLETE ? 'COMPLETE' : 'INCOMPLETE'})`);
 
-        // ctx.bezierCurveTo(370, 46.192883, 347.61423, 35, 320, 35);
+        // 先设置视口匹配FBO尺寸
+        gl.viewport(0, 0, width, height);
 
-        // ctx.bezierCurveTo(370, 73.80712, 347.61423, 85,  320, 85);
-        // ctx.bezierCurveTo(292.38577, 85, 270, 73.80712, 270, 60);
-        // ctx.bezierCurveTo(270, 46.192883, 292.38577, 35, 320, 35);
-
-
-        // ctx.stroke();
-        // ctx.closePath();
-
-
-
-        function erf(x) {
-            let negative = x < 0.0;
-            if (negative)
-                x = -x;
-            let x2 = x * x;
-            let x3 = x2 * x;
-            let x4 = x2 * x2;
-            let denom = 1.0 + 0.278393 * x + 0.230389 * x2 + 0.000972 * x3 + 0.078108 * x4;
-            let result = 1.0 - 1.0 / (denom * denom * denom * denom);
-            return negative ? -result : result;
-        }
-
-        // A useful helper for calculating integrals of the Gaussian function via the error function:
-        //
-        //      "erf"_sigma(x) = 2 int 1/sqrt(2 pi sigma^2) e^(-x^2/(2 sigma^2)) dx
-        //                     = "erf"(x/(sigma sqrt(2)))
-        function erfSigma(x, sigma) {
-            // -2 / 1.4
-            return erf(x / (sigma * 1.4142135623730951));
-        }
-
-        // Returns the blurred color value from the box itself (not counting any rounded corners). 'p_0' is
-        // the vector distance to the top left corner of the box; 'p_1' is the vector distance to its
-        // bottom right corner.
-        //
-        //      "colorFromRect"_sigma(p_0, p_1)
-        //          = int_{p_{0_y}}^{p_{1_y}} int_{p_{1_x}}^{p_{0_x}} G_sigma(y) G_sigma(x) dx dy
-        //          = 1/4 ("erf"_sigma(p_{1_x}) - "erf"_sigma(p_{0_x}))
-        //              ("erf"_sigma(p_{1_y}) - "erf"_sigma(p_{0_y}))
-        function colorFromRect(p0x, p0y, p1x, p1y, sigma) {
-            // 				-2  1				1      1	
-            let a = erfSigma(p1x, sigma);
-            console.log("p: ", p1x, "; a: ", a)
-            let b = erfSigma(p0x, sigma);
-            console.log("p: ", p0x, "; a: ", b)
-            let c = erfSigma(p1y, sigma);
-            console.log("p: ", p1y, "; a: ", c)
-            let d = erfSigma(p0y, sigma);
-            console.log("p: ", p0y, "; a: ", d)
-            return (a - b) * (c - d) / 4.0;
-        }
-
-        function colorFromFont(distance, width, sigma) {
-            
-            let a = erfSigma(distance, sigma);
-            console.log("p: ", distance, "; a: ", a)
-            let b = erfSigma(width + distance, sigma);
-            console.log("p: ", width - distance, "; a: ", b)
-            // let c = erfSigma(p1y, sigma);
-            // console.log("p: ", p1y, "; a: ", c)
-            // let d = erfSigma(p0y, sigma);
-            // console.log("p: ", p0y, "; a: ", d)
-            return Math.abs(a - b) / 2.0;
-        }
-
-        // The blurred color value for the point at 'pos' with the top left corner of the box at
-        // 'p_{0_"rect"}' and the bottom right corner of the box at 'p_{1_"rect"}'.
-        // 						(2,3) 		(1, 1)		(4, 4)			1	
-        function getShadowAlpha(posx, posy, ptMinx, ptMiny, ptMaxx, ptMaxy, sigma) {
-            // Compute the vector distances 'p_0' and 'p_1'.
-            //   (1, 2)				(-2, -1)
-            let dMinx = posx - ptMinx, dMiny = posy - ptMiny, dMaxx = posx - ptMaxx, dMaxy = posy - ptMaxy;
-
-            // Compute the basic color '"colorFromRect"_sigma(p_0, p_1)'. This is all we have to do if
-            // the box is unrounded.
-            // 					(1, 2) (-2,-1) 1
-            return colorFromRect(dMinx, dMiny, dMaxx, dMaxy, sigma);
-        }
-
-        // for (let y = 0; y < 5; y++) {
-        //     for (let x = 0; x < 5; x++) {
-            let posx = 6, posy = 6;
-            let a = getShadowAlpha(posx, posy, 0, 0, 5, 7, 1.0);
-            console.log("a: ", a);
-
-            let b = colorFromFont(1, 5, 1.0);
-            console.log("b: ", b);
-        //     }
-        // }
-
-
+        gl.clear(gl.DEPTH_BUFFER_BIT);
+        console.log("清空深度纹理附件: err: ", gl.getError());
 
     </script>
 

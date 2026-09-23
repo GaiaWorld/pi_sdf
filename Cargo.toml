@@ -56,12 +56,12 @@ env_logger = "0.10"
 winit = { registry = "yn", version = "0.27" }
 tracing = "0.1"
 tracing-subscriber = "0.3"
-naga = "0.19"
+naga = { version = "25.0", features = ["wgsl-in"] }
 pi_wgpu = { registry = "yn", version = "0.3" }
 serde_json = "1.0"
 image = "0.24"
 brotli = "6.0"
-pi_assets = "0.14"
+pi_assets = "0.15"
 
 [profile.release]
 # incremental = true

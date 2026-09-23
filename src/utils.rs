@@ -956,11 +956,24 @@ pub(crate) fn compute_layout(
     let extents_w = extents2.width();
     let extents_h = extents2.height();
     // 计算缩放比例，将矢量图的尺寸转换为适用的单位。
-    let scale = 1.0 / units_per_em as f32;
+    // 字体路径（is_svg = false）：extents 落在 SCALE(2048) 网格上，1em == SCALE；
+    // svg 路径（is_svg = true）：extents 为自身坐标系，沿用 units_per_em。
+    let scale: f32 = if is_svg {
+        1.0 / units_per_em as f32
+    } else {
+        1.0 / SCALE
+    };
     let plane_bounds = extents2.scaled(&Vector::new(scale, scale));
 
     // 计算每个像素在矢量图中的距离。
-    let px_distance = extents_w.max(extents_h) / tex_size as f32;
+    // 字体路径：以 em 为基准，保证 SDF 的距离尺度与 em 一致（着色器按 em 解算）；
+    // svg 路径：按图形自身归一化（旧行为）。
+    let px_distance = if is_svg {
+        extents_w.max(extents_h) / tex_size as f32
+        
+    } else {
+        SCALE / tex_size as f32
+    };
     let distance = px_distance * pxrange as f32;
     // 扩展矢量图的包围盒，以适应纹理边缘的处理。
     let expand = px_distance * cur_off as f32;
@@ -969,14 +982,20 @@ pub(crate) fn compute_layout(
     extents2.maxs.x += expand;
     extents2.maxs.y += expand;
 
+    // 内区 texel 数：字体路径按字形真实尺寸，svg 路径固定为传入的 tex_size（旧行为）。
+    let inner = if is_svg {
+        tex_size
+    } else {
+        (extents_w.max(extents_h) / px_distance).ceil().max(1.0) as usize
+    };
     // 计算考虑到偏移后的纹理大小。
-    let tex_size = tex_size + (cur_off * 2) as usize;
+    let tex_size = inner + (cur_off * 2) as usize;
     // 初始化atlas.Bounds，并根据当前偏移设置其边界范围。
     let mut atlas_bounds = Aabb::new_invalid();
     atlas_bounds.mins.x = cur_off as f32;
     atlas_bounds.mins.y = cur_off as f32;
-    atlas_bounds.maxs.x = tex_size as f32 - cur_off as f32;
-    atlas_bounds.maxs.y = tex_size as f32 - cur_off as f32;
+    atlas_bounds.maxs.x = (cur_off as usize + inner) as f32;
+    atlas_bounds.maxs.y = (cur_off as usize + inner) as f32;
 
     // 根据矢量图的宽高差异进行调整，确保矢量图在纹理中正确映射。
     let temp = extents_w - extents_h;

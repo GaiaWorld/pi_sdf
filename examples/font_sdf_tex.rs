@@ -2,7 +2,6 @@ use std::{fmt::UpperHex, mem::transmute, sync::Arc};
 
 use image::ColorType;
 use parry2d::na::{self};
-use pi_assets::allocator::Allocator;
 use tracing::Level;
 use tracing_subscriber::fmt::Subscriber;
 
@@ -30,14 +29,13 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
     let window_size = window.inner_size();
-    let instance = wgpu::Instance::default();
-    let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+    let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
         backends: wgpu::Backend::Gl.into(),
-        dx12_shader_compiler: wgpu::Dx12Compiler::default(),
         ..Default::default()
     });
 
     let surface = instance.create_surface(window.as_ref()).unwrap();
+    // SAFETY: event_loop 闭包同时持有 window 和 surface，且 surface 在闭包退出前不会脱离 window 使用。
     let surface: Surface<'static> = unsafe { transmute(surface) };
     let adapter = instance
         .request_adapter(&wgpu::RequestAdapterOptions {
@@ -50,7 +48,6 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         .expect("Failed to find an appropriate adapter");
 
     // Create the logical device and command queue
-    let mut allocator = Allocator::new(128 * 1024 * 1024);
     let (device, queue) = adapter
         .request_device(
             &wgpu::DeviceDescriptor {
@@ -59,9 +56,10 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
                 // Make sure we use the texture resolution limits from the adapter, so we can support images the size of the swapchain.
                 required_limits: wgpu::Limits::downlevel_webgl2_defaults()
                     .using_resolution(adapter.limits()),
+                memory_hints: Default::default(),
+                trace: Default::default(),
             },
             None,
-            // &mut allocator,
         )
         .await
         .expect("Failed to create device");
@@ -74,15 +72,6 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
             defines: Default::default(),
         },
     });
-    let vs2 = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-        label: None,
-        source: wgpu::ShaderSource::Glsl {
-            shader: include_str!("../source/sdf1.vs").into(),
-            stage: naga::ShaderStage::Vertex,
-            defines: Default::default(),
-        },
-    });
-
     // Load the shaders from disk
     let fs = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: None,
@@ -93,24 +82,15 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         },
     });
 
-    let fs2 = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-        label: None,
-        source: wgpu::ShaderSource::Glsl {
-            shader: include_str!("../source/sdf1.fs").into(),
-            stage: naga::ShaderStage::Fragment,
-            defines: Default::default(),
-        },
-    });
-
-    let buffer = std::fs::read("./source/wdyk-Reg.TTF").unwrap();
+    let buffer = std::fs::read("./source/ht.woff2").unwrap();
     // let buffer = std::fs::read("./source/wdyk.woff2").unwrap();
     let mut ft_face = { FontFace::new(Arc::new(buffer)) };
-    let g = ft_face.glyph_index('□');
+    let g = ft_face.glyph_index('.');
     println!("=============g: {}", g);
     println!("max_box_normaliz: {:?}", ft_face.max_box_normaliz());
     let pxrange = 10;
     let time = std::time::Instant::now();
-    let mut outline_info = ft_face.to_outline('【');
+    let mut outline_info = ft_face.to_outline('.');
 
     // println!("===================plane_bounds: {:?}", plane_bounds);
     let result_arcs = outline_info.compute_near_arcs(2.0);
@@ -175,10 +155,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
     let translation = vec![font_size, font_size, 10.0, 10.0];
 
     let vertexs = [
-        0.0f32, 0.0, 0.0, 0.0,
-         0.0, 1.0, 0.0, 1.0, 
-         1.0, 0.0, 1.0, 0.0, 
-         1.0, 1.0, 1.0, 1.0,
+        0.0f32, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0,
     ]; // 获取网格数据
     println!("vertexs: {:?}", vertexs);
 
@@ -292,8 +269,8 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
 
     let sdf_tex_sampler = device.create_sampler(&&wgpu::SamplerDescriptor {
         label: None,
-        // min_filter: wgpu::FilterMode::Linear,
-        // mag_filter: wgpu::FilterMode::Linear,
+        min_filter: wgpu::FilterMode::Linear,
+        mag_filter: wgpu::FilterMode::Linear,
         // mipmap_filter: wgpu::FilterMode::Linear,
         ..Default::default()
     });
@@ -364,7 +341,7 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
 
     let swapchain_capabilities = surface.get_capabilities(&adapter);
     println!("swapchain_format: {:?}", swapchain_capabilities.formats);
-    let swapchain_format = swapchain_capabilities.formats[1];
+    let swapchain_format = swapchain_capabilities.formats[0];
     // println!("swapchain_format: {:?}", swapchain_capabilities.formats);
     // 创建网格数据
     let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -397,7 +374,8 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         layout: Some(&pipeline_layout),
         vertex: wgpu::VertexState {
             module: &vs,
-            entry_point: "main",
+            entry_point: Some("main"),
+            compilation_options: Default::default(),
             buffers: &[
                 wgpu::VertexBufferLayout {
                     array_stride: std::mem::size_of::<[f32; 4]>() as wgpu::BufferAddress,
@@ -421,51 +399,15 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
         },
         fragment: Some(wgpu::FragmentState {
             module: &fs,
-            entry_point: "main",
+            entry_point: Some("main"),
+            compilation_options: Default::default(),
             targets: &[Some(tt)],
         }),
         primitive,
         depth_stencil: None,
         multisample: wgpu::MultisampleState::default(),
         multiview: None,
-    });
-
-    let render_pipeline2 = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: None,
-        layout: Some(&pipeline_layout),
-        vertex: wgpu::VertexState {
-            module: &vs2,
-            entry_point: "main",
-            buffers: &[
-                wgpu::VertexBufferLayout {
-                    array_stride: std::mem::size_of::<[f32; 4]>() as wgpu::BufferAddress,
-                    step_mode: wgpu::VertexStepMode::Vertex,
-                    attributes: &[wgpu::VertexAttribute {
-                        format: wgpu::VertexFormat::Float32x4,
-                        offset: 0,
-                        shader_location: 0,
-                    }],
-                },
-                wgpu::VertexBufferLayout {
-                    array_stride: std::mem::size_of::<[f32; 4]>() as wgpu::BufferAddress,
-                    step_mode: wgpu::VertexStepMode::Instance,
-                    attributes: &[wgpu::VertexAttribute {
-                        format: wgpu::VertexFormat::Float32x4,
-                        offset: 0,
-                        shader_location: 1,
-                    }],
-                },
-            ],
-        },
-        fragment: Some(wgpu::FragmentState {
-            module: &fs2,
-            entry_point: "main",
-            targets: &[Some(ColorTargetState::from(wgpu::TextureFormat::R8Unorm))],
-        }),
-        primitive,
-        depth_stencil: None,
-        multisample: wgpu::MultisampleState::default(),
-        multiview: None,
+        cache: None,
     });
 
     // println!("render_pipeline: {:?}", render_pipeline);
@@ -483,28 +425,11 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
 
     surface.configure(&device, &config);
 
-    let texture_extent = wgpu::Extent3d {
-        width: 2048,
-        height: 2048,
-        depth_or_array_layers: 1,
-    };
-    let fbo = device.create_texture(&wgpu::TextureDescriptor {
-        label: Some("FBO"),
-        size: texture_extent,
-        mip_level_count: 1,
-        sample_count: 1,
-        dimension: wgpu::TextureDimension::D2,
-        format: wgpu::TextureFormat::R8Unorm,
-        usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
-        view_formats: &[],
-    });
-    let mut is_first = true;
-
     event_loop.run(move |event, _, control_flow| {
         // Have the closure take ownership of the resources.
         // `event_loop.run` never returns, therefore we must do this to ensure
         // the resources are properly cleaned up.
-        // let _ = (&instance, &adapter, &shader, &pipeline_layout);
+        let _ = (&instance, &adapter);
 
         *control_flow = ControlFlow::Wait;
         // println!("=========1");
@@ -526,40 +451,6 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
             Event::RedrawRequested(_) => {
                 let mut encoder =
                     device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
-
-                // if is_first {
-                //     is_first = false;
-                    let fbo_view = fbo.create_view(&wgpu::TextureViewDescriptor::default());
-                    {
-                        let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                            label: None,
-                            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                                view: &fbo_view,
-                                resolve_target: None,
-                                ops: wgpu::Operations {
-                                    load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                                    store: wgpu::StoreOp::Store,
-                                },
-                            })],
-                            depth_stencil_attachment: None,
-                            timestamp_writes: None,
-                            occlusion_query_set: None,
-                        });
-                        // rpass.push_debug_group("Prepare data for draw.");
-                        rpass.set_pipeline(&render_pipeline2);
-                        rpass.set_viewport(128., 128., 512., 512., 0., 1.);
-                        rpass.set_bind_group(0, &bind_group0, &[]);
-                        rpass.set_bind_group(1, &bind_group1, &[]);
-                        // rpass.set_bind_group(2, &bind_group2, &[]);
-
-                        rpass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-                        rpass.set_vertex_buffer(0, vertex_buffer.slice(..));
-                        rpass.set_vertex_buffer(1, translation_buffer.slice(..));
-                        // rpass.set_vertex_buffer(2, u_info_buffer.slice(..));
-
-                        rpass.draw_indexed(0..6, 0, 0..1 as u32);
-                    }
-                // }
 
                 let frame = surface
                     .get_current_texture()
@@ -584,6 +475,15 @@ async fn run(event_loop: EventLoop<()>, window: Arc<Window>) {
                         occlusion_query_set: None,
                     });
                     // rpass.push_debug_group("Prepare data for draw.");
+                    rpass.set_viewport(
+                        0.0,
+                        0.0,
+                        config.width as f32,
+                        config.height as f32,
+                        0.0,
+                        1.0,
+                    );
+                    rpass.set_scissor_rect(0, 0, config.width, config.height);
                     rpass.set_pipeline(&render_pipeline);
 
                     rpass.set_bind_group(0, &bind_group0, &[]);
