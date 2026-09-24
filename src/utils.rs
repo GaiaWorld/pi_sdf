@@ -814,9 +814,11 @@ pub fn encode_sdf(
 
     // 初始化所有纹理点的值为0
     let mut data = vec![0; tex_size * tex_size]; // 创建一个一维数组用于存储最终的纹理数据
+    // 记录被 cell（近邻圆弧）覆盖的 texel：这些点用局部圆弧求出的符号可信
+    let mut covered = vec![false; tex_size * tex_size];
 
     // 遍历每个网格点（cell），每个cell对应一个弧段列表，以及该cell在矢量形状包围盒中的所在区域
-    for (near_arcs, cell) in arcs_info {  // 遍历每个预处理好的单元格
+    for (near_arcs, cell) in &arcs_info {  // 遍历每个预处理好的单元格
         if let Some(ab) = cell.collision(extents) { // 确定该单元格是否在矢量过程中实际占用空间
             // Compute the relative positions for this tile in texture space中将包围盒偏移一个单元尺寸，以适合整数坐标计算
             let begin = ab.mins - extents.mins; // 将包围盒的起点坐标系原点设为中心点坐标系下的张量起点，便于计算
@@ -854,25 +856,60 @@ pub fn encode_sdf(
                     let r = compute_sdf2(
                         global_arcs,
                         p,
-                        &near_arcs,
+                        near_arcs,
                         distance,
                         width,
                         is_outer_glow,
                         is_reverse,
+                        false,
                     );
 
                     // 根据是否是_svg模式，调整点p在数据数组中的索引。_svg模式则不需要颠倒y轴，否则颠倒y轴以适应纹理坐标系
                     if is_svg {
                         // 对SVG不存在颠倒，索引i,j直接访问
                         data[j * tex_size + i] = r.0;
+                        covered[j * tex_size + i] = true;
                     } else {
                         // 非-svg模式下，颠倒y轴，将纹理的y轴坐标从下往上存储，即(y) -> (tex_size - 1 - y)
                         data[(tex_size - j - 1) * tex_size + i] = r.0;
+                        covered[(tex_size - j - 1) * tex_size + i] = true;
                     }
                 }
             }
         }
     }
+
+    // cell 只覆盖字形周围约 3 倍字形尺寸的范围；纹理其余部分（padding）原本恒为 0（= 无限远），
+    // 小字形的描边/外发光采样到那里就会消失。这里把未覆盖的 texel 用全局圆弧补成真实距离。
+    // 只有宽度小于 distance 的窄小字形才会出现未覆盖 texel，且这类字形圆弧很少，代价很小；
+    // 字形较大时直接跳过，零额外开销。
+    if covered.iter().any(|c| !*c) {
+        let all_arcs: Vec<usize> = (0..global_arcs.len()).collect();
+        for j in 0..tex_size {
+            for i in 0..tex_size {
+                let idx = if is_svg { j * tex_size + i } else { (tex_size - j - 1) * tex_size + i };
+                if covered[idx] {
+                    continue;
+                }
+                let p = Point::new(
+                    (i as f32 + 0.5) * unit_d + extents.mins.x,
+                    (j as f32 + 0.5) * unit_d + extents.mins.y,
+                );
+                let r = compute_sdf2(
+                    global_arcs,
+                    p,
+                    &all_arcs,
+                    distance,
+                    width,
+                    is_outer_glow,
+                    is_reverse,
+                    true,
+                );
+                data[idx] = r.0;
+            }
+        }
+    }
+
     data // 返回生成的纹理数据
 }
 /// 计算SDF的函数，用于对每个点p进行采样，计算其对应SDF的值。
@@ -901,6 +938,7 @@ pub fn compute_sdf2(
     width: Option<f32>,             // 宽度参数，可能影响中心点的处理。
     is_outer_glow: bool,            // 是否外发光效果。
     is_reverse: Option<bool>,       // 是否反转颜色通道。
+    force_outside: bool,            // 强制取正号：cell 外扩出来的 padding 必然在字形之外，符号不可靠
 ) -> (u8, f32, f32) {
     let mut sdf = glyphy_sdf_from_arc_list3(near_arcs, p.clone(), global_arcs).0;
     // 去除浮点误差
@@ -910,6 +948,10 @@ pub fn compute_sdf2(
         if is_reverse {
             sdf = -sdf;
         }
+    }
+    if force_outside {
+        // padding 必然在字形之外，取正号
+        sdf = sdf.abs();
     }
     if let Some(_) = width {
         sdf = sdf.abs(); // - (width * 0.5);
